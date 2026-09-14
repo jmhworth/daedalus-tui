@@ -460,6 +460,8 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
         self.stages = tuple(str(stage) for stage in self.settings["activation_progress_stages"])
         self._running = True
         self._current_stage_index = -1
+        self._pending_progress: str | None = None
+        self._pending_finish: tuple[bool, str] | None = None
 
     @property
     def running(self) -> bool:
@@ -502,8 +504,26 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
                     disabled=True,
                 )
 
+    def on_mount(self) -> None:
+        """Apply worker results that arrived while this modal was mounting."""
+        if self._pending_progress is not None:
+            message = self._pending_progress
+            self._pending_progress = None
+            self._update_progress(message)
+        if self._pending_finish is not None:
+            succeeded, detail = self._pending_finish
+            self._pending_finish = None
+            self._apply_finish(succeeded, detail)
+
     def update_progress(self, message: str) -> None:
         """Mark the current activation phase and retain a readable status line."""
+        if not self._is_mounted:
+            self._pending_progress = message
+            return
+        self._update_progress(message)
+
+    def _update_progress(self, message: str) -> None:
+        """Update mounted progress widgets for one worker phase."""
         self.query_one("#personal-supabase-progress-status", Static).update(message)
         stage_index = self._STAGE_MESSAGES.get(message)
         if stage_index is None:
@@ -531,6 +551,13 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
     def finish(self, succeeded: bool, detail: str) -> None:
         """Freeze the progress display and allow the operator to close it."""
         self._running = False
+        if not self._is_mounted:
+            self._pending_finish = (succeeded, detail)
+            return
+        self._apply_finish(succeeded, detail)
+
+    def _apply_finish(self, succeeded: bool, detail: str) -> None:
+        """Render a completion state after all modal widgets are mounted."""
         if succeeded:
             for index, _stage in enumerate(self.stages):
                 self.query_one(f"#personal-supabase-progress-step-{index}", Static).update(
@@ -1593,7 +1620,14 @@ class DaedalusTuiApp(App[None]):
             self._set_error("Select an operating/target branch before Activate.")
             self._set_status("Personal Supabase Activate blocked")
             return
-        self._start_personal_supabase_activate(project_path, schema, operating_branch)
+        # Screen.dismiss invokes this callback before it pops the confirmation
+        # screen. Defer the push so the progress screen remains on top.
+        self.call_after_refresh(
+            self._start_personal_supabase_activate,
+            project_path,
+            schema,
+            operating_branch,
+        )
 
     def _start_personal_supabase_activate(
         self,

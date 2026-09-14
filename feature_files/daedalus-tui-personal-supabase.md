@@ -67,3 +67,4 @@ HACKING
 - 2026-09-13: Added an exact-project-name confirmation gate to both registration entry points so shared-Supabase linking is always deliberate.
 - 2026-09-14: Moved existing-project schema registration from the task bar to the `Ctrl+Shift+S` shortcut.
 - 2026-09-14: Added a non-dismissible-during-work activation progress modal with scaffold, Git, environment, connectivity, migration, completion, blocked, and already-activated states.
+- 2026-09-14: Deferred activation until the confirmation modal is popped and buffered fast worker updates until the progress modal is mounted.
