@@ -920,7 +920,7 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "- Agents must not run `supabase db push`; orchestration owns remote migration apply "
         "after verification when `supabase/migrations/` changes, and Activate owns the first apply.\n"
         "- File scaffolding alone is not ecosystem-ready; the operator must Activate via Daedalus "
-        "(`Ctrl+Shift+S`) so the software layer commits the scaffold and pushes migrations.\n"
+        "(`F4`) so the software layer commits the scaffold and pushes migrations.\n"
         "- After the first remote apply, the operator must allow-list this schema in the "
         "Supabase Dashboard Data API / PostgREST exposed-schemas settings.\n"
     )

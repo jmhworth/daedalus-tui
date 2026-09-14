@@ -17,7 +17,7 @@ ecosystem-ready.
   `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
   claim ecosystem readiness.
-- **Phase 2 — Activate**: Operator `Ctrl+Shift+S` after name confirmation runs
+- **Phase 2 — Activate**: Operator `F4` after name confirmation runs
   scaffold (when unregistered) then Activate when gates pass: require HEAD already
   on the selected operating/target branch (no checkout/switch), refuse unrelated
   dirty files, software-owned local commit of known scaffold paths + marker, launch-root
@@ -25,7 +25,7 @@ ecosystem-ready.
   remains the optional operator Push button.
 - **Existing projects only**: Personal Supabase is post-init for projects already
   in the Daedalus format. New Project has no personal-Supabase opt-in.
-- **Retry**: Scaffolded or Activate-blocked projects reuse `Ctrl+Shift+S` with the
+- **Retry**: Scaffolded or Activate-blocked projects reuse `F4` with the
   same name confirmation; skip re-scaffold when registered, validate completeness,
   and re-run Phase 2. Incomplete scaffolds fail closed.
 - **Status model**: Distinguish unregistered, scaffolded (`registered`, not
@@ -51,7 +51,7 @@ ecosystem-ready.
   preflight, Activate orchestration, canonical environment bootstrap, and temporary
   CLI configuration.
 - `tui/environment.py`: Comment-preserving atomic `.env` synchronization and runtime loading.
-- `tui/app.py`: Confirmation modal, activation progress modal, and `Ctrl+Shift+S` scaffold+Activate / retry worker.
+- `tui/app.py`: Confirmation modal, activation progress modal, and `F4` scaffold+Activate / retry worker.
 - `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation copy,
   activate commit message, and preflight timeout.
@@ -62,10 +62,10 @@ HACKING
 
 ## State Log
 - 2026-09-14: Renamed the progress modal's activation-state flag to avoid colliding with Textual's internal message-pump lifecycle field, restoring modal composition and completion rendering.
-- 2026-09-14: Redesigned personal Supabase into Phase 1 scaffold plus Phase 2 Activate with operating-branch Git gate, live preflight, activated-only launch push, and Ctrl+Shift+S retry; removed New Project opt-in.
+- 2026-09-14: Redesigned personal Supabase into Phase 1 scaffold plus Phase 2 Activate with operating-branch Git gate, live preflight, activated-only launch push, and F4 retry; removed New Project opt-in.
 - 2026-09-13: Added launch-root canonical environment synchronization and idempotent bootstrap preparation for all discovered registered projects.
 - 2026-09-13: Added file-only personal Supabase schema registration with New Project checkbox, task-bar button, profile guidance, and target `.env.example` placeholders.
 - 2026-09-13: Added an exact-project-name confirmation gate to both registration entry points so shared-Supabase linking is always deliberate.
-- 2026-09-14: Moved existing-project schema registration from the task bar to the `Ctrl+Shift+S` shortcut.
+- 2026-09-14: Moved existing-project schema registration from the task bar to the `F4` shortcut.
 - 2026-09-14: Added a non-dismissible-during-work activation progress modal with scaffold, Git, environment, connectivity, migration, completion, blocked, and already-activated states.
 - 2026-09-14: Deferred activation until the confirmation modal is popped and buffered fast worker updates until the progress modal is mounted.
