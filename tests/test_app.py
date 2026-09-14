@@ -202,16 +202,21 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.query_one("#retry-button", Button), Button)
             self.assertIsInstance(app.query_one("#continue-plan-button", Button), Button)
             self.assertIsInstance(app.query_one("#start-coding-button", Button), Button)
-            self.assertIsInstance(app.query_one("#new-task-button", Button), Button)
-            self.assertIsInstance(app.query_one("#create-topic-button", Button), Button)
-            self.assertIsInstance(app.query_one("#register-supabase-schema-button", Button), Button)
-            self.assertFalse(app.query_one("#register-supabase-schema-button", Button).disabled)
+            self.assertEqual(app.query("#new-task-button, #new-project-button").nodes, [])
+            self.assertEqual(
+                app.query("#create-topic-button, #register-supabase-schema-button").nodes,
+                [],
+            )
+            self.assertEqual(
+                [binding[0] for binding in app.BINDINGS if len(binding) > 3 and binding[3]],
+                ["ctrl+k"],
+            )
             self.assertIsInstance(app.query_one("#view-topic-button", Button), Button)
             self.assertTrue(app.query_one("#view-topic-button", Button).disabled)
             self.assertIsInstance(app.query_one("#output-toggle-button", Button), Button)
             await pilot.pause()
 
-    async def test_register_supabase_schema_button_disables_when_registered(self):
+    async def test_register_supabase_schema_shortcut_opens_confirmation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             project = root / "demo-app"
@@ -233,9 +238,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 coordinator=FakeCoordinator(),
             )
             async with app.run_test() as pilot:
-                button = app.query_one("#register-supabase-schema-button", Button)
-                self.assertFalse(button.disabled)
-                app.action_register_personal_supabase()
+                await pilot.press("ctrl+shift+s")
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
                 self.assertFalse((project / "supabase" / "config.toml").exists())
@@ -255,7 +258,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(confirmation_button.disabled)
                 await app.screen.dismiss(True)
                 await pilot.pause()
-                self.assertTrue(button.disabled)
                 self.assertTrue((project / "supabase" / "config.toml").is_file())
                 self.assertIn(
                     "Registered Supabase schema",
@@ -299,7 +301,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.query_one("#task-sidebar").styles.height.value, 6)
             self.assertEqual(app.query_one("#prompt-input").styles.height.value, 3)
             self.assertEqual(app.query_one("#compact-settings").styles.display, "block")
-            self.assertEqual(app.query_one("#new-project-button").styles.display, "block")
+            self.assertEqual(app.query("#new-project-button").nodes, [])
 
             await pilot.resize_terminal(180, 40)
             await pilot.pause()
@@ -996,13 +998,17 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Ctrl+K", shortcut_text)
             self.assertIn("Ctrl+P", shortcut_text)
             self.assertIn("Ctrl+T", shortcut_text)
+            self.assertIn("Ctrl+U", shortcut_text)
+            self.assertIn("Ctrl+Shift+N", shortcut_text)
+            self.assertIn("Ctrl+Shift+T", shortcut_text)
+            self.assertIn("Ctrl+Shift+S", shortcut_text)
             self.assertIn("gg / G", shortcut_text)
 
             await pilot.press("escape")
             await pilot.pause()
             self.assertNotIsInstance(app.screen, KeyboardShortcutsScreen)
 
-    async def test_ctrl_t_opens_coding_statistics_with_usage_columns_and_metrics(self):
+    async def test_ctrl_u_opens_coding_statistics_with_usage_columns_and_metrics(self):
         app, coordinator = self.make_app()
         async with app.run_test() as pilot:
             prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
@@ -1010,7 +1016,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_submit_prompt()
             coordinator.records[0].tokens_consumed = 165
             coordinator.records[0].status = "completed"
-            await pilot.press("ctrl+t")
+            await pilot.press("ctrl+u")
             await pilot.pause()
 
             self.assertIsInstance(app.screen, CodingStatisticsScreen)
@@ -1223,7 +1229,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_submit_prompt()
             await pilot.pause()
 
-            app.query_one("#new-task-button", Button).press()
+            await pilot.press("ctrl+t")
             await pilot.pause()
 
             self.assertEqual(prompt.text, "")
@@ -1241,7 +1247,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             record.status = "failed"
             record.phase = "Failed"
             coordinator.emit(record, "failed", "The task failed.", "error")
-            app.query_one("#new-task-button", Button).press()
+            app.action_new_task()
             await pilot.pause()
             task_list = app.query_one("#task-list", DataTable)
             task_list.move_cursor(row=0, column=0)

@@ -4,7 +4,7 @@
 The coding statistics tracker presents local task token usage and derived provider and time-window statistics from the TUI's persisted task history.
 
 ## Key Points
-- `Ctrl+T` opens a modal coding statistics view and is listed in the keyboard shortcuts menu.
+- `Ctrl+U` opens a modal coding statistics view and is listed in the keyboard shortcuts menu.
 - The left panel lists each task timestamp, provider, and recorded token total.
 - The top metrics show cumulative usage, current-local-day usage, and a monthly projection extrapolated from current-month-to-date usage.
 - The view toggles between token and task units; task counts use the same completed-task records as token accounting.
@@ -33,3 +33,4 @@ HACKING
 - 2026-08-20: Corrected the statistics layout regression fixture to mark its submitted task completed so it exercises real usage-row sizing.
 - 2026-08-23: Replaced cross-provider average and percentage splits with per-provider averages and absolute usage totals.
 - 2026-08-25: Changed weekly and monthly projections to extrapolate current calendar week/month-to-date usage so volatile daily usage is reflected without older history dilution.
+- 2026-09-14: Moved the coding statistics shortcut from `Ctrl+T` to `Ctrl+U` so `Ctrl+T` can provide a convenient New Task action.

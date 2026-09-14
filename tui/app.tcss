@@ -83,16 +83,6 @@ Screen {
     align: left middle;
 }
 
-#new-task-button {
-    width: 14;
-}
-
-#new-project-button, #create-topic-button, #register-supabase-schema-button {
-    width: auto;
-    min-width: 16;
-    margin-right: 1;
-}
-
 #settings Select {
     width: 1fr;
     margin-right: 1;

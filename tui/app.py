@@ -127,10 +127,13 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+P", "Pause task", "pause_task"),
     ("Ctrl+R", "Resume task", "resume_task"),
     ("Ctrl+X", "Cancel task", "cancel_task"),
-    ("Ctrl+N", "New project", "show_new_project"),
+    ("Ctrl+Shift+N", "New project", "show_new_project"),
+    ("Ctrl+Shift+T", "Create topic", "show_create_topic"),
+    ("Ctrl+Shift+S", "Register Supabase schema", "register_personal_supabase"),
+    ("Ctrl+T", "New task", "new_task"),
     ("Ctrl+Q", "Quit", "quit"),
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
-    ("Ctrl+T", "Show coding statistics", "show_statistics"),
+    ("Ctrl+U", "Show coding statistics", "show_statistics"),
 )
 
 _ACTIVE_TASK_STATUSES = {
@@ -156,7 +159,7 @@ SHORTCUT_SECTIONS = (
         (
             ("j / k", "Scroll output down / up"),
             ("gg / G", "Scroll to output start / end"),
-            ("Ctrl+D / Ctrl+U", "Scroll one page down / up"),
+            ("Ctrl+D / PageUp", "Scroll one page down / up"),
             ("y", "Copy selected text"),
             ("p", "Paste into the prompt"),
             ("i", "Focus the prompt"),
@@ -659,7 +662,7 @@ class CodingStatisticsScreen(ModalScreen[None]):
 
     BINDINGS = [
         ("escape", "close_statistics", "Close"),
-        ("ctrl+t", "close_statistics", "Close"),
+        ("ctrl+u", "close_statistics", "Close"),
     ]
 
     def __init__(
@@ -704,7 +707,7 @@ class CodingStatisticsScreen(ModalScreen[None]):
                     yield Static(id="seven-day-metric", classes="statistics-value")
                     yield Static(id="thirty-day-statistic", classes="statistics-value")
                     yield Static(id="provider-split", classes="statistics-value")
-            yield Static("Press Esc or Ctrl+T to close", id="coding-statistics-footer")
+            yield Static("Press Esc or Ctrl+U to close", id="coding-statistics-footer")
 
     def on_mount(self) -> None:
         self._refresh_statistics_view()
@@ -819,7 +822,10 @@ class DaedalusTuiApp(App[None]):
     # Keep Textual's arbitrary text selection enabled for labels, logs, and
     # other non-editor widgets. TextArea has its own native selection model.
     ALLOW_SELECT = True
-    BINDINGS = [(shortcut.lower(), action, description) for shortcut, description, action in GLOBAL_SHORTCUTS]
+    BINDINGS = [
+        (shortcut.lower(), action, description, shortcut == "Ctrl+K")
+        for shortcut, description, action in GLOBAL_SHORTCUTS
+    ]
 
     def __init__(
         self,
@@ -914,13 +920,6 @@ class DaedalusTuiApp(App[None]):
                             allow_blank=False,
                             id="project-select",
                         )
-                        yield Button("New Project", id="new-project-button")
-                        yield Button("Create Topic", id="create-topic-button", variant="primary")
-                        yield Button(
-                            "Register Supabase Schema",
-                            id="register-supabase-schema-button",
-                        )
-                        yield Button("New Task", id="new-task-button", variant="primary")
                     with Horizontal(id="settings"):
                         yield Select(
                             [(option.label, option.value) for option in self.settings.providers],
@@ -1131,7 +1130,6 @@ class DaedalusTuiApp(App[None]):
         self._apply_provider_selection(str(self.query_one("#provider-select", Select).value))
         self._refresh_target_branch_select()
         self._refresh_topic_select()
-        self._refresh_personal_supabase_button()
         self._refresh_push_button()
         self._refresh_task_list()
         self._refresh_compact_setting_value()
@@ -1167,7 +1165,7 @@ class DaedalusTuiApp(App[None]):
             self._set_status("g-")
             event.stop()
             return
-        if key in {"j", "k", "G", "ctrl+d", "ctrl+u", "y", "p", "i"}:
+        if key in {"j", "k", "G", "ctrl+d", "pageup", "y", "p", "i"}:
             self._handle_vim_key(key)
             event.stop()
 
@@ -1417,7 +1415,6 @@ class DaedalusTuiApp(App[None]):
             return
         if is_personal_supabase_registered(project_path, schema):
             self._set_status(f"Schema {schema!r} already registered")
-            self._refresh_personal_supabase_button()
             return
         self._set_status("Confirm personal Supabase schema registration…")
         self.push_screen(
@@ -1442,13 +1439,11 @@ class DaedalusTuiApp(App[None]):
         if result.status != "success":
             self._set_error(result.message)
             self._set_status("Supabase schema registration failed")
-            self._refresh_personal_supabase_button()
             return
         if result.already_registered:
             self._set_status(f"Schema {schema!r} already registered")
         else:
             self._set_status(f"Registered Supabase schema {schema!r}")
-        self._refresh_personal_supabase_button()
 
     def action_view_topic(self) -> None:
         """Open the selected project topic in a read-only modal."""
@@ -1467,14 +1462,6 @@ class DaedalusTuiApp(App[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "send-button":
             self._submit_prompt()
-        elif event.button.id == "new-task-button":
-            self._start_new_task()
-        elif event.button.id == "new-project-button":
-            self.action_show_new_project()
-        elif event.button.id == "create-topic-button":
-            self.action_show_create_topic()
-        elif event.button.id == "register-supabase-schema-button":
-            self.action_register_personal_supabase()
         elif event.button.id == "view-topic-button":
             self.action_view_topic()
         elif event.button.id == "push-branch-button":
@@ -2164,24 +2151,6 @@ class DaedalusTuiApp(App[None]):
             return
         self.query_one("#view-topic-button", Button).disabled = self._selected_topic() is None
 
-    def _refresh_personal_supabase_button(self) -> None:
-        """Disable registration when the active project already claimed its schema."""
-        if not self.query("#register-supabase-schema-button"):
-            return
-        button = self.query_one("#register-supabase-schema-button", Button)
-        project_path = self._active_project_path
-        try:
-            schema = schema_from_project_root(project_path)
-            registered = is_personal_supabase_registered(project_path, schema)
-        except ValueError:
-            registered = False
-            schema = None
-        button.disabled = registered
-        if registered and schema:
-            button.tooltip = f"Schema {schema!r} already registered"
-        else:
-            button.tooltip = "Claim a dedicated schema on the shared personal Supabase database"
-
     def _usage_entries(self):
         try:
             persisted = usage_entries_from_memory(self.memory)
@@ -2240,7 +2209,6 @@ class DaedalusTuiApp(App[None]):
         self.query_one("#directory", Static).update(self._directory_text())
         self._refresh_target_branch_select()
         self._refresh_topic_select()
-        self._refresh_personal_supabase_button()
         self._refresh_task_list()
         self._render_selected_task_safely("project switch")
         if draft is not None:
@@ -2290,10 +2258,7 @@ class DaedalusTuiApp(App[None]):
                 self._switch_project(target)
             else:
                 self.query_one("#directory", Static).update(self._directory_text())
-                self._refresh_personal_supabase_button()
             self.query_one("#project-select", Select).value = self._project_select_value()
-        else:
-            self._refresh_personal_supabase_button()
 
     def _refresh_project_selector(self) -> None:
         project_select = self.query_one("#project-select", Select)
@@ -2945,7 +2910,7 @@ class DaedalusTuiApp(App[None]):
             self._scroll_output("end")
         elif key == "ctrl+d":
             self._scroll_output("page_down")
-        elif key == "ctrl+u":
+        elif key == "pageup":
             self._scroll_output("page_up")
         elif key == "y":
             self._copy_selection()

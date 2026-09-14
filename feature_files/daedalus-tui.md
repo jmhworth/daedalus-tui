@@ -11,8 +11,8 @@ The standalone Daedalus TUI is an installable Textual application that runs from
   Branch Select for the operating branch used by new task worktrees, with an
   operator Push control that publishes that branch to `origin`.
 - **Responsive layouts**: Terminal resize events switch narrow screens to a
-  vertical workspace with a compact full-width task inbox and stacked toolbar
-  actions. The wide task and settings bars are measured after layout, so the
+  vertical workspace with a compact full-width task inbox and stacked project
+  selector. The wide task and settings bars are measured after layout, so the
   compact category/value picker appears when a control is actually clipped or
   when a settings selector falls below its parameterized readable width; a
   conservative parameterized safety guard covers very narrow or not-yet-laid-
@@ -35,12 +35,13 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Readable streamed output**: Assistant messages are separated by a blank line, transcript lines reflow at word boundaries with hyphenation only for overlong words, and the output pane keeps a small width buffer so long responses remain visible.
 - **Incremental Vim input**: The prompt uses a modal VimTextArea with a practical command subset; additional Vim commands can be added as they become useful instead of implementing the entire Vim language up front.
 - **Project selection**: Launching from a root directory discovers only immediate child directories with `feature_files` folders; nested descendants are excluded, and the launch root is used only as a fallback when no eligible child exists. The task toolbar selects the project for new submissions, editable prompt drafts survive project switches, and focusing an inbox row synchronizes the active project without mixing transcripts or worktrees. Each project's remembered operating branch is restored independently when focus returns.
-- **Project initialization**: New Project materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
+- **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Stable task inbox layout**: The task inbox uses fixed, parameterized marker/project/task/status widths and visible ellipses so background update markers cannot resize or horizontally scroll the sidebar.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
+- **Keyboard-first actions**: Low-frequency actions stay out of the project toolbar and are available through `Ctrl+Shift+N` (new project), `Ctrl+Shift+T` (create topic), `Ctrl+Shift+S` (register Supabase schema), and `Ctrl+T` (new task); `Ctrl+U` opens coding statistics, while `Ctrl+K` opens the shortcut reference and is the only global binding shown in the bottom footer.
 
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
@@ -159,3 +160,4 @@ HACKING
 - 2026-09-05: Removed the blank option from the project selector so direct-child labels are the only displayed project choices.
 - 2026-09-13: Added opt-in personal shared-Supabase schema registration from New Project and the project task bar (file scaffolding only).
 - 2026-09-13: Repaired Textual 8.2 compatibility for responsive styling and compact selector cascades, including delayed event filtering and Scalar-aware resize assertions.
+- 2026-09-14: Replaced low-frequency project-toolbar actions with keyboard shortcuts, moved coding statistics to `Ctrl+U`, and kept only the `Ctrl+K` shortcut-reference binding visible in the footer.

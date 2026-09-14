@@ -18,9 +18,9 @@ project's ignored `.env`, and asks orchestration to push its migration.
 - **New Project opt-in**: Checkbox on the New Project modal; when selected, a separate
   confirmation requires typing the project name before registration runs after template
   materialization and before the initial `git add`/`git commit`.
-- **Existing-project action**: Task-bar button beside New Project / Create Topic opens the
-  same confirmation, requiring the selected project's name before scaffolding the schema;
-  it disables once registered for that schema.
+- **Existing-project action**: The `Ctrl+Shift+S` shortcut opens the same
+  confirmation, requiring the selected project's name before scaffolding the
+  schema; repeated registration remains a no-op for that schema.
 - **Deliberate linking**: The confirmation warns that registration joins the operator's
   internal shared-Supabase ecosystem, and the Register action remains disabled until the
   exact project name is entered.
@@ -47,7 +47,8 @@ project's ignored `.env`, and asks orchestration to push its migration.
   scaffold validation, and temporary CLI configuration.
 - `tui/environment.py`: Comment-preserving atomic `.env` synchronization and runtime loading.
 - `tui/project_initializer.py`: Optional `registerPersonalSupabase` flag wired pre-commit.
-- `tui/app.py`: New Project checkbox, confirmation modal, and task-bar Register Supabase Schema button.
+- `tui/app.py`: New Project checkbox, confirmation modal, and the
+  `Ctrl+Shift+S` Register Supabase Schema shortcut.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env key definitions, required shared
   settings, and migration filename.
 - `tests/test_personal_supabase.py`, `tests/test_app.py`, `tests/test_project_initializer.py`: Coverage.
@@ -59,3 +60,4 @@ HACKING
 - 2026-09-13: Added launch-root canonical environment synchronization and idempotent bootstrap preparation for all discovered registered projects.
 - 2026-09-13: Added file-only personal Supabase schema registration with New Project checkbox, task-bar button, profile guidance, and target `.env.example` placeholders.
 - 2026-09-13: Added an exact-project-name confirmation gate to both registration entry points so shared-Supabase linking is always deliberate.
+- 2026-09-14: Moved existing-project schema registration from the task bar to the `Ctrl+Shift+S` shortcut.
