@@ -79,5 +79,8 @@
   "77": ".cursor_shape",
   "78": ".enter_insert_mode",
   "79": ".nav_word_end",
-  "80": ".edit_paste_after"
+  "80": ".edit_paste_after",
+  "81": ".on_data_table_row_selected",
+  "82": ".on_resize",
+  "83": ".edit_paste_before"
 }
