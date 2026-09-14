@@ -27,7 +27,7 @@ If this project has a `[personal_supabase]` registration in `.daedalus`, its
 schema is project-specific but shared connection details belong to the Daedalus
 launch-root `.env`. Daedalus synchronizes the ignored project `.env` at launch.
 Never commit credentials, use the `public` schema, or run `supabase db push`;
-orchestration prepares and applies migrations.
+orchestration prepares and applies migrations after Activate.
 
 ## Topics
 

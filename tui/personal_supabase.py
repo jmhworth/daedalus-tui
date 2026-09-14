@@ -1,16 +1,22 @@
-"""File-only personal shared-Supabase schema registration for target projects."""
+"""Personal shared-Supabase scaffold (Phase 1) and ecosystem Activate (Phase 2)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import urlparse
+import os
 import re
+import shutil
+import socket
+import subprocess
 import tomllib
 from typing import Iterator
 
-from .environment import read_env_file, synchronize_env_file
+from .environment import read_env_file, redact_environment_values, synchronize_env_file
 from .project_config import DAEDALUS_CONFIG_FILENAME
+from .supabase_migrations import push_migrations
 
 TUI_ROOT = Path(__file__).resolve().parents[1]
 PARAMETER_PATH = TUI_ROOT / "parameter_files" / "daedalus-tui-personal-supabase.toml"
@@ -19,6 +25,12 @@ PROFILE_RELATIVE_PATHS = (
     Path(".agents") / "profiles" / "architecture.md",
 )
 SECTION_TABLE = "personal_supabase"
+
+# Activation outcome classes stored in the marker (never credentials).
+ACTIVATE_STATUS_SUCCESS = "success"
+ACTIVATE_STATUS_BLOCKED_GIT = "blocked_git"
+ACTIVATE_STATUS_BLOCKED_SUPABASE = "blocked_supabase"
+ACTIVATE_STATUS_BLOCKED_SCAFFOLD = "blocked_scaffold"
 
 
 def _validate_schema_name(schema: object, maximum_length: int) -> str:
@@ -30,10 +42,13 @@ def _validate_schema_name(schema: object, maximum_length: int) -> str:
 
 @dataclass(frozen=True)
 class PersonalSupabaseStatus:
-    """Registration marker loaded from a target project's ``.daedalus`` file."""
+    """Registration / activation marker loaded from a target project's ``.daedalus``."""
 
     registered: bool
     schema: str | None = None
+    activated: bool = False
+    last_activate_status: str | None = None
+    last_activate_error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +74,38 @@ class PersonalSupabaseBootstrapResult:
     environment: dict[str, str] | None = field(default=None, repr=False)
 
 
+@dataclass(frozen=True)
+class ActivationResult:
+    """Outcome of Phase 2 Activate (and optional Phase 1 scaffold)."""
+
+    status: str
+    schema: str
+    message: str
+    project_root: Path
+    activated: bool = False
+    scaffolded: bool = False
+    committed: bool = False
+    blocked_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class PreflightResult:
+    """Outcome of the access-method-aware live Supabase connectivity probe."""
+
+    succeeded: bool
+    message: str = ""
+    method: str = ""
+
+
+@dataclass(frozen=True)
+class GitScaffoldCommitResult:
+    """Outcome of the operating-branch Git gate and software-owned scaffold commit."""
+
+    succeeded: bool
+    message: str = ""
+    committed: bool = False
+
+
 def personal_supabase_environment_settings(settings: dict | None = None) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Return canonical and required environment keys from the feature parameters."""
     values = settings or load_personal_supabase_settings()
@@ -78,6 +125,22 @@ def schema_from_project_root(project_root: Path, maximum_length: int | None = No
     settings = load_personal_supabase_settings()
     limit = int(maximum_length if maximum_length is not None else settings["maximum_schema_name_length"])
     return _validate_schema_name(project_root.resolve().name, limit)
+
+
+def personal_supabase_scaffold_relative_paths(
+    schema: str,
+    settings: dict | None = None,
+) -> tuple[str, ...]:
+    """Return repository-relative paths owned by personal-Supabase scaffolding."""
+    values = settings or load_personal_supabase_settings()
+    return (
+        "supabase/config.toml",
+        f"supabase/migrations/{values['migration_filename']}",
+        ".env.example",
+        str(PROFILE_RELATIVE_PATHS[0]),
+        str(PROFILE_RELATIVE_PATHS[1]),
+        DAEDALUS_CONFIG_FILENAME,
+    )
 
 
 def load_personal_supabase_status(project_root: Path) -> PersonalSupabaseStatus:
@@ -103,7 +166,24 @@ def load_personal_supabase_status(project_root: Path) -> PersonalSupabaseStatus:
     schema = table.get("schema")
     if schema is not None and (not isinstance(schema, str) or not schema.strip()):
         raise ValueError(f"{path} {SECTION_TABLE}.schema must be a non-empty string when set.")
-    return PersonalSupabaseStatus(registered=registered, schema=schema.strip() if isinstance(schema, str) else None)
+    activated = table.get("activated", False)
+    if not isinstance(activated, bool):
+        raise ValueError(f"{path} {SECTION_TABLE}.activated must be a boolean.")
+    last_status = table.get("last_activate_status")
+    if last_status is not None and (not isinstance(last_status, str) or not last_status.strip()):
+        raise ValueError(
+            f"{path} {SECTION_TABLE}.last_activate_status must be a non-empty string when set."
+        )
+    last_error = table.get("last_activate_error")
+    if last_error is not None and not isinstance(last_error, str):
+        raise ValueError(f"{path} {SECTION_TABLE}.last_activate_error must be a string when set.")
+    return PersonalSupabaseStatus(
+        registered=registered,
+        schema=schema.strip() if isinstance(schema, str) else None,
+        activated=activated,
+        last_activate_status=last_status.strip() if isinstance(last_status, str) else None,
+        last_activate_error=last_error if isinstance(last_error, str) else None,
+    )
 
 
 def bootstrap_personal_supabase(
@@ -218,6 +298,21 @@ def _validate_supabase_scaffold(
         }
     ):
         return "supabase/config.toml project ref conflicts with launch environment."
+    heading = str(settings["profile_section_heading"])
+    for relative in PROFILE_RELATIVE_PATHS:
+        path = root / relative
+        if not path.is_file():
+            return f"Personal Supabase scaffold is missing {relative}."
+        text = path.read_text(encoding="utf-8")
+        if heading not in text or schema not in text.split(heading, 1)[1]:
+            return f"Personal Supabase scaffold profile guidance is incomplete in {relative}."
+    env_example = root / ".env.example"
+    if not env_example.is_file():
+        return "Personal Supabase scaffold is missing .env.example."
+    env_text = env_example.read_text(encoding="utf-8")
+    schema_key = str(settings["env_schema_key"])
+    if f"{schema_key}={schema}" not in env_text:
+        return f".env.example does not set {schema_key}={schema}."
     return None
 
 
@@ -268,13 +363,26 @@ def is_personal_supabase_registered(project_root: Path, schema: str | None = Non
     return status.schema == schema
 
 
+def is_personal_supabase_activated(project_root: Path, schema: str | None = None) -> bool:
+    """True when the project is registered and activated for ``schema`` (or any)."""
+    try:
+        status = load_personal_supabase_status(project_root)
+    except ValueError:
+        return False
+    if not status.registered or not status.activated:
+        return False
+    if schema is None:
+        return True
+    return status.schema == schema
+
+
 def register_personal_supabase(
     project_root: Path,
     schema: str | None = None,
 ) -> RegistrationResult:
     """Scaffold supabase files, env placeholders, profiles, and a ``.daedalus`` marker.
 
-    Remote apply is intentionally out of scope; orchestration owns ``supabase db push``.
+    Phase 1 only. Remote apply and ecosystem Activate are intentionally out of scope.
     """
     root = project_root.expanduser().resolve()
     settings = load_personal_supabase_settings()
@@ -315,6 +423,14 @@ def register_personal_supabase(
     if status.registered and status.schema == schema_name:
         try:
             _ensure_env_example(root, schema_name, settings)
+            # Preserve activation fields on idempotent re-scaffold checks.
+            _write_registration_marker(
+                root,
+                schema_name,
+                activated=status.activated,
+                last_activate_status=status.last_activate_status,
+                last_activate_error=status.last_activate_error,
+            )
         except (OSError, ValueError) as error:
             return RegistrationResult(
                 status="failed",
@@ -353,7 +469,7 @@ def register_personal_supabase(
         _ensure_supabase_scaffold(root, schema_name, settings)
         _ensure_env_example(root, schema_name, settings)
         _ensure_profile_guidance(root, schema_name, settings)
-        _write_registration_marker(root, schema_name)
+        _write_registration_marker(root, schema_name, activated=False)
     except (OSError, ValueError) as error:
         return RegistrationResult(
             status="failed",
@@ -365,8 +481,395 @@ def register_personal_supabase(
     return RegistrationResult(
         status="success",
         schema=schema_name,
-        message=f"Registered personal Supabase schema {schema_name!r}.",
+        message=f"Scaffolded personal Supabase schema {schema_name!r}.",
         project_root=root,
+    )
+
+
+def commit_personal_supabase_scaffold(
+    project_root: Path,
+    operating_branch: str,
+    *,
+    schema: str | None = None,
+    commit_message: str | None = None,
+) -> GitScaffoldCommitResult:
+    """Require operating-branch HEAD, refuse unrelated dirt, commit scaffold paths only."""
+    root = project_root.expanduser().resolve()
+    settings = load_personal_supabase_settings()
+    branch = operating_branch.strip()
+    if not branch:
+        return GitScaffoldCommitResult(
+            False,
+            "Select an operating/target branch before Activate.",
+        )
+    try:
+        status = load_personal_supabase_status(root)
+    except ValueError as error:
+        return GitScaffoldCommitResult(False, str(error))
+    if not status.registered:
+        return GitScaffoldCommitResult(False, "Project is not registered for personal Supabase.")
+    schema_name = schema or status.schema
+    if not schema_name:
+        return GitScaffoldCommitResult(False, "Registered project has no schema marker.")
+    try:
+        schema_name = _validate_schema_name(schema_name, int(settings["maximum_schema_name_length"]))
+    except ValueError as error:
+        return GitScaffoldCommitResult(False, str(error))
+
+    current = _git_output(["branch", "--show-current"], root)
+    if current is None:
+        return GitScaffoldCommitResult(False, "Project directory is not a Git repository.")
+    if current != branch:
+        if not current:
+            detail = (
+                f"HEAD is detached; check out operating branch {branch!r} before Activate."
+            )
+        else:
+            detail = (
+                f"HEAD is on {current!r}; check out operating branch {branch!r} before Activate."
+            )
+        return GitScaffoldCommitResult(False, detail)
+
+    allowed = set(personal_supabase_scaffold_relative_paths(schema_name, settings))
+    dirty = _git_porcelain_paths(root)
+    if dirty is None:
+        return GitScaffoldCommitResult(False, "Could not read Git status for Activate.")
+    unrelated = sorted(path for path in dirty if not _path_allowed_for_scaffold(path, allowed))
+    if unrelated:
+        preview = ", ".join(unrelated[:5])
+        suffix = "…" if len(unrelated) > 5 else ""
+        return GitScaffoldCommitResult(
+            False,
+            f"Unrelated dirty files block Activate ({preview}{suffix}). "
+            "Commit or clean them, or keep only personal-Supabase scaffold changes.",
+        )
+
+    scaffold_dirty = [path for path in dirty if _path_allowed_for_scaffold(path, allowed)]
+    message = commit_message or str(settings["activate_commit_message"])
+    if not scaffold_dirty:
+        return GitScaffoldCommitResult(
+            True,
+            "Personal Supabase scaffold is already committed on the operating branch.",
+            committed=False,
+        )
+
+    existing = [path for path in allowed if (root / path).exists() or path in scaffold_dirty]
+    return _commit_paths(root, existing, message)
+
+
+def _commit_paths(
+    directory: Path,
+    paths: tuple[str, ...] | list[str],
+    message: str,
+) -> GitScaffoldCommitResult:
+    selected = [path for path in paths if (directory / path).exists()]
+    if not selected:
+        return GitScaffoldCommitResult(True, "Nothing to commit.", committed=False)
+    add = _run_git(["add", "--", *selected], directory)
+    if not add.succeeded:
+        return GitScaffoldCommitResult(False, add.message or "Failed to stage paths.")
+    staged = _git_output(["diff", "--cached", "--name-only"], directory)
+    if staged is None:
+        return GitScaffoldCommitResult(False, "Could not inspect staged Activate changes.")
+    if not staged.strip():
+        return GitScaffoldCommitResult(True, "Nothing to commit.", committed=False)
+    commit = _run_git(["commit", "-m", message], directory)
+    if not commit.succeeded:
+        return GitScaffoldCommitResult(False, commit.message or "Failed to commit paths.")
+    return GitScaffoldCommitResult(True, "Committed personal Supabase changes.", committed=True)
+
+
+def preflight_personal_supabase(
+    launch_root: Path,
+    *,
+    executable: str = "supabase",
+    timeout_seconds: float | None = None,
+    run_process=subprocess.run,
+    find_executable=shutil.which,
+) -> PreflightResult:
+    """Run access-method-aware live connectivity checks; never mutates schema."""
+    settings = load_personal_supabase_settings()
+    timeout = float(
+        timeout_seconds
+        if timeout_seconds is not None
+        else settings["preflight_timeout_seconds"]
+    )
+    source = launch_root.expanduser().resolve() / ".env"
+    values = read_env_file(source)
+    _, required = personal_supabase_environment_settings(settings)
+    missing = [key for key in required if not values.get(key, "").strip()]
+    if missing:
+        return PreflightResult(False, f"Launch environment missing required keys: {', '.join(missing)}.")
+    project_ref = values.get(str(settings["env_project_ref_key"]), "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", project_ref):
+        return PreflightResult(False, "Launch environment has a malformed Supabase project ref.")
+    access_token = values.get(str(settings["env_access_token_key"]), "").strip()
+    db_url = values.get(str(settings["env_db_url_key"]), "").strip()
+    if not access_token and not db_url:
+        return PreflightResult(
+            False,
+            "Launch environment must define SUPABASE_ACCESS_TOKEN or SUPABASE_DB_URL.",
+        )
+    if find_executable(executable) is None:
+        return PreflightResult(False, f"{executable} is not available on PATH.")
+
+    env = {**os.environ, **values}
+    if access_token:
+        try:
+            process = run_process(
+                [executable, "projects", "list"],
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return PreflightResult(False, "Supabase projects list timed out.", method="access_token")
+        except OSError as error:
+            return PreflightResult(False, str(error), method="access_token")
+        output = "\n".join(
+            part.strip() for part in (process.stdout, process.stderr) if part and part.strip()
+        )
+        if process.returncode != 0:
+            redacted = redact_environment_values(output, values) or "Supabase projects list failed."
+            return PreflightResult(False, redacted, method="access_token")
+        if project_ref not in output:
+            return PreflightResult(
+                False,
+                f"Supabase project ref {project_ref!r} was not visible to the access token.",
+                method="access_token",
+            )
+        return PreflightResult(True, "Supabase access-token preflight succeeded.", method="access_token")
+
+    probe = _probe_database_url(db_url, timeout, find_executable=find_executable, run_process=run_process)
+    if not probe.succeeded:
+        return PreflightResult(False, probe.message, method="db_url")
+    return PreflightResult(True, probe.message or "Supabase DB URL preflight succeeded.", method="db_url")
+
+
+def activate_personal_supabase(
+    project_root: Path,
+    launch_root: Path,
+    operating_branch: str,
+    *,
+    schema: str | None = None,
+    executable: str = "supabase",
+    run_process=subprocess.run,
+    find_executable=shutil.which,
+) -> ActivationResult:
+    """Phase 1 (if needed) then Phase 2: Git commit, preflight, and migration push."""
+    root = project_root.expanduser().resolve()
+    launch = launch_root.expanduser().resolve()
+    settings = load_personal_supabase_settings()
+    try:
+        status = load_personal_supabase_status(root)
+    except ValueError as error:
+        return ActivationResult("failed", schema or "", str(error), root)
+
+    if schema is None:
+        try:
+            schema_name = status.schema or schema_from_project_root(root)
+        except ValueError as error:
+            return ActivationResult("failed", "", str(error), root)
+    else:
+        try:
+            schema_name = _validate_schema_name(schema, int(settings["maximum_schema_name_length"]))
+        except ValueError as error:
+            return ActivationResult("failed", str(schema), str(error), root)
+
+    if status.registered and status.activated and status.schema == schema_name:
+        return ActivationResult(
+            "success",
+            schema_name,
+            f"Schema {schema_name!r} is already activated.",
+            root,
+            activated=True,
+        )
+
+    scaffolded = False
+    if not status.registered:
+        registration = register_personal_supabase(root, schema=schema_name)
+        if registration.status != "success":
+            return ActivationResult("failed", schema_name, registration.message, root)
+        scaffolded = not registration.already_registered
+        status = load_personal_supabase_status(root)
+    elif status.schema != schema_name:
+        return ActivationResult(
+            "failed",
+            schema_name,
+            (
+                f"Project is already registered for schema {status.schema!r}; "
+                f"refusing to activate {schema_name!r}."
+            ),
+            root,
+        )
+
+    scaffold_error = _validate_supabase_scaffold(root, schema_name, settings)
+    if scaffold_error:
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_SCAFFOLD,
+            last_activate_error=_short_error(scaffold_error),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            scaffold_error,
+            root,
+            scaffolded=scaffolded,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_SCAFFOLD,
+        )
+
+    git_result = commit_personal_supabase_scaffold(
+        root,
+        operating_branch,
+        schema=schema_name,
+        commit_message=str(settings["activate_commit_message"]),
+    )
+    if not git_result.succeeded:
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_GIT,
+            last_activate_error=_short_error(git_result.message),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            git_result.message,
+            root,
+            scaffolded=scaffolded,
+            committed=False,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_GIT,
+        )
+
+    prepared = bootstrap_personal_supabase(root, launch, require_database_access=True)
+    if prepared.status != "success":
+        message = prepared.message or "Environment synchronization failed."
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+            last_activate_error=_short_error(message),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            message,
+            root,
+            scaffolded=scaffolded,
+            committed=git_result.committed,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+        )
+
+    preflight = preflight_personal_supabase(
+        launch,
+        executable=executable,
+        run_process=run_process,
+        find_executable=find_executable,
+    )
+    if not preflight.succeeded:
+        message = preflight.message or "Supabase connectivity preflight failed."
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+            last_activate_error=_short_error(message),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            message,
+            root,
+            scaffolded=scaffolded,
+            committed=git_result.committed,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+        )
+
+    environment = prepared.environment or {}
+    project_ref = (prepared.project_ref or "").strip()
+    try:
+        with temporary_supabase_cli_config(root, project_ref):
+            pushed = push_migrations(root, executable=executable, env=environment)
+    except ValueError as error:
+        message = str(error)
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+            last_activate_error=_short_error(message),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            message,
+            root,
+            scaffolded=scaffolded,
+            committed=git_result.committed,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+        )
+
+    if not pushed.succeeded:
+        message = (
+            redact_environment_values(pushed.output, environment)
+            or "Supabase migration push failed."
+        )
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+            last_activate_error=_short_error(message),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            message,
+            root,
+            scaffolded=scaffolded,
+            committed=git_result.committed,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+        )
+
+    _write_registration_marker(
+        root,
+        schema_name,
+        activated=True,
+        last_activate_status=ACTIVATE_STATUS_SUCCESS,
+        last_activate_error=None,
+    )
+    status_commit = _commit_paths(
+        root,
+        (DAEDALUS_CONFIG_FILENAME,),
+        str(settings.get("activate_status_commit_message", "Mark personal Supabase schema activated.")),
+    )
+    if not status_commit.succeeded:
+        return ActivationResult(
+            "success",
+            schema_name,
+            (
+                f"Activated personal Supabase schema {schema_name!r}, "
+                f"but activation marker commit failed: {status_commit.message}"
+            ),
+            root,
+            activated=True,
+            scaffolded=scaffolded,
+            committed=git_result.committed,
+        )
+    return ActivationResult(
+        "success",
+        schema_name,
+        f"Activated personal Supabase schema {schema_name!r}.",
+        root,
+        activated=True,
+        scaffolded=scaffolded,
+        committed=git_result.committed or status_commit.committed,
     )
 
 
@@ -387,10 +890,135 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "- Never assume PostgREST or Supabase clients default to `public` for this app.\n"
         "- Auth is shared across apps on this Supabase project; reuse the existing auth setup.\n"
         "- Agents must not run `supabase db push`; orchestration owns remote migration apply "
-        "after verification when `supabase/migrations/` changes.\n"
+        "after verification when `supabase/migrations/` changes, and Activate owns the first apply.\n"
+        "- File scaffolding alone is not ecosystem-ready; the operator must Activate via Daedalus "
+        "(`Ctrl+Shift+S`) so the software layer commits the scaffold and pushes migrations.\n"
         "- After the first remote apply, the operator must allow-list this schema in the "
         "Supabase Dashboard Data API / PostgREST exposed-schemas settings.\n"
     )
+
+
+def _short_error(message: str, limit: int = 240) -> str:
+    text = " ".join(message.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
+
+
+def _path_allowed_for_scaffold(path: str, allowed: set[str]) -> bool:
+    normalized = path.replace("\\", "/").strip()
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    normalized = normalized.rstrip("/")
+    if normalized in allowed:
+        return True
+    if any(candidate.startswith(normalized + "/") for candidate in allowed):
+        # Allow parent directory entries such as ``supabase/`` while scaffolding.
+        return True
+    return False
+
+
+def _git_output(command: list[str], directory: Path) -> str | None:
+    try:
+        process = subprocess.run(
+            ["git", *command],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if process.returncode != 0:
+        return None
+    return process.stdout.strip()
+
+
+@dataclass(frozen=True)
+class _GitCommandResult:
+    succeeded: bool
+    message: str = ""
+
+
+def _run_git(command: list[str], directory: Path) -> _GitCommandResult:
+    try:
+        process = subprocess.run(
+            ["git", *command],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:
+        return _GitCommandResult(False, str(error))
+    if process.returncode != 0:
+        output = "\n".join(
+            part.strip() for part in (process.stdout, process.stderr) if part and part.strip()
+        )
+        return _GitCommandResult(False, output or f"git {' '.join(command)} failed.")
+    return _GitCommandResult(True)
+
+
+def _git_porcelain_paths(directory: Path) -> set[str] | None:
+    try:
+        process = subprocess.run(
+            ["git", "status", "--porcelain", "-uall"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if process.returncode != 0:
+        return None
+    paths: set[str] = set()
+    for line in process.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        entry = line[3:]
+        if " -> " in entry:
+            entry = entry.split(" -> ", 1)[1]
+        entry = entry.strip().strip('"')
+        if entry:
+            paths.add(entry.replace("\\", "/"))
+    return paths
+
+
+def _probe_database_url(
+    db_url: str,
+    timeout: float,
+    *,
+    find_executable,
+    run_process,
+) -> PreflightResult:
+    if find_executable("psql") is not None:
+        try:
+            process = run_process(
+                ["psql", db_url, "-v", "ON_ERROR_STOP=1", "-c", "SELECT 1;"],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return PreflightResult(False, "Database reachability check timed out.")
+        except OSError as error:
+            return PreflightResult(False, str(error))
+        if process.returncode == 0:
+            return PreflightResult(True, "Database reachability check succeeded.")
+        output = "\n".join(
+            part.strip() for part in (process.stdout, process.stderr) if part and part.strip()
+        )
+        return PreflightResult(False, output or "Database reachability check failed.")
+
+    parsed = urlparse(db_url)
+    host = parsed.hostname
+    if not host:
+        return PreflightResult(False, "SUPABASE_DB_URL is missing a host.")
+    port = parsed.port or 5432
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            pass
+    except OSError as error:
+        return PreflightResult(False, f"Could not reach database host {host}:{port} ({error}).")
+    return PreflightResult(True, f"Database host {host}:{port} is reachable.")
 
 
 def _supabase_layout_conflict(root: Path, schema: str, settings: dict) -> str | None:
@@ -444,7 +1072,7 @@ def _ensure_supabase_scaffold(root: Path, schema: str, settings: dict) -> None:
             (
                 "# Scaffolded by Daedalus personal Supabase registration.\n"
                 "# Daedalus supplies the launch-root SUPABASE_PROJECT_REF temporarily at launch.\n"
-                "# Registration writes files only; orchestration owns `supabase db push`.\n"
+                "# Phase 1 writes files only; Activate / orchestration owns `supabase db push`.\n"
                 f'project_id = "{placeholder}"\n'
                 "\n"
                 "[api]\n"
@@ -578,13 +1206,26 @@ def _ensure_profile_guidance(root: Path, schema: str, settings: dict) -> None:
             path.write_text(section, encoding="utf-8")
 
 
-def _write_registration_marker(root: Path, schema: str) -> None:
+def _write_registration_marker(
+    root: Path,
+    schema: str,
+    *,
+    activated: bool = False,
+    last_activate_status: str | None = None,
+    last_activate_error: str | None = None,
+) -> None:
     path = root / DAEDALUS_CONFIG_FILENAME
-    section = (
-        f"[{SECTION_TABLE}]\n"
-        "registered = true\n"
-        f'schema = "{schema}"\n'
-    )
+    lines = [
+        f"[{SECTION_TABLE}]",
+        "registered = true",
+        f'schema = "{schema}"',
+        f"activated = {'true' if activated else 'false'}",
+    ]
+    if last_activate_status:
+        lines.append(f'last_activate_status = "{_toml_escape(last_activate_status)}"')
+    if last_activate_error:
+        lines.append(f'last_activate_error = "{_toml_escape(last_activate_error)}"')
+    section = "\n".join(lines) + "\n"
     if not path.exists():
         path.write_text(section, encoding="utf-8")
         return
@@ -598,3 +1239,7 @@ def _write_registration_marker(root: Path, schema: str) -> None:
     else:
         updated = text.rstrip() + "\n\n" + section
     path.write_text(updated if updated.endswith("\n") else updated + "\n", encoding="utf-8")
+
+
+def _toml_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')

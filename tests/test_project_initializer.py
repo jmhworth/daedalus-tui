@@ -171,7 +171,7 @@ class ProjectInitializerTests(unittest.TestCase):
                 calls,
             )
 
-    def test_optional_personal_supabase_registration_is_atomic_with_tempdir(self):
+    def test_optional_personal_supabase_registration_is_no_longer_supported(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             calls = []
@@ -195,8 +195,7 @@ class ProjectInitializerTests(unittest.TestCase):
             )
             destination = root / "with-schema"
             self.assertEqual(result["status"], "success")
-            self.assertTrue((destination / "supabase" / "config.toml").is_file())
-            self.assertTrue((destination / ".env.example").is_file())
+            self.assertFalse((destination / "supabase").exists())
             self.assertFalse(any(path.name.startswith(".with-schema.daedalus-init-")
                                  for path in root.iterdir()))
             self.assertIn(["git", "add", "."], calls)

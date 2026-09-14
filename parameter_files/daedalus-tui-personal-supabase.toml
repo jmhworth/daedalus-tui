@@ -1,4 +1,4 @@
-# Tunables for opt-in personal shared-Supabase schema registration.
+# Tunables for personal shared-Supabase scaffold + ecosystem activate.
 # Secrets never belong here; connection values live only in the launch-root .env.
 snippet_version = 1
 maximum_schema_name_length = 100
@@ -26,7 +26,10 @@ required_env_keys = [
 migration_filename = "20260101000000_create_personal_schema.sql"
 profile_section_heading = "## Personal Supabase Schema"
 config_project_id_placeholder = "YOUR_SHARED_SUPABASE_PROJECT_REF"
-confirmation_title = "Register personal Supabase schema?"
-confirmation_warning = "This creates a project schema and shared-Supabase configuration in this project. Only continue if this project should join your internal Supabase ecosystem."
+confirmation_title = "Activate personal Supabase?"
+confirmation_warning = "This scaffolds a project schema (if needed) and then activates it for the Daedalus ecosystem: a local software-owned commit on the selected operating branch, live Supabase connectivity preflight, and orchestration-owned migration push. Remote Git publish is not part of Activate. Only continue if this project should join your internal Supabase ecosystem."
 confirmation_name_prompt = "Type this project name exactly to confirm:"
-confirmation_button_label = "Register schema"
+confirmation_button_label = "Activate"
+activate_commit_message = "Add personal Supabase schema scaffold."
+activate_status_commit_message = "Mark personal Supabase schema activated."
+preflight_timeout_seconds = 15

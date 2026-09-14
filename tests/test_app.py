@@ -256,37 +256,125 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 confirmation_input.value = "demo-app"
                 await pilot.pause()
                 self.assertFalse(confirmation_button.disabled)
-                await app.screen.dismiss(True)
-                await pilot.pause()
-                self.assertTrue((project / "supabase" / "config.toml").is_file())
+
+                from tui.personal_supabase import ActivationResult
+
+                activate = Mock(
+                    return_value=ActivationResult(
+                        "success",
+                        "demo-app",
+                        "Activated personal Supabase schema 'demo-app'.",
+                        project,
+                        activated=True,
+                        scaffolded=True,
+                        committed=True,
+                    )
+                )
+
+                def run_inline(work, **kwargs):
+                    work()
+
+                with patch("tui.app.activate_personal_supabase", activate), patch.object(
+                    app, "_selected_operating_branch", return_value="main"
+                ), patch.object(
+                    app, "run_worker", side_effect=run_inline
+                ), patch.object(app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)):
+                    await app.screen.dismiss(True)
+                    await pilot.pause()
+
+                activate.assert_called_once()
+                self.assertEqual(activate.call_args.args[2], "main")
                 self.assertIn(
-                    "Registered Supabase schema",
+                    "Activated Supabase schema",
                     str(app.query_one("#status", Static).render()),
                 )
 
-    async def test_new_project_modal_includes_personal_supabase_checkbox(self):
+    async def test_new_project_modal_omits_personal_supabase_checkbox(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
             initializer = ProjectInitializerScreen(Path("/tmp"))
             app.push_screen(initializer)
             await pilot.pause()
 
-            checkbox = app.screen.query_one("#project-personal-supabase-checkbox")
-            self.assertFalse(checkbox.value)
+            self.assertEqual(app.screen.query("#project-personal-supabase-checkbox").nodes, [])
             app.screen.query_one("#project-name-input", Input).value = "new-project"
-            checkbox.value = True
-            initializer._create_project()
-            await pilot.pause()
-            self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
-            confirmation_input = app.screen.query_one("#personal-supabase-confirmation-input", Input)
-            confirmation_input.value = "new-project"
-            await pilot.pause()
-            self.assertFalse(
-                app.screen.query_one("#confirm-personal-supabase-button", Button).disabled
+            with patch("tui.app.initialize_project") as initialize:
+                initialize.return_value = {
+                    "status": "success",
+                    "projectName": "new-project",
+                    "destination": "/tmp/new-project",
+                }
+                initializer._create_project()
+                await pilot.pause()
+                initialize.assert_called_once()
+                self.assertNotIn(
+                    "registerPersonalSupabase",
+                    initialize.call_args.args[0],
+                )
+
+    async def test_launch_bootstrap_pushes_only_activated_projects(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scaffolded = root / "scaffolded-app"
+            activated = root / "activated-app"
+            for project, marker in (
+                (
+                    scaffolded,
+                    '[personal_supabase]\nregistered = true\nschema = "scaffolded-app"\nactivated = false\n',
+                ),
+                (
+                    activated,
+                    '[personal_supabase]\nregistered = true\nschema = "activated-app"\nactivated = true\n',
+                ),
+            ):
+                (project / "feature_files").mkdir(parents=True)
+                (project / ".daedalus").write_text(marker, encoding="utf-8")
+
+            app = DaedalusTuiApp(
+                runner=FakeRunner(),
+                directory=root,
+                settings=settings(),
+                coordinator=FakeCoordinator(),
             )
-            await app.screen.dismiss(False)
-            await pilot.pause()
-            self.assertIs(app.screen, initializer)
+            app.projects = (
+                DaedalusProject(scaffolded, root),
+                DaedalusProject(activated, root),
+            )
+            app.launch_root = root
+            app._supabase_bootstrap_started = True
+
+            from tui.personal_supabase import PersonalSupabaseBootstrapResult
+
+            def fake_bootstrap(project_path, launch_root, require_database_access=True):
+                return PersonalSupabaseBootstrapResult(
+                    "success",
+                    project_path,
+                    schema=project_path.name,
+                    project_ref="shared-ref",
+                    message="ok",
+                    environment={"SUPABASE_PROJECT_REF": "shared-ref"},
+                )
+
+            push = Mock(return_value=Mock(succeeded=True, output="ok"))
+
+            def run_inline(work, **kwargs):
+                work()
+
+            async with app.run_test() as pilot:
+                with patch("tui.app.bootstrap_personal_supabase", side_effect=fake_bootstrap) as bootstrap, patch(
+                    "tui.app.push_migrations", push
+                ), patch("tui.app.temporary_supabase_cli_config"), patch(
+                    "tui.app.cursor_environment",
+                    return_value={"SUPABASE_PROJECT_REF": "shared-ref"},
+                ), patch("tui.app.is_direct_child_project", return_value=True), patch.object(
+                    app, "run_worker", side_effect=run_inline
+                ), patch.object(app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)):
+                    app._supabase_bootstrap_started = False
+                    app._start_personal_supabase_bootstrap()
+                    await pilot.pause()
+                self.assertEqual(bootstrap.call_count, 2)
+                self.assertEqual(push.call_count, 1)
+                self.assertEqual(push.call_args.args[0], activated.resolve())
 
     async def test_responsive_layout_transitions_restore_wide_dimensions(self):
         app = DaedalusTuiApp(

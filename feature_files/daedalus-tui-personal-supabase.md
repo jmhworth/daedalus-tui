@@ -1,62 +1,67 @@
 # Daedalus TUI Personal Shared Supabase
 
 ## Summary
-Opt-in registration that scaffolds a dedicated Postgres schema for a Daedalus-managed
-target project inside one operator-owned shared Supabase database. Registration is
-file-only (`supabase/` config + `CREATE SCHEMA` migration, `.env.example`, coding and
-architecture profile guidance, and a `.daedalus` marker). At launch Daedalus uses the
-launch-root `.env` as the canonical shared source, synchronizes each registered
-project's ignored `.env`, and asks orchestration to push its migration.
+Two-phase personal Supabase support for Daedalus-managed target projects on one
+operator-owned shared database. Phase 1 scaffolds durable project files so
+humans and agents can develop against a dedicated schema. Phase 2 (Activate)
+is software-owned Daedalus ecosystem readiness: commit the scaffold onto the
+already-checked-out operating branch, live-preflight Supabase connectivity, and
+orchestration-owned `supabase db push`. File scaffolding alone is not
+ecosystem-ready.
 
 ## Key Points
 - **Shared database, per-project schema**: Schema identity is always the validated
   project slug. Apps share auth on the single Supabase project; agents must never
   default to `public`.
-- **File-only register**: Writes durable project files only. Does not call the Supabase
-  Management API or `supabase db push` at register time; launch bootstrap owns preparation
-  and orchestration remains the only remote push owner.
-- **New Project opt-in**: Checkbox on the New Project modal; when selected, a separate
-  confirmation requires typing the project name before registration runs after template
-  materialization and before the initial `git add`/`git commit`.
-- **Existing-project action**: The `Ctrl+Shift+S` shortcut opens the same
-  confirmation, requiring the selected project's name before scaffolding the
-  schema; repeated registration remains a no-op for that schema.
-- **Deliberate linking**: The confirmation warns that registration joins the operator's
-  internal shared-Supabase ecosystem, and the Register action remains disabled until the
-  exact project name is entered.
+- **Phase 1 — Scaffold**: Writes durable project files only (`supabase/` config +
+  `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
+  and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
+  claim ecosystem readiness.
+- **Phase 2 — Activate**: Operator `Ctrl+Shift+S` after name confirmation runs
+  scaffold (when unregistered) then Activate when gates pass: require HEAD already
+  on the selected operating/target branch (no checkout/switch), refuse unrelated
+  dirty files, software-owned local commit of known scaffold paths + marker, launch-root
+  env sync, access-method-aware live preflight, then `db push`. Remote Git publish
+  remains the optional operator Push button.
+- **Existing projects only**: Personal Supabase is post-init for projects already
+  in the Daedalus format. New Project has no personal-Supabase opt-in.
+- **Retry**: Scaffolded or Activate-blocked projects reuse `Ctrl+Shift+S` with the
+  same name confirmation; skip re-scaffold when registered, validate completeness,
+  and re-run Phase 2. Incomplete scaffolds fail closed.
+- **Status model**: Distinguish unregistered, scaffolded (`registered`, not
+  `activated`), activated, and blocked reasons (`last_activate_status` /
+  redacted error class—no credentials). Launch env-syncs all registered projects;
+  launch `db push` runs only for activated projects when `supabase_db_push_enabled`.
+- **Supabase connected**: Launch-root required keys + one DB access method
+  (`SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`), `supabase` on PATH, and a
+  bounded non-destructive access-method-aware reachability probe before push.
+- **Deliberate linking**: Confirmation warns about scaffold + Activate prerequisites;
+  the Activate action stays disabled until the exact project name is entered.
 - **Agent teaching**: Idempotently appends a Personal Supabase Schema section to
   `.agents/profiles/coding.md` and `architecture.md` (no Cursor skill file).
-- **Canonical environment**: The launch-root `.env` owns `SUPABASE_PROJECT_REF`, shared
-  URL and keys, and database access (`SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`). Each
-  ignored project `.env` receives those values plus only its own `SUPABASE_SCHEMA` marker;
-  populated conflicts are refused and process variables remain runtime-only overrides.
-- **Secret-free examples**: Root and generated project `.env.example` files contain names,
-  blanks, and guidance only; credentials never belong in feature or parameter files.
-- **Idempotency / conflicts**: Same-schema re-register is a no-op success; conflicting
-  markers or foreign `supabase/migrations` content fail without mutating the tree.
+- **Canonical environment**: The launch-root `.env` owns shared connection values;
+  each ignored project `.env` receives those plus `SUPABASE_SCHEMA`.
 - **Manual API exposure**: Operators must allow-list the schema in Supabase Dashboard
   Data API / PostgREST settings after the migration is applied remotely.
-- **Launch bootstrap**: Every discovered registered project is synchronized and pushed at
-  launch when `supabase_db_push_enabled` is enabled, without consulting `migrations_pending`.
-  Disabled pushes still synchronize local ignored environments. Bootstrap is idempotent,
-  redacts diagnostics, and temporarily supplies the shared project ref to the CLI without
-  leaving tracked placeholder configuration dirty.
+- **Ownership**: Agents never `db push` or push remotes; software owns Activate
+  commits and migration push.
 
 ## Relevant Files
-- `tui/personal_supabase.py`: Registration helper, marker I/O, canonical environment bootstrap,
-  scaffold validation, and temporary CLI configuration.
+- `tui/personal_supabase.py`: Scaffold helper, marker I/O, Git gate/commit, live
+  preflight, Activate orchestration, canonical environment bootstrap, and temporary
+  CLI configuration.
 - `tui/environment.py`: Comment-preserving atomic `.env` synchronization and runtime loading.
-- `tui/project_initializer.py`: Optional `registerPersonalSupabase` flag wired pre-commit.
-- `tui/app.py`: New Project checkbox, confirmation modal, and the
-  `Ctrl+Shift+S` Register Supabase Schema shortcut.
-- `parameter_files/daedalus-tui-personal-supabase.toml`: Env key definitions, required shared
-  settings, and migration filename.
-- `tests/test_personal_supabase.py`, `tests/test_app.py`, `tests/test_project_initializer.py`: Coverage.
+- `tui/app.py`: Confirmation modal and `Ctrl+Shift+S` scaffold+Activate / retry worker.
+- `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
+- `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation copy,
+  activate commit message, and preflight timeout.
+- `tests/test_personal_supabase.py`, `tests/test_app.py`: Coverage.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-14: Redesigned personal Supabase into Phase 1 scaffold plus Phase 2 Activate with operating-branch Git gate, live preflight, activated-only launch push, and Ctrl+Shift+S retry; removed New Project opt-in.
 - 2026-09-13: Added launch-root canonical environment synchronization and idempotent bootstrap preparation for all discovered registered projects.
 - 2026-09-13: Added file-only personal Supabase schema registration with New Project checkbox, task-bar button, profile guidance, and target `.env.example` placeholders.
 - 2026-09-13: Added an exact-project-name confirmation gate to both registration entry points so shared-Supabase linking is always deliberate.

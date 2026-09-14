@@ -41,7 +41,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
-- **Keyboard-first actions**: Low-frequency actions stay out of the project toolbar and are available through `Ctrl+Shift+N` (new project), `Ctrl+Shift+T` (create topic), `Ctrl+Shift+S` (register Supabase schema), and `Ctrl+T` (new task); `Ctrl+U` opens coding statistics, while `Ctrl+K` opens the shortcut reference and is the only global binding shown in the bottom footer.
+- **Keyboard-first actions**: Low-frequency actions stay out of the project toolbar and are available through `Ctrl+Shift+N` (new project), `Ctrl+Shift+T` (create topic), `Ctrl+Shift+S` (activate personal Supabase), and `Ctrl+T` (new task); `Ctrl+U` opens coding statistics, while `Ctrl+K` opens the shortcut reference and is the only global binding shown in the bottom footer.
 - **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a three-column settings grid above the output and composer, giving the transcript and prompt larger starting heights while retaining independent scrolling inside each widget.
 
 ## Relevant Files
@@ -66,6 +66,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-14: Relabeled Ctrl+Shift+S as activate personal Supabase after the scaffold+Activate redesign.
 - 2026-09-13: Removed the per-project task-count suffix from the Project Select labels so options show only the project name.
 - 2026-09-13: Adjusted the default readable selector floor to 13 cells to
   account for Textual's fractional-width rounding, allowing the wide settings

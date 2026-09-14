@@ -1,20 +1,25 @@
+import subprocess
 import tempfile
 import tomllib
 import unittest
-import uuid
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from tui.personal_supabase import (
+    activate_personal_supabase,
     bootstrap_personal_supabase,
+    commit_personal_supabase_scaffold,
+    is_personal_supabase_activated,
     is_personal_supabase_registered,
     load_personal_supabase_status,
+    preflight_personal_supabase,
     profile_guidance_section,
     register_personal_supabase,
     schema_from_project_root,
     temporary_supabase_cli_config,
 )
-from tui.project_initializer import initialize_project
+from tui.supabase_migrations import PushResult
 
 
 class PersonalSupabaseTests(unittest.TestCase):
@@ -32,6 +37,36 @@ class PersonalSupabaseTests(unittest.TestCase):
             encoding="utf-8",
         )
         return project
+
+    def _git(self, project: Path, *args: str) -> None:
+        process = subprocess.run(
+            ["git", *args],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertEqual(process.returncode, 0)
+
+    def _init_git_repo(self, project: Path, branch: str = "main") -> None:
+        self._git(project, "init", "-b", branch)
+        self._git(project, "config", "user.email", "test@example.com")
+        self._git(project, "config", "user.name", "Test")
+        self._git(project, "add", ".")
+        self._git(project, "commit", "-m", "initial")
+
+    def _write_launch_env(self, launch: Path, *, token: bool = False) -> None:
+        lines = [
+            "SUPABASE_PROJECT_REF=shared-ref",
+            "SUPABASE_URL=https://example.test",
+            "SUPABASE_ANON_KEY=anon-key",
+            "SUPABASE_SERVICE_ROLE_KEY=service-key",
+        ]
+        if token:
+            lines.append("SUPABASE_ACCESS_TOKEN=access-token")
+        else:
+            lines.append("SUPABASE_DB_URL=postgres://user:password@example.test:5432/db")
+        (launch / ".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def test_schema_matches_validated_project_slug(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -77,13 +112,16 @@ class PersonalSupabaseTests(unittest.TestCase):
 
             status = load_personal_supabase_status(project)
             self.assertTrue(status.registered)
+            self.assertFalse(status.activated)
             self.assertEqual(status.schema, "example-project")
             self.assertTrue(is_personal_supabase_registered(project, "example-project"))
+            self.assertFalse(is_personal_supabase_activated(project, "example-project"))
 
             with (project / ".daedalus").open("rb") as source:
                 values = tomllib.load(source)
             self.assertEqual(values["worktree"]["install_command"], [])
             self.assertEqual(values["personal_supabase"]["schema"], "example-project")
+            self.assertFalse(values["personal_supabase"]["activated"])
 
     def test_registration_is_idempotent_for_same_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -126,6 +164,7 @@ class PersonalSupabaseTests(unittest.TestCase):
         self.assertIn("`demo-app`", section)
         self.assertIn("public", section)
         self.assertIn("supabase db push", section)
+        self.assertIn("Activate", section)
 
     def test_launch_bootstrap_syncs_root_env_and_restores_placeholder_config(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -135,14 +174,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             project.mkdir(parents=True)
             self._seed_project(launch, "demo-app")
             register_personal_supabase(project, schema="demo-app")
-            (launch / ".env").write_text(
-                "SUPABASE_PROJECT_REF=shared-ref\n"
-                "SUPABASE_URL=https://example.test\n"
-                "SUPABASE_ANON_KEY=anon-key\n"
-                "SUPABASE_SERVICE_ROLE_KEY=service-key\n"
-                "SUPABASE_DB_URL=postgres://user:password@example.test/db\n",
-                encoding="utf-8",
-            )
+            self._write_launch_env(launch)
             config = project / "supabase" / "config.toml"
             original = config.read_text(encoding="utf-8")
 
@@ -201,14 +233,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self._seed_project(launch, "demo-app")
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
-            (launch / ".env").write_text(
-                "SUPABASE_PROJECT_REF=shared-ref\n"
-                "SUPABASE_URL=https://example.test\n"
-                "SUPABASE_ANON_KEY=anon-key\n"
-                "SUPABASE_SERVICE_ROLE_KEY=service-key\n"
-                "SUPABASE_DB_URL=postgres://user:password@example.test/db\n",
-                encoding="utf-8",
-            )
+            self._write_launch_env(launch)
             project_env = project / ".env"
             project_env.write_text("# preserve\nSUPABASE_URL=https://other.test\n", encoding="utf-8")
             before = project_env.read_text(encoding="utf-8")
@@ -219,44 +244,253 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertIn("conflicting", result.message)
             self.assertEqual(project_env.read_text(encoding="utf-8"), before)
 
-    def test_new_project_flag_registers_before_git_commit(self):
+    def test_wrong_branch_blocks_activate_without_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp), "demo-app")
+            self._init_git_repo(project, "main")
+            register_personal_supabase(project, schema="demo-app")
+            self._git(project, "checkout", "-b", "feature")
+
+            result = commit_personal_supabase_scaffold(project, "main", schema="demo-app")
+
+            self.assertFalse(result.succeeded)
+            self.assertIn("feature", result.message)
+            self.assertIn("main", result.message)
+            branch = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self.assertEqual(branch, "feature")
+
+    def test_unrelated_dirty_files_block_activate_commit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp), "demo-app")
+            self._init_git_repo(project, "main")
+            register_personal_supabase(project, schema="demo-app")
+            (project / "NOTES.md").write_text("unrelated\n", encoding="utf-8")
+
+            result = commit_personal_supabase_scaffold(project, "main", schema="demo-app")
+
+            self.assertFalse(result.succeeded)
+            self.assertIn("Unrelated dirty", result.message)
+
+    def test_clean_operating_branch_commits_only_scaffold_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp), "demo-app")
+            self._init_git_repo(project, "main")
+            register_personal_supabase(project, schema="demo-app")
+
+            result = commit_personal_supabase_scaffold(project, "main", schema="demo-app")
+
+            self.assertTrue(result.succeeded)
+            self.assertTrue(result.committed)
+            names = subprocess.run(
+                ["git", "show", "--name-only", "--pretty=", "HEAD"],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.splitlines()
+            self.assertIn("supabase/config.toml", names)
+            self.assertIn(".daedalus", names)
+            self.assertNotIn("NOTES.md", names)
+            status = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self.assertEqual(status, "")
+
+    def test_preflight_token_requires_visible_project_ref(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            launch = Path(tmp)
+            self._write_launch_env(launch, token=True)
+
+            def fake_run(command, capture_output, text, env, timeout):
+                self.assertEqual(command[:3], ["supabase", "projects", "list"])
+                return SimpleNamespace(returncode=0, stdout="other-ref\n", stderr="")
+
+            result = preflight_personal_supabase(
+                launch,
+                run_process=fake_run,
+                find_executable=lambda name: f"/bin/{name}",
+            )
+            self.assertFalse(result.succeeded)
+            self.assertIn("not visible", result.message)
+
+            def ok_run(command, capture_output, text, env, timeout):
+                return SimpleNamespace(returncode=0, stdout="shared-ref\n", stderr="")
+
+            ok = preflight_personal_supabase(
+                launch,
+                run_process=ok_run,
+                find_executable=lambda name: f"/bin/{name}",
+            )
+            self.assertTrue(ok.succeeded)
+            self.assertEqual(ok.method, "access_token")
+
+    def test_preflight_db_url_uses_reachability_probe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            launch = Path(tmp)
+            self._write_launch_env(launch, token=False)
+
+            with patch("tui.personal_supabase.socket.create_connection") as connect:
+                connect.return_value.__enter__ = lambda self: None
+                connect.return_value.__exit__ = lambda *args: None
+                result = preflight_personal_supabase(
+                    launch,
+                    find_executable=lambda name: "/bin/supabase" if name == "supabase" else None,
+                )
+            self.assertTrue(result.succeeded)
+            self.assertEqual(result.method, "db_url")
+
+    def test_activate_success_pushes_once_and_marks_activated(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            calls = []
+            launch = root / "launch"
+            project = self._seed_project(launch, "demo-app")
+            self._init_git_repo(project, "main")
+            self._write_launch_env(launch, token=True)
+            push_calls = []
 
-            def fake_run(command, cwd, capture_output, text, shell):
-                calls.append((command, Path(cwd)))
-                if command[:2] == ["git", "init"]:
-                    (Path(cwd) / ".git").mkdir()
-                if command[:2] == ["git", "add"]:
-                    destination = Path(cwd)
-                    self.assertTrue((destination / "supabase" / "config.toml").is_file())
-                    self.assertTrue((destination / ".env.example").is_file())
-                    self.assertTrue(
-                        is_personal_supabase_registered(destination, "schema-app")
-                    )
-                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
+                if command[:3] == ["supabase", "projects", "list"]:
+                    return SimpleNamespace(returncode=0, stdout="shared-ref\n", stderr="")
+                raise AssertionError(f"Unexpected command: {command}")
 
-            result = initialize_project(
-                {
-                    "requestId": str(uuid.uuid4()),
-                    "projectName": "schema-app",
-                    "createGitHubRepository": False,
-                    "registerPersonalSupabase": True,
-                },
-                execution_root=root,
-                run_process=fake_run,
-                find_executable=lambda executable: f"/bin/{executable}",
+            def fake_push(directory, *, executable="supabase", env=None):
+                push_calls.append(directory)
+                return PushResult(True, "ok")
+
+            with patch("tui.personal_supabase.push_migrations", side_effect=fake_push):
+                result = activate_personal_supabase(
+                    project,
+                    launch,
+                    "main",
+                    schema="demo-app",
+                    run_process=fake_run,
+                    find_executable=lambda name: f"/bin/{name}",
+                )
+
+            self.assertEqual(result.status, "success")
+            self.assertTrue(result.activated)
+            self.assertTrue(result.scaffolded)
+            self.assertEqual(len(push_calls), 1)
+            status = load_personal_supabase_status(project)
+            self.assertTrue(status.activated)
+            self.assertEqual(status.last_activate_status, "success")
+            config = (project / "supabase" / "config.toml").read_text(encoding="utf-8")
+            self.assertIn("YOUR_SHARED_SUPABASE_PROJECT_REF", config)
+            dirty = subprocess.run(
+                ["git", "status", "--porcelain", "--", ".daedalus", "supabase", ".env.example", ".agents"],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self.assertEqual(dirty, "")
+            log = subprocess.run(
+                ["git", "log", "--oneline"],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            self.assertIn("activated", log.lower())
+            with (project / ".daedalus").open("rb") as source:
+                committed = tomllib.load(source)
+            tip = subprocess.run(
+                ["git", "show", "HEAD:.daedalus"],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            self.assertIn("activated = true", tip)
+            self.assertTrue(committed["personal_supabase"]["activated"])
+
+    def test_activate_retry_skips_scaffold_and_reruns_phase_two(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            launch = root / "launch"
+            project = self._seed_project(launch, "demo-app")
+            self._init_git_repo(project, "main")
+            register_personal_supabase(project, schema="demo-app")
+            migration = (
+                project / "supabase" / "migrations" / "20260101000000_create_personal_schema.sql"
             )
-            self.assertEqual(result["status"], "success")
-            destination = root / "schema-app"
-            self.assertTrue(is_personal_supabase_registered(destination, "schema-app"))
-            env_text = (destination / ".env.example").read_text(encoding="utf-8")
-            self.assertIn("SUPABASE_SCHEMA=schema-app", env_text)
-            self.assertIn(
-                ["git", "add", "."],
-                [command for command, _ in calls],
-            )
+            before = migration.read_text(encoding="utf-8")
+            self._write_launch_env(launch, token=True)
+
+            def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
+                return SimpleNamespace(returncode=0, stdout="shared-ref\n", stderr="")
+
+            with patch(
+                "tui.personal_supabase.push_migrations",
+                return_value=PushResult(True, "ok"),
+            ):
+                result = activate_personal_supabase(
+                    project,
+                    launch,
+                    "main",
+                    schema="demo-app",
+                    run_process=fake_run,
+                    find_executable=lambda name: f"/bin/{name}",
+                )
+
+            self.assertEqual(result.status, "success")
+            self.assertFalse(result.scaffolded)
+            self.assertEqual(migration.read_text(encoding="utf-8"), before)
+            self.assertTrue(is_personal_supabase_activated(project, "demo-app"))
+
+    def test_failed_preflight_leaves_commit_and_records_blocked_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            launch = root / "launch"
+            project = self._seed_project(launch, "demo-app")
+            self._init_git_repo(project, "main")
+            self._write_launch_env(launch, token=True)
+
+            def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
+                return SimpleNamespace(returncode=1, stdout="", stderr="auth failed")
+
+            with patch("tui.personal_supabase.push_migrations") as push:
+                result = activate_personal_supabase(
+                    project,
+                    launch,
+                    "main",
+                    schema="demo-app",
+                    run_process=fake_run,
+                    find_executable=lambda name: f"/bin/{name}",
+                )
+                push.assert_not_called()
+
+            self.assertEqual(result.status, "blocked")
+            self.assertEqual(result.blocked_reason, "blocked_supabase")
+            status = load_personal_supabase_status(project)
+            self.assertTrue(status.registered)
+            self.assertFalse(status.activated)
+            self.assertEqual(status.last_activate_status, "blocked_supabase")
+            log = subprocess.run(
+                ["git", "log", "--oneline"],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            self.assertIn("personal Supabase", log)
+
+    def test_activated_helper_distinguishes_scaffolded_projects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp), "demo-app")
+            register_personal_supabase(project, schema="demo-app")
+            self.assertTrue(is_personal_supabase_registered(project, "demo-app"))
+            self.assertFalse(is_personal_supabase_activated(project, "demo-app"))
 
 
 if __name__ == "__main__":

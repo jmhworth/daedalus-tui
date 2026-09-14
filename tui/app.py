@@ -33,11 +33,13 @@ from .git_worktree import GitWorktreeError, list_local_branches, push_branch, re
 from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
 from .project_initializer import initialize_project, load_initializer_settings, validate_project_name
 from .personal_supabase import (
+    ActivationResult,
     PersonalSupabaseBootstrapResult,
+    activate_personal_supabase,
     bootstrap_personal_supabase,
-    is_personal_supabase_registered,
+    is_personal_supabase_activated,
     load_personal_supabase_settings,
-    register_personal_supabase,
+    load_personal_supabase_status,
     schema_from_project_root,
     temporary_supabase_cli_config,
 )
@@ -130,7 +132,7 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+X", "Cancel task", "cancel_task"),
     ("Ctrl+Shift+N", "New project", "show_new_project"),
     ("Ctrl+Shift+T", "Create topic", "show_create_topic"),
-    ("Ctrl+Shift+S", "Register Supabase schema", "register_personal_supabase"),
+    ("Ctrl+Shift+S", "Activate personal Supabase", "register_personal_supabase"),
     ("Ctrl+T", "New task", "new_task"),
     ("Ctrl+Q", "Quit", "quit"),
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
@@ -345,7 +347,7 @@ class KeyboardShortcutsScreen(ModalScreen[None]):
 
 
 class PersonalSupabaseConfirmationScreen(ModalScreen[bool]):
-    """Require an explicit confirmation before claiming a shared schema."""
+    """Require an explicit confirmation before scaffolding/Activating a shared schema."""
 
     BINDINGS = [
         ("escape", "cancel_registration", "Cancel"),
@@ -414,7 +416,7 @@ class PersonalSupabaseConfirmationScreen(ModalScreen[bool]):
         entered = self.query_one("#personal-supabase-confirmation-input", Input).value
         if entered != self.project_name:
             self.query_one("#personal-supabase-confirmation-status", Static).update(
-                "Type the project name exactly to enable registration."
+                "Type the project name exactly to enable Activate."
             )
             self.query_one("#personal-supabase-confirmation-input", Input).focus()
             return
@@ -443,10 +445,6 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
             yield Static("Project name (lowercase, digits, hyphens)", id="project-name-label")
             yield Input(placeholder="example-project", id="project-name-input")
             yield Checkbox("Also create a private GitHub repository", id="project-github-checkbox")
-            yield Checkbox(
-                "Register schema on personal Supabase (requires confirmation)",
-                id="project-personal-supabase-checkbox",
-            )
             yield Static("", id="project-initializer-status")
             with Horizontal(id="project-initializer-actions"):
                 yield Button("Create", id="create-project-button", variant="primary")
@@ -475,10 +473,6 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
         status = self.query_one("#project-initializer-status", Static)
         name_input = self.query_one("#project-name-input", Input)
         create_github = self.query_one("#project-github-checkbox", Checkbox).value
-        register_personal = self.query_one(
-            "#project-personal-supabase-checkbox",
-            Checkbox,
-        ).value
         try:
             settings = load_initializer_settings()
             project_name = validate_project_name(
@@ -490,42 +484,12 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
             name_input.focus()
             return
 
-        if register_personal:
-            self._busy = True
-            status.update("Confirm personal Supabase schema registration…")
-            self.query_one("#create-project-button", Button).disabled = True
-            self.app.push_screen(
-                PersonalSupabaseConfirmationScreen(project_name),
-                lambda confirmed: self._on_supabase_confirmation(
-                    confirmed,
-                    project_name,
-                    create_github,
-                ),
-            )
-            return
-
-        self._initialize_project(project_name, create_github, register_personal=False)
-
-    def _on_supabase_confirmation(
-        self,
-        confirmed: bool,
-        project_name: str,
-        create_github: bool,
-    ) -> None:
-        if not confirmed:
-            self._busy = False
-            self.query_one("#create-project-button", Button).disabled = False
-            self.query_one("#project-initializer-status", Static).update(
-                "Supabase schema registration cancelled."
-            )
-            return
-        self._initialize_project(project_name, create_github, register_personal=True)
+        self._initialize_project(project_name, create_github)
 
     def _initialize_project(
         self,
         project_name: str,
         create_github: bool,
-        register_personal: bool,
     ) -> None:
         status = self.query_one("#project-initializer-status", Static)
         self._busy = True
@@ -537,7 +501,6 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
                     "requestId": str(uuid.uuid4()),
                     "projectName": project_name,
                     "createGitHubRepository": create_github,
-                    "registerPersonalSupabase": register_personal,
                 },
                 execution_root=self.launch_root,
             )
@@ -1045,7 +1008,7 @@ class DaedalusTuiApp(App[None]):
         yield Footer()
 
     def _start_personal_supabase_bootstrap(self) -> None:
-        """Synchronize and optionally push every registered discovered project."""
+        """Synchronize registered projects; push migrations only when activated."""
         if self._supabase_bootstrap_started:
             return
         self._supabase_bootstrap_started = True
@@ -1071,10 +1034,12 @@ class DaedalusTuiApp(App[None]):
                             require_database_access=self.orchestration_settings.supabase_db_push_enabled,
                         )
                         push_message = ""
-                        if (
+                        should_push = (
                             prepared.status == "success"
                             and self.orchestration_settings.supabase_db_push_enabled
-                        ):
+                            and is_personal_supabase_activated(project_path)
+                        )
+                        if should_push:
                             runtime_environment = cursor_environment(
                                 project_path,
                                 (project_path / ".env", self.launch_root / ".env"),
@@ -1438,18 +1403,22 @@ class DaedalusTuiApp(App[None]):
         self.push_screen(CreateTopicScreen(self._active_project_path), self._on_topic_created)
 
     def action_register_personal_supabase(self) -> None:
-        """Ask for confirmation before scaffolding a shared Supabase schema."""
+        """Confirm, then scaffold (if needed) and Activate personal Supabase."""
         project_path = self._active_project_path
         try:
             schema = schema_from_project_root(project_path)
+            status = load_personal_supabase_status(project_path)
         except ValueError as error:
             self._set_error(str(error))
-            self._set_status("Supabase schema registration failed")
+            self._set_status("Personal Supabase Activate failed")
             return
-        if is_personal_supabase_registered(project_path, schema):
-            self._set_status(f"Schema {schema!r} already registered")
+        if status.registered and status.activated and status.schema == schema:
+            self._set_status(f"Schema {schema!r} already activated")
             return
-        self._set_status("Confirm personal Supabase schema registration…")
+        if status.registered and not status.activated:
+            self._set_status("Confirm personal Supabase Activate retry…")
+        else:
+            self._set_status("Confirm personal Supabase Activate…")
         self.push_screen(
             PersonalSupabaseConfirmationScreen(schema),
             lambda confirmed: self._on_personal_supabase_confirmation(
@@ -1466,17 +1435,61 @@ class DaedalusTuiApp(App[None]):
         schema: str,
     ) -> None:
         if not confirmed:
-            self._set_status("Supabase schema registration cancelled")
+            self._set_status("Personal Supabase Activate cancelled")
             return
-        result = register_personal_supabase(project_path, schema=schema)
-        if result.status != "success":
-            self._set_error(result.message)
-            self._set_status("Supabase schema registration failed")
+        operating_branch = self._selected_operating_branch()
+        if not operating_branch:
+            self._set_error("Select an operating/target branch before Activate.")
+            self._set_status("Personal Supabase Activate blocked")
             return
-        if result.already_registered:
-            self._set_status(f"Schema {schema!r} already registered")
-        else:
-            self._set_status(f"Registered Supabase schema {schema!r}")
+        self._start_personal_supabase_activate(project_path, schema, operating_branch)
+
+    def _start_personal_supabase_activate(
+        self,
+        project_path: Path,
+        schema: str,
+        operating_branch: str,
+    ) -> None:
+        """Run scaffold+Activate in a background worker so the TUI stays responsive."""
+        self._set_error("")
+        self._set_status(f"Activating personal Supabase schema {schema!r}…")
+        root = project_path.resolve()
+        lock = self._migration_push_locks.setdefault(root, threading.Lock())
+
+        def work() -> None:
+            with lock:
+                result = activate_personal_supabase(
+                    root,
+                    self.launch_root,
+                    operating_branch,
+                    schema=schema,
+                    executable=self.orchestration_settings.supabase_executable,
+                )
+            self.call_from_thread(self._on_personal_supabase_activate_finished, result)
+
+        self.run_worker(
+            work,
+            thread=True,
+            exclusive=False,
+            group="personal-supabase-activate",
+            exit_on_error=False,
+        )
+
+    def _on_personal_supabase_activate_finished(self, result: ActivationResult) -> None:
+        detail = _redact_supabase_diagnostic(result.message)
+        if result.status == "success" and result.activated:
+            self._set_error("")
+            self._set_status(f"Activated Supabase schema {result.schema!r}")
+            return
+        if result.status == "blocked":
+            reason = result.blocked_reason or "blocked"
+            self._set_error(detail)
+            self._set_status(
+                f"Activate blocked ({reason}) for schema {result.schema!r}; retry with Ctrl+Shift+S"
+            )
+            return
+        self._set_error(detail or "Personal Supabase Activate failed.")
+        self._set_status("Personal Supabase Activate failed")
 
     def action_view_topic(self) -> None:
         """Open the selected project topic in a read-only modal."""

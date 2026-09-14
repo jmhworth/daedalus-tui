@@ -10,8 +10,6 @@ import uuid
 from pathlib import Path
 from typing import Callable
 
-from .personal_supabase import register_personal_supabase
-
 
 TUI_ROOT = Path(__file__).resolve().parents[1]
 PARAMETER_PATH = TUI_ROOT / "parameter_files" / "daedalus-tui-project-initialization.toml"
@@ -199,9 +197,6 @@ def initialize_project(
     create_github = request.get("createGitHubRepository", False)
     if not isinstance(create_github, bool):
         raise ValueError("createGitHubRepository must be a boolean.")
-    register_personal = request.get("registerPersonalSupabase", False)
-    if not isinstance(register_personal, bool):
-        raise ValueError("registerPersonalSupabase must be a boolean.")
 
     root = (execution_root or Path.cwd()).resolve()
     destination = resolve_destination(root, project_name)
@@ -254,16 +249,6 @@ def initialize_project(
     if not local_complete:
         try:
             materialize_templates(temporary, project_name, settings)
-            if register_personal:
-                registration = register_personal_supabase(temporary, schema=project_name)
-                if registration.status != "success":
-                    safe_cleanup_temporary(root, temporary, project_name)
-                    base_result["status"] = "failed"
-                    base_result["error"] = (
-                        registration.message
-                        or "Personal Supabase schema registration failed."
-                    )
-                    return base_result
             for current_step in steps:
                 if current_step["name"] == "github-auth-status":
                     continue

@@ -9,7 +9,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Restart recovery**: Persisted failed tasks are restored with Retry available, while tasks active during shutdown are restored as paused tasks with their existing worktree context.
 - **Verification repair**: Failed task checks launch repair attempts in the same worktree up to the configured limit.
 - **Verification diagnostics**: When every verification attempt fails, each attempt's failure output is written to the task error panel and included in the final failure message.
-- **Supabase migration push**: After verification succeeds, orchestration runs `supabase db push --yes` only when the task changed `supabase/migrations/` relative to the worktree base commit; failures emit diagnostics and launch coding-profile repairs up to the verification attempt limit before blocking integration. Launch bootstrap may request the same orchestration-owned push for every registered personal schema without consulting `migrations_pending`; task-time verify→push behavior remains unchanged.
+- **Supabase migration push**: After verification succeeds, orchestration runs `supabase db push --yes` only when the task changed `supabase/migrations/` relative to the worktree base commit; failures emit diagnostics and launch coding-profile repairs up to the verification attempt limit before blocking integration. Launch bootstrap env-syncs every registered personal schema and, when `supabase_db_push_enabled`, pushes only activated projects (scaffolded/blocked wait for explicit Activate); task-time verify→push behavior remains unchanged.
 - **Integration-stage retry**: After coding, verification, and any required migration push succeed, failed integration or resolver retries resume at the integration gate instead of re-running the coding agent.
 - **Resolver fallback**: Merge conflicts and post-merge verification failures launch the selected provider as a resolver with the latest failure details.
 - **Configurable target branch**: `target_branch` (default `main`, alias
@@ -46,6 +46,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-09-14: Documented activated-only launch migration push while env-sync still covers all registered personal Supabase projects.
 - 2026-09-13: Threaded the launch-root shared environment through task orchestration and serialized launch/task Supabase pushes per project while preserving task verify→push semantics.
 - 2026-09-13: Noted that personal shared-Supabase schema registration scaffolds migrations only; orchestration remains the sole `supabase db push` owner.
 - 2026-08-25: Added post-verification Supabase migration push with a verify→repair loop when `supabase/migrations/` changed, gated by `supabase_db_push_enabled`.

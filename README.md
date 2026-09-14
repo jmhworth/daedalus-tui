@@ -62,11 +62,12 @@ For personal shared Supabase projects, keep the shared `SUPABASE_PROJECT_REF`,
 `SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN` in this launch-root `.env`.
 Registered projects store only their schema marker; Daedalus synchronizes each
 ignored project `.env` from the launch-root file at startup. When
-`supabase_db_push_enabled` is enabled, startup prepares the registered schema's
-CLI configuration temporarily and pushes its migrations through orchestration.
-Process environment variables remain runtime overrides and are never written to
-disk. Copy the root `.env.example` to `.env`; do not put Supabase credentials in
-tracked feature, parameter, or `.env.example` files.
+`supabase_db_push_enabled` is enabled, startup pushes migrations only for
+projects that have been Activated (ecosystem-ready); scaffolded projects wait
+for explicit Activate via `Ctrl+Shift+S`. Process environment variables remain
+runtime overrides and are never written to disk. Copy the root `.env.example`
+to `.env`; do not put Supabase credentials in tracked feature, parameter, or
+`.env.example` files.
 
 Each prompt creates an independent local Git worktree based on the configured
 `target_branch` (default `main`; `primary_branch` remains accepted as an
