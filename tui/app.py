@@ -32,6 +32,7 @@ from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
 from .project_initializer import initialize_project, load_initializer_settings, validate_project_name
 from .personal_supabase import (
     is_personal_supabase_registered,
+    load_personal_supabase_settings,
     register_personal_supabase,
     schema_from_project_root,
 )
@@ -307,6 +308,83 @@ class KeyboardShortcutsScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
+class PersonalSupabaseConfirmationScreen(ModalScreen[bool]):
+    """Require an explicit confirmation before claiming a shared schema."""
+
+    BINDINGS = [
+        ("escape", "cancel_registration", "Cancel"),
+    ]
+
+    def __init__(self, project_name: str) -> None:
+        super().__init__()
+        self.project_name = project_name
+        self.settings = load_personal_supabase_settings()
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="personal-supabase-confirmation-dialog"):
+            yield Static(
+                str(self.settings["confirmation_title"]),
+                id="personal-supabase-confirmation-title",
+            )
+            yield Static(
+                str(self.settings["confirmation_warning"]),
+                id="personal-supabase-confirmation-warning",
+                markup=False,
+            )
+            yield Static(
+                f"{self.settings['confirmation_name_prompt']}\n{self.project_name}",
+                id="personal-supabase-confirmation-prompt",
+                markup=False,
+            )
+            yield Input(
+                id="personal-supabase-confirmation-input",
+                placeholder=self.project_name,
+            )
+            yield Static("", id="personal-supabase-confirmation-status")
+            with Horizontal(id="personal-supabase-confirmation-actions"):
+                yield Button(
+                    str(self.settings["confirmation_button_label"]),
+                    id="confirm-personal-supabase-button",
+                    variant="error",
+                    disabled=True,
+                )
+                yield Button("Cancel", id="cancel-personal-supabase-button")
+
+    def on_mount(self) -> None:
+        self.query_one("#personal-supabase-confirmation-input", Input).focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "personal-supabase-confirmation-input":
+            return
+        matches = event.value == self.project_name
+        self.query_one("#confirm-personal-supabase-button", Button).disabled = not matches
+        if matches:
+            self.query_one("#personal-supabase-confirmation-status", Static).update("")
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "personal-supabase-confirmation-input":
+            self._confirm()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel-personal-supabase-button":
+            self.dismiss(False)
+        elif event.button.id == "confirm-personal-supabase-button":
+            self._confirm()
+
+    def action_cancel_registration(self) -> None:
+        self.dismiss(False)
+
+    def _confirm(self) -> None:
+        entered = self.query_one("#personal-supabase-confirmation-input", Input).value
+        if entered != self.project_name:
+            self.query_one("#personal-supabase-confirmation-status", Static).update(
+                "Type the project name exactly to enable registration."
+            )
+            self.query_one("#personal-supabase-confirmation-input", Input).focus()
+            return
+        self.dismiss(True)
+
+
 class ProjectInitializerScreen(ModalScreen[dict | None]):
     """Collect a project slug and create a Daedalus-compatible directory."""
 
@@ -330,7 +408,7 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
             yield Input(placeholder="example-project", id="project-name-input")
             yield Checkbox("Also create a private GitHub repository", id="project-github-checkbox")
             yield Checkbox(
-                "Register schema on personal Supabase",
+                "Register schema on personal Supabase (requires confirmation)",
                 id="project-personal-supabase-checkbox",
             )
             yield Static("", id="project-initializer-status")
@@ -376,6 +454,44 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
             name_input.focus()
             return
 
+        if register_personal:
+            self._busy = True
+            status.update("Confirm personal Supabase schema registration…")
+            self.query_one("#create-project-button", Button).disabled = True
+            self.app.push_screen(
+                PersonalSupabaseConfirmationScreen(project_name),
+                lambda confirmed: self._on_supabase_confirmation(
+                    confirmed,
+                    project_name,
+                    create_github,
+                ),
+            )
+            return
+
+        self._initialize_project(project_name, create_github, register_personal=False)
+
+    def _on_supabase_confirmation(
+        self,
+        confirmed: bool,
+        project_name: str,
+        create_github: bool,
+    ) -> None:
+        if not confirmed:
+            self._busy = False
+            self.query_one("#create-project-button", Button).disabled = False
+            self.query_one("#project-initializer-status", Static).update(
+                "Supabase schema registration cancelled."
+            )
+            return
+        self._initialize_project(project_name, create_github, register_personal=True)
+
+    def _initialize_project(
+        self,
+        project_name: str,
+        create_github: bool,
+        register_personal: bool,
+    ) -> None:
+        status = self.query_one("#project-initializer-status", Static)
         self._busy = True
         status.update(f"Initializing {project_name}…")
         self.query_one("#create-project-button", Button).disabled = True
@@ -1172,7 +1288,7 @@ class DaedalusTuiApp(App[None]):
         self.push_screen(CreateTopicScreen(self._active_project_path), self._on_topic_created)
 
     def action_register_personal_supabase(self) -> None:
-        """Scaffold personal shared-Supabase schema files for the active project."""
+        """Ask for confirmation before scaffolding a shared Supabase schema."""
         project_path = self._active_project_path
         try:
             schema = schema_from_project_root(project_path)
@@ -1183,6 +1299,25 @@ class DaedalusTuiApp(App[None]):
         if is_personal_supabase_registered(project_path, schema):
             self._set_status(f"Schema {schema!r} already registered")
             self._refresh_personal_supabase_button()
+            return
+        self._set_status("Confirm personal Supabase schema registration…")
+        self.push_screen(
+            PersonalSupabaseConfirmationScreen(schema),
+            lambda confirmed: self._on_personal_supabase_confirmation(
+                confirmed,
+                project_path,
+                schema,
+            ),
+        )
+
+    def _on_personal_supabase_confirmation(
+        self,
+        confirmed: bool,
+        project_path: Path,
+        schema: str,
+    ) -> None:
+        if not confirmed:
+            self._set_status("Supabase schema registration cancelled")
             return
         result = register_personal_supabase(project_path, schema=schema)
         if result.status != "success":

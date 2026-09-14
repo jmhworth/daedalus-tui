@@ -9,13 +9,14 @@ from unittest.mock import Mock, patch
 from textual import events
 from textual.geometry import Offset
 from textual.selection import Selection as ScreenSelection
-from textual.widgets import Button, DataTable, Log, Select, Static, TextArea
+from textual.widgets import Button, DataTable, Input, Log, Select, Static, TextArea
 from vimkeys_input import VimMode
 
 from tui.app import (
     CodingStatisticsScreen,
     DaedalusTuiApp,
     KeyboardShortcutsScreen,
+    PersonalSupabaseConfirmationScreen,
     ProjectInitializerScreen,
     TopicViewerScreen,
 )
@@ -236,6 +237,24 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(button.disabled)
                 app.action_register_personal_supabase()
                 await pilot.pause()
+                self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
+                self.assertFalse((project / "supabase" / "config.toml").exists())
+                confirmation_input = app.screen.query_one(
+                    "#personal-supabase-confirmation-input",
+                    Input,
+                )
+                confirmation_button = app.screen.query_one(
+                    "#confirm-personal-supabase-button",
+                    Button,
+                )
+                confirmation_input.value = "wrong-name"
+                await pilot.pause()
+                self.assertTrue(confirmation_button.disabled)
+                confirmation_input.value = "demo-app"
+                await pilot.pause()
+                self.assertFalse(confirmation_button.disabled)
+                await app.screen.dismiss(True)
+                await pilot.pause()
                 self.assertTrue(button.disabled)
                 self.assertTrue((project / "supabase" / "config.toml").is_file())
                 self.assertIn(
@@ -246,14 +265,26 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
     async def test_new_project_modal_includes_personal_supabase_checkbox(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            app.push_screen(ProjectInitializerScreen(Path("/tmp")))
+            initializer = ProjectInitializerScreen(Path("/tmp"))
+            app.push_screen(initializer)
             await pilot.pause()
-            from textual.widgets import Checkbox
 
-            checkbox = app.screen.query_one("#project-personal-supabase-checkbox", Checkbox)
+            checkbox = app.screen.query_one("#project-personal-supabase-checkbox")
             self.assertFalse(checkbox.value)
-            await app.screen.dismiss(None)
+            app.screen.query_one("#project-name-input", Input).value = "new-project"
+            checkbox.value = True
+            initializer._create_project()
             await pilot.pause()
+            self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
+            confirmation_input = app.screen.query_one("#personal-supabase-confirmation-input", Input)
+            confirmation_input.value = "new-project"
+            await pilot.pause()
+            self.assertFalse(
+                app.screen.query_one("#confirm-personal-supabase-button", Button).disabled
+            )
+            await app.screen.dismiss(False)
+            await pilot.pause()
+            self.assertIs(app.screen, initializer)
 
     async def test_responsive_layout_transitions_restore_wide_dimensions(self):
         app = DaedalusTuiApp(

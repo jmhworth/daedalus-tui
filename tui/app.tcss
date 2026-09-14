@@ -422,6 +422,10 @@ ProjectInitializerScreen {
     align: center middle;
 }
 
+PersonalSupabaseConfirmationScreen {
+    align: center middle;
+}
+
 CreateTopicScreen {
     align: center middle;
 }
@@ -530,6 +534,47 @@ TopicViewerScreen {
 
 #project-github-checkbox {
     margin-bottom: 1;
+}
+
+#personal-supabase-confirmation-dialog {
+    width: 76;
+    height: auto;
+    border: round $error;
+    background: $surface;
+    padding: 1 2;
+}
+
+#personal-supabase-confirmation-title {
+    color: $error;
+    text-style: bold;
+    height: 2;
+}
+
+#personal-supabase-confirmation-warning,
+#personal-supabase-confirmation-prompt,
+#personal-supabase-confirmation-status {
+    color: $text-muted;
+    height: auto;
+    margin-bottom: 1;
+}
+
+#personal-supabase-confirmation-prompt {
+    color: $text;
+}
+
+#personal-supabase-confirmation-input {
+    margin-bottom: 1;
+}
+
+#personal-supabase-confirmation-actions {
+    height: 3;
+    align: left middle;
+}
+
+#confirm-personal-supabase-button,
+#cancel-personal-supabase-button {
+    width: 20;
+    margin-right: 1;
 }
 
 #project-initializer-actions {
