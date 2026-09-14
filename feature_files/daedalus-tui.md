@@ -164,3 +164,4 @@ HACKING
 - 2026-09-14: Replaced low-frequency project-toolbar actions with keyboard shortcuts, moved coding statistics to `Ctrl+U`, and kept only the `Ctrl+K` shortcut-reference binding visible in the footer.
 - 2026-09-14: Repaired Textual 8 binding compatibility and priority handling so global shortcuts import cleanly and remain active while the prompt editor has focus.
 - 2026-09-14: Made compact-width mode a scrollable vertical workspace with a three-column settings grid and parameterized starting heights for the output transcript and prompt editor.
+- 2026-09-14: Repaired the responsive-layout tests for Textual 8's Layout object API by asserting the grid layout name.
