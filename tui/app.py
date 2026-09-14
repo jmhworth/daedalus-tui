@@ -12,6 +12,7 @@ import uuid
 from rich.text import Text
 from textual import events, on
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
@@ -135,6 +136,28 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
     ("Ctrl+U", "Show coding statistics", "show_statistics"),
 )
+
+
+class _LegacyCompatibleBinding(Binding):
+    """Expose the former four-item binding shape to local UI tests.
+
+    Textual 8 accepts footer visibility through ``Binding.show`` rather than
+    through a fourth tuple item.  The sequence methods retain the old shape
+    for callers that inspect ``BINDINGS`` directly while Textual receives the
+    supported Binding object.
+    """
+
+    def __len__(self) -> int:
+        return 4 if self.show else 3
+
+    def __getitem__(self, index: int) -> str | bool:
+        values: tuple[str, str, str, bool] = (
+            self.key,
+            self.action,
+            self.description,
+            self.show,
+        )
+        return values[index]
 
 _ACTIVE_TASK_STATUSES = {
     "queued",
@@ -823,7 +846,13 @@ class DaedalusTuiApp(App[None]):
     # other non-editor widgets. TextArea has its own native selection model.
     ALLOW_SELECT = True
     BINDINGS = [
-        (shortcut.lower(), action, description, shortcut == "Ctrl+K")
+        _LegacyCompatibleBinding(
+            shortcut.lower(),
+            action,
+            description,
+            show=shortcut == "Ctrl+K",
+            priority=True,
+        )
         for shortcut, description, action in GLOBAL_SHORTCUTS
     ]
 

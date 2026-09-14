@@ -161,3 +161,4 @@ HACKING
 - 2026-09-13: Added opt-in personal shared-Supabase schema registration from New Project and the project task bar (file scaffolding only).
 - 2026-09-13: Repaired Textual 8.2 compatibility for responsive styling and compact selector cascades, including delayed event filtering and Scalar-aware resize assertions.
 - 2026-09-14: Replaced low-frequency project-toolbar actions with keyboard shortcuts, moved coding statistics to `Ctrl+U`, and kept only the `Ctrl+K` shortcut-reference binding visible in the footer.
+- 2026-09-14: Repaired Textual 8 binding compatibility and priority handling so global shortcuts import cleanly and remain active while the prompt editor has focus.
