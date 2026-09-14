@@ -458,7 +458,7 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
         self.schema = schema
         self.settings = load_personal_supabase_settings()
         self.stages = tuple(str(stage) for stage in self.settings["activation_progress_stages"])
-        self._running = True
+        self._activation_running = True
         self._current_stage_index = -1
         self._pending_progress: str | None = None
         self._pending_finish: tuple[bool, str] | None = None
@@ -466,7 +466,7 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
     @property
     def running(self) -> bool:
         """Whether the activation worker still owns this progress surface."""
-        return self._running
+        return self._activation_running
 
     def compose(self) -> ComposeResult:
         with Vertical(id="personal-supabase-progress-dialog"):
@@ -550,7 +550,7 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
 
     def finish(self, succeeded: bool, detail: str) -> None:
         """Freeze the progress display and allow the operator to close it."""
-        self._running = False
+        self._activation_running = False
         if not self._is_mounted:
             self._pending_finish = (succeeded, detail)
             return
@@ -578,11 +578,11 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
         self.query_one("#close-personal-supabase-progress-button", Button).disabled = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "close-personal-supabase-progress-button" and not self._running:
+        if event.button.id == "close-personal-supabase-progress-button" and not self._activation_running:
             self.dismiss(None)
 
     def action_close_activation_progress(self) -> None:
-        if not self._running:
+        if not self._activation_running:
             self.dismiss(None)
 
 

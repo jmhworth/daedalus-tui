@@ -61,6 +61,7 @@ ecosystem-ready.
 HACKING
 
 ## State Log
+- 2026-09-14: Renamed the progress modal's activation-state flag to avoid colliding with Textual's internal message-pump lifecycle field, restoring modal composition and completion rendering.
 - 2026-09-14: Redesigned personal Supabase into Phase 1 scaffold plus Phase 2 Activate with operating-branch Git gate, live preflight, activated-only launch push, and Ctrl+Shift+S retry; removed New Project opt-in.
 - 2026-09-13: Added launch-root canonical environment synchronization and idempotent bootstrap preparation for all discovered registered projects.
 - 2026-09-13: Added file-only personal Supabase schema registration with New Project checkbox, task-bar button, profile guidance, and target `.env.example` placeholders.
