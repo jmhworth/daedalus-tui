@@ -357,6 +357,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self._init_git_repo(project, "main")
             self._write_launch_env(launch, token=True)
             push_calls = []
+            progress = []
 
             def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
                 if command[:3] == ["supabase", "projects", "list"]:
@@ -375,12 +376,26 @@ class PersonalSupabaseTests(unittest.TestCase):
                     schema="demo-app",
                     run_process=fake_run,
                     find_executable=lambda name: f"/bin/{name}",
+                    progress_callback=progress.append,
                 )
 
             self.assertEqual(result.status, "success")
             self.assertTrue(result.activated)
             self.assertTrue(result.scaffolded)
             self.assertEqual(len(push_calls), 1)
+            self.assertEqual(
+                progress,
+                [
+                    "Checking registration",
+                    "Scaffolding project files",
+                    "Validating scaffold",
+                    "Committing scaffold changes",
+                    "Synchronizing environment",
+                    "Checking Supabase connection",
+                    "Pushing migrations",
+                    "Complete",
+                ],
+            )
             status = load_personal_supabase_status(project)
             self.assertTrue(status.activated)
             self.assertEqual(status.last_activate_status, "success")

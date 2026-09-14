@@ -425,6 +425,10 @@ PersonalSupabaseConfirmationScreen {
     align: center middle;
 }
 
+PersonalSupabaseActivationProgressScreen {
+    align: center middle;
+}
+
 CreateTopicScreen {
     align: center middle;
 }
@@ -574,6 +578,49 @@ TopicViewerScreen {
 #cancel-personal-supabase-button {
     width: 20;
     margin-right: 1;
+}
+
+#personal-supabase-progress-dialog {
+    width: 76;
+    height: auto;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#personal-supabase-progress-title {
+    color: $text-accent;
+    text-style: bold;
+    height: 2;
+}
+
+#personal-supabase-progress-subtitle,
+#personal-supabase-progress-status {
+    color: $text-muted;
+    height: auto;
+    margin-bottom: 1;
+}
+
+#personal-supabase-progress-bar {
+    margin-bottom: 1;
+}
+
+#personal-supabase-progress-steps {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#personal-supabase-progress-steps Static {
+    height: 1;
+}
+
+#personal-supabase-progress-actions {
+    height: 3;
+    align: left middle;
+}
+
+#close-personal-supabase-progress-button {
+    width: 20;
 }
 
 #project-initializer-actions {

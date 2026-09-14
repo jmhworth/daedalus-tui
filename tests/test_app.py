@@ -17,6 +17,7 @@ from tui.app import (
     DaedalusTuiApp,
     KeyboardShortcutsScreen,
     PersonalSupabaseConfirmationScreen,
+    PersonalSupabaseActivationProgressScreen,
     ProjectInitializerScreen,
     TopicViewerScreen,
 )
@@ -284,6 +285,16 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
                 activate.assert_called_once()
                 self.assertEqual(activate.call_args.args[2], "main")
+                self.assertIsInstance(app.screen, PersonalSupabaseActivationProgressScreen)
+                self.assertIn(
+                    "Activated personal Supabase schema",
+                    str(
+                        app.screen.query_one(
+                            "#personal-supabase-progress-status",
+                            Static,
+                        ).render()
+                    ),
+                )
                 self.assertIn(
                     "Activated Supabase schema",
                     str(app.query_one("#status", Static).render()),
@@ -310,6 +321,42 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn(
                     "registerPersonalSupabase",
                     initialize.call_args.args[0],
+                )
+
+    async def test_existing_activated_supabase_opens_completed_progress_modal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "demo-app"
+            (project / "feature_files").mkdir(parents=True)
+            (project / ".daedalus").write_text(
+                '[personal_supabase]\nregistered = true\nschema = "demo-app"\nactivated = true\n',
+                encoding="utf-8",
+            )
+            app = DaedalusTuiApp(
+                runner=FakeRunner(),
+                directory=project,
+                settings=settings(),
+                coordinator=FakeCoordinator(),
+            )
+            app._supabase_bootstrap_started = True
+            async with app.run_test() as pilot:
+                await pilot.press("ctrl+shift+s")
+                await pilot.pause()
+
+                self.assertIsInstance(app.screen, PersonalSupabaseActivationProgressScreen)
+                self.assertFalse(
+                    app.screen.query_one(
+                        "#close-personal-supabase-progress-button",
+                        Button,
+                    ).disabled
+                )
+                self.assertIn(
+                    "already activated",
+                    str(
+                        app.screen.query_one(
+                            "#personal-supabase-progress-status",
+                            Static,
+                        ).render()
+                    ),
                 )
 
     async def test_launch_bootstrap_pushes_only_activated_projects(self):

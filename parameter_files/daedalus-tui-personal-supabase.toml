@@ -33,3 +33,14 @@ confirmation_button_label = "Activate"
 activate_commit_message = "Add personal Supabase schema scaffold."
 activate_status_commit_message = "Mark personal Supabase schema activated."
 preflight_timeout_seconds = 15
+activation_progress_title = "Personal Supabase activation"
+activation_progress_subtitle = "The local scaffold, Git, connectivity, and migration steps will appear here."
+activation_progress_stages = [
+  "Scaffold project files",
+  "Validate scaffold",
+  "Commit scaffold changes",
+  "Synchronize environment",
+  "Check Supabase connection",
+  "Push migrations",
+]
+activation_progress_close_label = "Close"

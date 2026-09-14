@@ -12,7 +12,7 @@ import shutil
 import socket
 import subprocess
 import tomllib
-from typing import Iterator
+from collections.abc import Callable, Iterator
 
 from .environment import read_env_file, redact_environment_values, synchronize_env_file
 from .project_config import DAEDALUS_CONFIG_FILENAME
@@ -656,11 +656,29 @@ def activate_personal_supabase(
     executable: str = "supabase",
     run_process=subprocess.run,
     find_executable=shutil.which,
+    progress_callback: Callable[[str], None] | None = None,
 ) -> ActivationResult:
-    """Phase 1 (if needed) then Phase 2: Git commit, preflight, and migration push."""
+    """Phase 1 (if needed) then Phase 2: Git commit, preflight, and migration push.
+
+    ``progress_callback`` receives short, credential-free phase labels for a
+    caller-owned progress surface.
+    """
     root = project_root.expanduser().resolve()
     launch = launch_root.expanduser().resolve()
     settings = load_personal_supabase_settings()
+
+    def report_progress(message: str) -> None:
+        """Report UI progress without letting a stale UI callback break activation."""
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(message)
+        except Exception:
+            # Activation owns the durable operation; the progress surface is
+            # best-effort because it can disappear during application shutdown.
+            pass
+
+    report_progress("Checking registration")
     try:
         status = load_personal_supabase_status(root)
     except ValueError as error:
@@ -678,6 +696,7 @@ def activate_personal_supabase(
             return ActivationResult("failed", str(schema), str(error), root)
 
     if status.registered and status.activated and status.schema == schema_name:
+        report_progress("Already activated")
         return ActivationResult(
             "success",
             schema_name,
@@ -688,6 +707,7 @@ def activate_personal_supabase(
 
     scaffolded = False
     if not status.registered:
+        report_progress("Scaffolding project files")
         registration = register_personal_supabase(root, schema=schema_name)
         if registration.status != "success":
             return ActivationResult("failed", schema_name, registration.message, root)
@@ -703,7 +723,10 @@ def activate_personal_supabase(
             ),
             root,
         )
+    else:
+        report_progress("Using existing scaffold")
 
+    report_progress("Validating scaffold")
     scaffold_error = _validate_supabase_scaffold(root, schema_name, settings)
     if scaffold_error:
         _write_registration_marker(
@@ -722,6 +745,7 @@ def activate_personal_supabase(
             blocked_reason=ACTIVATE_STATUS_BLOCKED_SCAFFOLD,
         )
 
+    report_progress("Committing scaffold changes")
     git_result = commit_personal_supabase_scaffold(
         root,
         operating_branch,
@@ -746,6 +770,7 @@ def activate_personal_supabase(
             blocked_reason=ACTIVATE_STATUS_BLOCKED_GIT,
         )
 
+    report_progress("Synchronizing environment")
     prepared = bootstrap_personal_supabase(root, launch, require_database_access=True)
     if prepared.status != "success":
         message = prepared.message or "Environment synchronization failed."
@@ -766,6 +791,7 @@ def activate_personal_supabase(
             blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
         )
 
+    report_progress("Checking Supabase connection")
     preflight = preflight_personal_supabase(
         launch,
         executable=executable,
@@ -793,6 +819,7 @@ def activate_personal_supabase(
 
     environment = prepared.environment or {}
     project_ref = (prepared.project_ref or "").strip()
+    report_progress("Pushing migrations")
     try:
         with temporary_supabase_cli_config(root, project_ref):
             pushed = push_migrations(root, executable=executable, env=environment)
@@ -862,6 +889,7 @@ def activate_personal_supabase(
             scaffolded=scaffolded,
             committed=git_result.committed,
         )
+    report_progress("Complete")
     return ActivationResult(
         "success",
         schema_name,

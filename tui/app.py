@@ -16,7 +16,19 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, Log, Select, Static, TextArea
+from textual.widgets import (
+    Button,
+    Checkbox,
+    DataTable,
+    Footer,
+    Header,
+    Input,
+    Log,
+    ProgressBar,
+    Select,
+    Static,
+    TextArea,
+)
 from textual.widgets.select import InvalidSelectValueError
 from .agent_runner import AgentRunner
 from .clipboard import copy_to_system_clipboard, paste_from_system_clipboard
@@ -421,6 +433,130 @@ class PersonalSupabaseConfirmationScreen(ModalScreen[bool]):
             self.query_one("#personal-supabase-confirmation-input", Input).focus()
             return
         self.dismiss(True)
+
+
+class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
+    """Show the durable activation phases while the worker runs."""
+
+    BINDINGS = [
+        ("escape", "close_activation_progress", "Close"),
+    ]
+
+    _STAGE_MESSAGES = {
+        "Scaffolding project files": 0,
+        "Using existing scaffold": 0,
+        "Validating scaffold": 1,
+        "Committing scaffold changes": 2,
+        "Synchronizing environment": 3,
+        "Checking Supabase connection": 4,
+        "Pushing migrations": 5,
+    }
+
+    def __init__(self, project_name: str, schema: str) -> None:
+        super().__init__()
+        self.project_name = project_name
+        self.schema = schema
+        self.settings = load_personal_supabase_settings()
+        self.stages = tuple(str(stage) for stage in self.settings["activation_progress_stages"])
+        self._running = True
+        self._current_stage_index = -1
+
+    @property
+    def running(self) -> bool:
+        """Whether the activation worker still owns this progress surface."""
+        return self._running
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="personal-supabase-progress-dialog"):
+            yield Static(
+                str(self.settings["activation_progress_title"]),
+                id="personal-supabase-progress-title",
+            )
+            yield Static(
+                f"{self.settings['activation_progress_subtitle']}\n"
+                f"Project: {self.project_name}  ·  Schema: {self.schema}",
+                id="personal-supabase-progress-subtitle",
+                markup=False,
+            )
+            yield ProgressBar(
+                total=len(self.stages),
+                show_eta=False,
+                id="personal-supabase-progress-bar",
+            )
+            yield Static(
+                "Checking registration…",
+                id="personal-supabase-progress-status",
+                markup=False,
+            )
+            with Vertical(id="personal-supabase-progress-steps"):
+                for index, stage in enumerate(self.stages):
+                    yield Static(
+                        f"○ {stage}",
+                        id=f"personal-supabase-progress-step-{index}",
+                        markup=False,
+                    )
+            with Horizontal(id="personal-supabase-progress-actions"):
+                yield Button(
+                    str(self.settings["activation_progress_close_label"]),
+                    id="close-personal-supabase-progress-button",
+                    disabled=True,
+                )
+
+    def update_progress(self, message: str) -> None:
+        """Mark the current activation phase and retain a readable status line."""
+        self.query_one("#personal-supabase-progress-status", Static).update(message)
+        stage_index = self._STAGE_MESSAGES.get(message)
+        if stage_index is None:
+            stage_index = next(
+                (index for index, stage in enumerate(self.stages) if stage == message),
+                None,
+            )
+        if stage_index is None:
+            return
+        self._current_stage_index = stage_index
+        for index, _stage in enumerate(self.stages):
+            if index < stage_index:
+                marker = "✓"
+            elif index == stage_index:
+                marker = "⟳"
+            else:
+                marker = "○"
+            self.query_one(f"#personal-supabase-progress-step-{index}", Static).update(
+                f"{marker} {self.stages[index]}"
+            )
+        self.query_one("#personal-supabase-progress-bar", ProgressBar).update(
+            progress=stage_index
+        )
+
+    def finish(self, succeeded: bool, detail: str) -> None:
+        """Freeze the progress display and allow the operator to close it."""
+        self._running = False
+        if succeeded:
+            for index, _stage in enumerate(self.stages):
+                self.query_one(f"#personal-supabase-progress-step-{index}", Static).update(
+                    f"✓ {self.stages[index]}"
+                )
+            self.query_one("#personal-supabase-progress-bar", ProgressBar).update(
+                progress=len(self.stages)
+            )
+            status = detail or "Personal Supabase is activated."
+        else:
+            if 0 <= self._current_stage_index < len(self.stages):
+                self.query_one(
+                    f"#personal-supabase-progress-step-{self._current_stage_index}",
+                    Static,
+                ).update(f"✗ {self.stages[self._current_stage_index]}")
+            status = f"Activation blocked: {detail or 'Activation failed.'}"
+        self.query_one("#personal-supabase-progress-status", Static).update(status)
+        self.query_one("#close-personal-supabase-progress-button", Button).disabled = False
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "close-personal-supabase-progress-button" and not self._running:
+            self.dismiss(None)
+
+    def action_close_activation_progress(self) -> None:
+        if not self._running:
+            self.dismiss(None)
 
 
 class ProjectInitializerScreen(ModalScreen[dict | None]):
@@ -891,6 +1027,9 @@ class DaedalusTuiApp(App[None]):
         self._responsive_measure_pending = False
         self._displayed_error = ""
         self._supabase_bootstrap_started = False
+        self._personal_supabase_progress_screen: (
+            PersonalSupabaseActivationProgressScreen | None
+        ) = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -1404,6 +1543,10 @@ class DaedalusTuiApp(App[None]):
 
     def action_register_personal_supabase(self) -> None:
         """Confirm, then scaffold (if needed) and Activate personal Supabase."""
+        progress = self._personal_supabase_progress_screen
+        if progress is not None and progress.running and progress.is_attached:
+            self._set_status("Personal Supabase Activate is already running…")
+            return
         project_path = self._active_project_path
         try:
             schema = schema_from_project_root(project_path)
@@ -1413,6 +1556,14 @@ class DaedalusTuiApp(App[None]):
             self._set_status("Personal Supabase Activate failed")
             return
         if status.registered and status.activated and status.schema == schema:
+            progress = PersonalSupabaseActivationProgressScreen(project_path.name, schema)
+            self._personal_supabase_progress_screen = progress
+            self.push_screen(progress)
+            self.call_after_refresh(
+                progress.finish,
+                True,
+                f"Schema {schema!r} is already activated.",
+            )
             self._set_status(f"Schema {schema!r} already activated")
             return
         if status.registered and not status.activated:
@@ -1452,18 +1603,37 @@ class DaedalusTuiApp(App[None]):
     ) -> None:
         """Run scaffold+Activate in a background worker so the TUI stays responsive."""
         self._set_error("")
+        progress = PersonalSupabaseActivationProgressScreen(project_path.name, schema)
+        self._personal_supabase_progress_screen = progress
+        self.push_screen(progress)
         self._set_status(f"Activating personal Supabase schema {schema!r}…")
         root = project_path.resolve()
         lock = self._migration_push_locks.setdefault(root, threading.Lock())
 
         def work() -> None:
-            with lock:
-                result = activate_personal_supabase(
+            try:
+                with lock:
+                    result = activate_personal_supabase(
+                        root,
+                        self.launch_root,
+                        operating_branch,
+                        schema=schema,
+                        executable=self.orchestration_settings.supabase_executable,
+                        progress_callback=lambda message: self.call_from_thread(
+                            self._on_personal_supabase_activation_progress,
+                            message,
+                        ),
+                    )
+            except Exception as error:
+                log_exception(
+                    f"Personal Supabase Activate failed project={root.name}",
+                    error,
+                )
+                result = ActivationResult(
+                    "failed",
+                    schema,
+                    _redact_supabase_diagnostic(str(error)),
                     root,
-                    self.launch_root,
-                    operating_branch,
-                    schema=schema,
-                    executable=self.orchestration_settings.supabase_executable,
                 )
             self.call_from_thread(self._on_personal_supabase_activate_finished, result)
 
@@ -1475,11 +1645,25 @@ class DaedalusTuiApp(App[None]):
             exit_on_error=False,
         )
 
+    def _on_personal_supabase_activation_progress(self, message: str) -> None:
+        """Forward worker phases to the modal and the main status line."""
+        progress = self._personal_supabase_progress_screen
+        if progress is not None and progress.is_attached:
+            progress.update_progress(message)
+        self._set_status(f"Supabase: {message}")
+
     def _on_personal_supabase_activate_finished(self, result: ActivationResult) -> None:
         detail = _redact_supabase_diagnostic(result.message)
+        progress = self._personal_supabase_progress_screen
         if result.status == "success" and result.activated:
             self._set_error("")
             self._set_status(f"Activated Supabase schema {result.schema!r}")
+            self.call_after_refresh(
+                self._finish_personal_supabase_progress,
+                progress,
+                True,
+                detail,
+            )
             return
         if result.status == "blocked":
             reason = result.blocked_reason or "blocked"
@@ -1487,9 +1671,31 @@ class DaedalusTuiApp(App[None]):
             self._set_status(
                 f"Activate blocked ({reason}) for schema {result.schema!r}; retry with Ctrl+Shift+S"
             )
+            self.call_after_refresh(
+                self._finish_personal_supabase_progress,
+                progress,
+                False,
+                detail,
+            )
             return
         self._set_error(detail or "Personal Supabase Activate failed.")
         self._set_status("Personal Supabase Activate failed")
+        self.call_after_refresh(
+            self._finish_personal_supabase_progress,
+            progress,
+            False,
+            detail,
+        )
+
+    @staticmethod
+    def _finish_personal_supabase_progress(
+        progress: PersonalSupabaseActivationProgressScreen | None,
+        succeeded: bool,
+        detail: str,
+    ) -> None:
+        """Finish a queued modal update only if its screen is still mounted."""
+        if progress is not None and progress.is_attached:
+            progress.finish(succeeded, detail)
 
     def action_view_topic(self) -> None:
         """Open the selected project topic in a read-only modal."""
