@@ -201,6 +201,8 @@ class TaskCoordinator:
         settings: OrchestrationSettings,
         on_event: TaskEventCallback | None = None,
         memory_path: Path | None = None,
+        environment_path: Path | None = None,
+        migration_push_lock: Lock | None = None,
     ) -> None:
         if settings.max_concurrent_tasks < 1:
             raise ValueError("max_concurrent_tasks must be positive")
@@ -208,6 +210,8 @@ class TaskCoordinator:
         self.runner = runner
         self.settings = settings
         self.on_event = on_event
+        self.environment_path = environment_path.resolve() if environment_path is not None else None
+        self.migration_push_lock = migration_push_lock
         self.integration = IntegrationCoordinator()
         self.executor = ThreadPoolExecutor(max_workers=settings.max_concurrent_tasks)
         self._lock = Lock()
@@ -619,13 +623,7 @@ class TaskCoordinator:
             if kind == "message" and message:
                 answer_chunks.append(message)
 
-        orchestrator = LocalOrchestrator(
-            self.repository,
-            self.runner,
-            self.settings,
-            on_event,
-            integration_gate=self.integration.run_when_ready,
-        )
+        orchestrator = self._orchestrator(on_event)
         try:
             result = orchestrator.run(
                 prompt,
@@ -689,6 +687,21 @@ class TaskCoordinator:
                     return clarification
         return None
 
+    def _orchestrator(self, on_event: Callable[..., None]) -> LocalOrchestrator:
+        """Construct an orchestrator with the shared launch environment when configured."""
+        options: dict[str, object] = {"integration_gate": self.integration.run_when_ready}
+        if self.environment_path is not None:
+            options["environment_path"] = self.environment_path
+        if self.migration_push_lock is not None:
+            options["migration_push_lock"] = self.migration_push_lock
+        return LocalOrchestrator(
+            self.repository,
+            self.runner,
+            self.settings,
+            on_event,
+            **options,
+        )
+
     def _run(self, record: TaskRecord) -> None:
         LOGGER.info("Task worker started task=%s mode=%s", record.task_id, record.mode)
         record.started_at = time.time()
@@ -705,12 +718,8 @@ class TaskCoordinator:
         if record.retry_output_context:
             resume_notes += (record.retry_output_context,)
         record.retry_output_context = None
-        orchestrator = LocalOrchestrator(
-            self.repository,
-            self.runner,
-            self.settings,
-            lambda phase, message, kind="status": self._handle_event(record, phase, message, kind),
-            integration_gate=self.integration.run_when_ready,
+        orchestrator = self._orchestrator(
+            lambda phase, message, kind="status": self._handle_event(record, phase, message, kind)
         )
         try:
             result = orchestrator.run(

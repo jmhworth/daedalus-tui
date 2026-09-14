@@ -2,7 +2,8 @@
 
 This directory is an independently exportable project. It contains the
 Textual interface and all local agent orchestration code; it does not import
-the Daedalus daemon, use a database, or communicate with Supabase.
+the Daedalus daemon or depend on a database service. Registered personal-Supabase
+projects may use the locally installed Supabase CLI through orchestration.
 
 Install it into the Python environment used from the target repository:
 
@@ -45,7 +46,7 @@ defaults in the `[layout]` table of
 `parameter_files/daedalus-tui.toml` (`compact_width`, `short_height`,
 `compact_task_sidebar_height`, and `compact_prompt_height`).
 
-For Cursor CLI, edit the included `.env` file (or copy `.env.example` to a
+For Cursor CLI, edit the launch-root `.env` file (or copy `.env.example` to a
 new `.env`) and set your key:
 
 ```bash
@@ -55,6 +56,17 @@ cp .env.example .env
 
 The TUI passes `CURSOR_API_KEY` to Cursor only when it is not already present
 in the process environment. You can also authenticate with `agent login`.
+
+For personal shared Supabase projects, keep the shared `SUPABASE_PROJECT_REF`,
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and either
+`SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN` in this launch-root `.env`.
+Registered projects store only their schema marker; Daedalus synchronizes each
+ignored project `.env` from the launch-root file at startup. When
+`supabase_db_push_enabled` is enabled, startup prepares the registered schema's
+CLI configuration temporarily and pushes its migrations through orchestration.
+Process environment variables remain runtime overrides and are never written to
+disk. Copy the root `.env.example` to `.env`; do not put Supabase credentials in
+tracked feature, parameter, or `.env.example` files.
 
 Each prompt creates an independent local Git worktree based on the configured
 `target_branch` (default `main`; `primary_branch` remains accepted as an

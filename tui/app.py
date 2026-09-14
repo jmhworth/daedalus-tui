@@ -27,14 +27,18 @@ from .config import (
     load_tui_settings,
 )
 from .debug_log import LOGGER, close_fault_handler, configure_debug_logging, install_fault_handler, log_exception
+from .environment import cursor_environment, redact_environment_values
 from .git_worktree import GitWorktreeError, list_local_branches, push_branch, remote_exists
 from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
 from .project_initializer import initialize_project, load_initializer_settings, validate_project_name
 from .personal_supabase import (
+    PersonalSupabaseBootstrapResult,
+    bootstrap_personal_supabase,
     is_personal_supabase_registered,
     load_personal_supabase_settings,
     register_personal_supabase,
     schema_from_project_root,
+    temporary_supabase_cli_config,
 )
 from .projects import DaedalusProject, discover_projects, is_direct_child_project
 from .plan import (
@@ -48,6 +52,7 @@ from .plan import (
 )
 from .prompts import build_topic_population_prompt
 from .task_coordinator import TaskCoordinator, TaskRecord
+from .supabase_migrations import push_migrations
 from .topics import (
     TOPIC_NONE_VALUE,
     build_topic_template,
@@ -67,6 +72,11 @@ from .vim_text_area import DaedalusVimTextArea
 def _literal_select_options(options: list[tuple[str, str]]) -> list[tuple[Text, str]]:
     """Build Select prompts that Rich will not parse as markup."""
     return [(Text(label), value) for label, value in options]
+
+
+def _redact_supabase_diagnostic(message: str, environment: dict[str, str] | None = None) -> str:
+    """Remove known credential values before diagnostics reach the UI or log."""
+    return truncate_diagnostic(redact_environment_values(message, environment))
 
 
 _THREAD_EXIT_APPS: dict[int, "DaedalusTuiApp"] = {}
@@ -847,6 +857,7 @@ class DaedalusTuiApp(App[None]):
             discovered.insert(0, DaedalusProject(active_project, self.launch_root))
         self.projects = tuple(discovered)
         self._coordinators: dict[Path, TaskCoordinator] = {}
+        self._migration_push_locks: dict[Path, threading.Lock] = {}
         self._external_coordinator = coordinator
         self._active_project_path = active_project
         self.directory = active_project
@@ -881,6 +892,7 @@ class DaedalusTuiApp(App[None]):
         self._short_height_mode = False
         self._responsive_measure_pending = False
         self._displayed_error = ""
+        self._supabase_bootstrap_started = False
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -1004,6 +1016,112 @@ class DaedalusTuiApp(App[None]):
                             yield Static("Idle", id="status")
         yield Footer()
 
+    def _start_personal_supabase_bootstrap(self) -> None:
+        """Synchronize and optionally push every registered discovered project."""
+        if self._supabase_bootstrap_started:
+            return
+        self._supabase_bootstrap_started = True
+        projects = tuple(
+            project.path.resolve()
+            for project in self.projects
+            if is_direct_child_project(project.path, self.launch_root)
+        )
+        if not projects:
+            return
+        self._set_status("Preparing personal Supabase…")
+
+        def work() -> None:
+            results: list[tuple[Path, PersonalSupabaseBootstrapResult, str]] = []
+            for project_path in projects:
+                lock = self._migration_push_locks.setdefault(project_path, threading.Lock())
+                prepared: PersonalSupabaseBootstrapResult | None = None
+                try:
+                    with lock:
+                        prepared = bootstrap_personal_supabase(
+                            project_path,
+                            self.launch_root,
+                            require_database_access=self.orchestration_settings.supabase_db_push_enabled,
+                        )
+                        push_message = ""
+                        if (
+                            prepared.status == "success"
+                            and self.orchestration_settings.supabase_db_push_enabled
+                        ):
+                            runtime_environment = cursor_environment(
+                                project_path,
+                                (project_path / ".env", self.launch_root / ".env"),
+                            )
+                            project_ref_key = str(
+                                load_personal_supabase_settings()["env_project_ref_key"]
+                            )
+                            project_ref = runtime_environment.get(project_ref_key, "").strip()
+                            with temporary_supabase_cli_config(project_path, project_ref):
+                                pushed = push_migrations(
+                                    project_path,
+                                    executable=self.orchestration_settings.supabase_executable,
+                                    env=runtime_environment,
+                                )
+                            if not pushed.succeeded:
+                                push_message = _redact_supabase_diagnostic(
+                                    pushed.output, runtime_environment
+                                ) or "Supabase migration push failed."
+                        results.append((project_path, prepared, push_message))
+                except Exception as error:  # Keep one project from blocking other projects.
+                    log_exception(
+                        f"Personal Supabase bootstrap failed project={project_path.name}",
+                        error,
+                    )
+                    results.append(
+                        (
+                            project_path,
+                            PersonalSupabaseBootstrapResult(
+                                "failed",
+                                project_path,
+                                message=_redact_supabase_diagnostic(
+                                    str(error),
+                                    prepared.environment if prepared is not None else None,
+                                ),
+                            ),
+                            "",
+                        )
+                    )
+            self.call_from_thread(self._on_personal_supabase_bootstrap_finished, results)
+
+        self.run_worker(
+            work,
+            thread=True,
+            exclusive=True,
+            group="personal-supabase-bootstrap",
+            exit_on_error=False,
+        )
+
+    def _on_personal_supabase_bootstrap_finished(
+        self,
+        results: list[tuple[Path, PersonalSupabaseBootstrapResult, str]],
+    ) -> None:
+        registered = [item for item in results if item[1].status != "skipped"]
+        failures = [
+            (path, result, push_message)
+            for path, result, push_message in results
+            if result.status == "failed" or push_message
+        ]
+        if failures:
+            diagnostics = []
+            for path, result, push_message in failures:
+                detail = push_message or result.message or "Bootstrap failed."
+                diagnostics.append(f"{path.name}: {_redact_supabase_diagnostic(detail)}")
+            self._set_error("\n".join(diagnostics))
+            self._set_status(f"Supabase bootstrap incomplete ({len(failures)} project(s))")
+            return
+        if registered:
+            action = "environments synchronized"
+            if self.orchestration_settings.supabase_db_push_enabled:
+                action = "bootstrap complete"
+            self._set_status(f"Supabase {action} ({len(registered)} project(s))")
+        else:
+            self._set_status(f"Supabase bootstrap skipped ({len(results)} unregistered project(s))")
+
+
     def on_mount(self) -> None:
         self.debug_log_path = configure_debug_logging(self.debug_log_path)
         self._fault_log_file = install_fault_handler(self.debug_log_path)
@@ -1018,6 +1136,7 @@ class DaedalusTuiApp(App[None]):
         self._refresh_task_list()
         self._refresh_compact_setting_value()
         self._apply_responsive_layout()
+        self._start_personal_supabase_bootstrap()
         prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
         prompt.enter_insert_mode()
         prompt.focus()
@@ -1838,6 +1957,10 @@ class DaedalusTuiApp(App[None]):
             coordinator = self._external_coordinator
             self._external_coordinator = None
             coordinator.settings = settings
+            coordinator.environment_path = self.launch_root / ".env"
+            coordinator.migration_push_lock = self._migration_push_locks.setdefault(
+                project_path, threading.Lock()
+            )
         else:
             coordinator = TaskCoordinator(
                 project_path,
@@ -1845,6 +1968,10 @@ class DaedalusTuiApp(App[None]):
                 settings,
                 self._on_task_event,
                 memory_path=self.launch_root / DEFAULT_MEMORY_FILE,
+                environment_path=self.launch_root / ".env",
+                migration_push_lock=self._migration_push_locks.setdefault(
+                    project_path, threading.Lock()
+                ),
             )
         if hasattr(coordinator, "set_event_callback"):
             coordinator.set_event_callback(self._on_task_event)

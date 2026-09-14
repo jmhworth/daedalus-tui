@@ -9,7 +9,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Restart recovery**: Persisted failed tasks are restored with Retry available, while tasks active during shutdown are restored as paused tasks with their existing worktree context.
 - **Verification repair**: Failed task checks launch repair attempts in the same worktree up to the configured limit.
 - **Verification diagnostics**: When every verification attempt fails, each attempt's failure output is written to the task error panel and included in the final failure message.
-- **Supabase migration push**: After verification succeeds, orchestration runs `supabase db push --yes` only when the task changed `supabase/migrations/` relative to the worktree base commit; failures emit diagnostics and launch coding-profile repairs up to the verification attempt limit before blocking integration. Personal schema registration (separate feature) only scaffolds those migration files; this feature remains the sole remote push owner.
+- **Supabase migration push**: After verification succeeds, orchestration runs `supabase db push --yes` only when the task changed `supabase/migrations/` relative to the worktree base commit; failures emit diagnostics and launch coding-profile repairs up to the verification attempt limit before blocking integration. Launch bootstrap may request the same orchestration-owned push for every registered personal schema without consulting `migrations_pending`; task-time verify→push behavior remains unchanged.
 - **Integration-stage retry**: After coding, verification, and any required migration push succeed, failed integration or resolver retries resume at the integration gate instead of re-running the coding agent.
 - **Resolver fallback**: Merge conflicts and post-merge verification failures launch the selected provider as a resolver with the latest failure details.
 - **Configurable target branch**: `target_branch` (default `main`, alias
@@ -25,7 +25,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Profile prompt boundary**: The orchestrator reloads the selected repository profile from the active task worktree and embeds it inline before each task, repair, follow-up planning, or resolver prompt; agents apply supplied profile content directly without reopening the file, while the mode and orchestration constraints that follow remain authoritative.
 - **Topic prompt boundary**: When a task carries a topic slug, the orchestrator reloads that topic markdown from the task worktree and embeds it with mode-specific instructions before task, repair, and resolver prompts; missing topics emit a non-fatal diagnostic and omit the embed.
 - **Graph refresh boundary**: Graphify runs only after successful primary promotion, and a failed refresh is cleaned up and reported without starting a resolver.
-- **Local-only boundary**: No persistence or daemon communications. Orchestration may push pending Supabase migrations for target projects via the Supabase CLI; agents still do not own DB push. Automated orchestration never pushes Git remotes; an explicit operator Push in the TUI may publish the selected operating branch.
+- **Local-only boundary**: No persistence or daemon communications. The launch-root `.env` is the canonical shared Supabase environment and is threaded into task agents and CLI pushes; project `.env` files are ignored synchronized copies. Orchestration may push Supabase migrations via the CLI; agents still do not own DB push. Automated orchestration never pushes Git remotes; an explicit operator Push in the TUI may publish the selected operating branch.
 - **Project discovery boundary**: The TUI discovers only immediate launch-root child directories containing `feature_files`; nested paths are excluded, with the launch root used only when no eligible child exists.
 - **Project-scoped execution**: The TUI creates one coordinator per discovered `feature_files` project, so task numbering, worktrees, branches, and integration gates stay scoped to the selected repository.
 - **Shutdown diagnostics**: A rotating project-local debug log records agent process IDs, task transitions, Textual exceptions, worker shutdown, and on-demand all-thread stack dumps.
@@ -39,12 +39,14 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - `tui/topics.py`: Topic discovery and embed helpers used at prompt-build time.
 - `tui/verification.py`: Configured and convention-based verification execution.
 - `tui/supabase_migrations.py`: Pending migration detection and non-interactive `supabase db push`.
+- `tui/environment.py`, `tui/personal_supabase.py`: Canonical environment loading, safe synchronization, and temporary project-ref preparation used by launch and task pushes.
 - `parameter_files/daedalus-tui-orchestration.toml`: Default target branch seed, worktree, verification, migration push, and retry settings.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-13: Threaded the launch-root shared environment through task orchestration and serialized launch/task Supabase pushes per project while preserving task verify→push semantics.
 - 2026-09-13: Noted that personal shared-Supabase schema registration scaffolds migrations only; orchestration remains the sole `supabase db push` owner.
 - 2026-08-25: Added post-verification Supabase migration push with a verify→repair loop when `supabase/migrations/` changed, gated by `supabase_db_push_enabled`.
 - 2026-08-25: Clarified that remote push remains outside automated orchestration while the TUI may offer an operator-owned Push for the selected operating branch.

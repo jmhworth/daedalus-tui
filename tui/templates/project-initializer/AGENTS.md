@@ -21,6 +21,14 @@ Do not read unrelated profiles.
 
 Do not automatically read every file under `.agents/`.
 
+## Shared personal Supabase
+
+If this project has a `[personal_supabase]` registration in `.daedalus`, its
+schema is project-specific but shared connection details belong to the Daedalus
+launch-root `.env`. Daedalus synchronizes the ignored project `.env` at launch.
+Never commit credentials, use the `public` schema, or run `supabase db push`;
+orchestration prepares and applies migrations.
+
 ## Topics
 
 Optional topic umbrellas live in `topic_files/`. Not every task needs a topic.

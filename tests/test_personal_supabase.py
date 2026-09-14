@@ -6,11 +6,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from tui.personal_supabase import (
+    bootstrap_personal_supabase,
     is_personal_supabase_registered,
     load_personal_supabase_status,
     profile_guidance_section,
     register_personal_supabase,
     schema_from_project_root,
+    temporary_supabase_cli_config,
 )
 from tui.project_initializer import initialize_project
 
@@ -124,6 +126,98 @@ class PersonalSupabaseTests(unittest.TestCase):
         self.assertIn("`demo-app`", section)
         self.assertIn("public", section)
         self.assertIn("supabase db push", section)
+
+    def test_launch_bootstrap_syncs_root_env_and_restores_placeholder_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            launch = root / "launch"
+            project = launch / "demo-app"
+            project.mkdir(parents=True)
+            self._seed_project(launch, "demo-app")
+            register_personal_supabase(project, schema="demo-app")
+            (launch / ".env").write_text(
+                "SUPABASE_PROJECT_REF=shared-ref\n"
+                "SUPABASE_URL=https://example.test\n"
+                "SUPABASE_ANON_KEY=anon-key\n"
+                "SUPABASE_SERVICE_ROLE_KEY=service-key\n"
+                "SUPABASE_DB_URL=postgres://user:password@example.test/db\n",
+                encoding="utf-8",
+            )
+            config = project / "supabase" / "config.toml"
+            original = config.read_text(encoding="utf-8")
+
+            result = bootstrap_personal_supabase(project, launch)
+            self.assertEqual(result.status, "success")
+            self.assertEqual(result.project_ref, "shared-ref")
+            project_env = (project / ".env").read_text(encoding="utf-8")
+            self.assertIn("SUPABASE_PROJECT_REF=shared-ref", project_env)
+            self.assertIn("SUPABASE_SCHEMA=demo-app", project_env)
+            with temporary_supabase_cli_config(project, "shared-ref"):
+                self.assertIn('project_id = "shared-ref"', config.read_text(encoding="utf-8"))
+            self.assertEqual(config.read_text(encoding="utf-8"), original)
+
+    def test_launch_bootstrap_reports_missing_credentials_without_writing_project_env(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            launch = root / "launch"
+            self._seed_project(launch, "demo-app")
+            project = launch / "demo-app"
+            register_personal_supabase(project, schema="demo-app")
+
+            result = bootstrap_personal_supabase(project, launch)
+
+            self.assertEqual(result.status, "failed")
+            self.assertIn("database access", result.message)
+            self.assertFalse((project / ".env").exists())
+
+    def test_disabled_push_bootstrap_syncs_without_database_access(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            launch = root / "launch"
+            self._seed_project(launch, "demo-app")
+            project = launch / "demo-app"
+            register_personal_supabase(project, schema="demo-app")
+            (launch / ".env").write_text(
+                "SUPABASE_PROJECT_REF=shared-ref\n"
+                "SUPABASE_URL=https://example.test\n"
+                "SUPABASE_ANON_KEY=anon-key\n"
+                "SUPABASE_SERVICE_ROLE_KEY=service-key\n",
+                encoding="utf-8",
+            )
+
+            result = bootstrap_personal_supabase(
+                project,
+                launch,
+                require_database_access=False,
+            )
+
+            self.assertEqual(result.status, "success")
+            self.assertIn("SUPABASE_PROJECT_REF=shared-ref", (project / ".env").read_text(encoding="utf-8"))
+
+    def test_launch_bootstrap_rejects_project_env_conflict_atomically(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            launch = root / "launch"
+            self._seed_project(launch, "demo-app")
+            project = launch / "demo-app"
+            register_personal_supabase(project, schema="demo-app")
+            (launch / ".env").write_text(
+                "SUPABASE_PROJECT_REF=shared-ref\n"
+                "SUPABASE_URL=https://example.test\n"
+                "SUPABASE_ANON_KEY=anon-key\n"
+                "SUPABASE_SERVICE_ROLE_KEY=service-key\n"
+                "SUPABASE_DB_URL=postgres://user:password@example.test/db\n",
+                encoding="utf-8",
+            )
+            project_env = project / ".env"
+            project_env.write_text("# preserve\nSUPABASE_URL=https://other.test\n", encoding="utf-8")
+            before = project_env.read_text(encoding="utf-8")
+
+            result = bootstrap_personal_supabase(project, launch)
+
+            self.assertEqual(result.status, "failed")
+            self.assertIn("conflicting", result.message)
+            self.assertEqual(project_env.read_text(encoding="utf-8"), before)
 
     def test_new_project_flag_registers_before_git_commit(self):
         with tempfile.TemporaryDirectory() as tmp:

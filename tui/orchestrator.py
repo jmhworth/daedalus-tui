@@ -4,15 +4,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 import uuid
 from typing import Callable
 
 from .agent_runner import AgentControl, AgentRequest, AgentResult, AgentRunner
 from .debug_log import LOGGER, log_exception
-from .environment import cursor_environment
+from .environment import cursor_environment, redact_environment_values
 from .graphify import update_repository
 from .git_worktree import GitWorktreeError, GitWorktreeManager, WorktreeContext
 from .project_config import load_project_worktree_settings
+from .personal_supabase import (
+    is_personal_supabase_registered,
+    load_personal_supabase_settings,
+    temporary_supabase_cli_config,
+)
 from .prompts import (
     build_migration_repair_prompt,
     build_repair_prompt,
@@ -78,12 +84,16 @@ class LocalOrchestrator:
         settings: OrchestrationSettings,
         on_event: EventCallback,
         integration_gate: IntegrationGate | None = None,
+        environment_path: Path | None = None,
+        migration_push_lock: Lock | None = None,
     ):
         self.repository = repository.resolve()
         self.runner = runner
         self.settings = settings
         self.on_event = on_event
         self.integration_gate = integration_gate or (lambda _sequence, operation: operation())
+        self.environment_path = environment_path.resolve() if environment_path is not None else None
+        self.migration_push_lock = migration_push_lock
         self._tokens_consumed = 0
 
     def run(
@@ -276,7 +286,11 @@ class LocalOrchestrator:
             model=model,
             reasoning=reasoning,
             writable_directories=(context.path,),
-            environment_files=(self.repository / ".env",),
+            environment_files=(
+                (self.repository / ".env", self.environment_path)
+                if self.environment_path is not None
+                else (self.repository / ".env",)
+            ),
             control=control,
             timeout_seconds=self.settings.agent_timeout_seconds,
         )
@@ -359,25 +373,59 @@ class LocalOrchestrator:
     ) -> None:
         if not self.settings.supabase_db_push_enabled:
             return
+        lock = self.migration_push_lock
+        if lock is None:
+            self._push_migrations_with_repairs(
+                manager, context, selection, original, control, topic_slug
+            )
+            return
+        with lock:
+            self._push_migrations_with_repairs(
+                manager, context, selection, original, control, topic_slug
+            )
+
+    def _push_migrations_with_repairs(
+        self,
+        manager: GitWorktreeManager,
+        context: WorktreeContext,
+        selection: tuple[str, str, str],
+        original: str,
+        control: AgentControl | None,
+        topic_slug: str | None,
+    ) -> None:
         attempts = 0
         failure_log: list[str] = []
         limit = self.settings.task_verification_attempt_limit
-        environment = cursor_environment(context.path, (self.repository / ".env",))
+        extra_environment = (self.environment_path,) if self.environment_path is not None else ()
+        environment = cursor_environment(context.path, (self.repository / ".env", *extra_environment))
+        project_ref_key = str(load_personal_supabase_settings()["env_project_ref_key"])
+        project_ref = environment.get(project_ref_key, "").strip()
+        personal_registered = is_personal_supabase_registered(context.path)
         while True:
             if not migrations_pending(context.path, context.base_commit):
                 return
             self.emit("migrations", "Pushing pending Supabase migrations.")
             self._raise_if_stopped(control)
-            result = push_migrations(
-                context.path,
-                executable=self.settings.supabase_executable,
-                env=environment,
-            )
+            if personal_registered:
+                with temporary_supabase_cli_config(context.path, project_ref):
+                    result = push_migrations(
+                        context.path,
+                        executable=self.settings.supabase_executable,
+                        env=environment,
+                    )
+            else:
+                result = push_migrations(
+                    context.path,
+                    executable=self.settings.supabase_executable,
+                    env=environment,
+                )
             self._raise_if_stopped(control)
             if result.succeeded:
                 return
             attempts += 1
-            reason = result.output.strip() or "Migration push produced no diagnostic output."
+            reason = redact_environment_values(
+                result.output.strip(), environment
+            ) or "Migration push produced no diagnostic output."
             attempt_summary = f"Migration push attempt {attempts}/{limit} failed.\n\n{reason}"
             failure_log.append(attempt_summary)
             self.emit("migrations", attempt_summary, "error")

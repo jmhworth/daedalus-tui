@@ -9,7 +9,7 @@ The TUI can initialize a new Daedalus-compatible project under the launch root b
 - **`.daedalus` scaffold**: New projects receive a TOML `.daedalus` with an empty `[worktree]` table (`install_command`, `readonly_paths`) so orchestration provisioning is ready to configure.
 - **Recoverable requests**: A `.git/daedalus-initialization-request-id` marker lets retries recognize initializer-owned projects without overwriting unrelated directories.
 - **Local by default**: Graphify install and Git init/commit always run; GitHub creation is optional and private.
-- **Optional personal Supabase**: New Project can opt into file-only schema registration on the operator's shared Supabase database (see personal-supabase feature); remote apply stays with orchestration.
+- **Optional personal Supabase**: New Project can opt into schema registration on the operator's shared Supabase database (see personal-supabase feature). The launch-root `.env` owns shared URL, project ref, keys, and database access; launch bootstrap synchronizes ignored project `.env` files and remote apply stays with orchestration.
 - **Discovery refresh**: After success, the TUI rediscovers `feature_files` projects and switches to the new project.
 
 ## Relevant Files
@@ -24,6 +24,7 @@ The TUI can initialize a new Daedalus-compatible project under the launch root b
 HACKING
 
 ## State Log
+- 2026-09-13: Updated initialization guidance so registered projects inherit shared Supabase connection details from the launch-root environment at launch.
 - 2026-09-13: New Project can optionally register a personal shared-Supabase schema (file scaffolding only) before the initial commit.
 - 2026-08-24: New Project templates now include an empty `topic_files/` directory for optional Topics.
 - 2026-08-24: New Project template materialization now includes a scaffold `.daedalus` TOML with empty worktree install/readonly settings.

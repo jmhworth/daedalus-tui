@@ -1,12 +1,28 @@
 # Tunables for opt-in personal shared-Supabase schema registration.
-# Secrets never belong here; connection values live only in the target .env.example.
+# Secrets never belong here; connection values live only in the launch-root .env.
 snippet_version = 1
 maximum_schema_name_length = 100
 env_schema_key = "SUPABASE_SCHEMA"
+env_project_ref_key = "SUPABASE_PROJECT_REF"
 env_url_key = "SUPABASE_URL"
 env_anon_key = "SUPABASE_ANON_KEY"
 env_service_role_key = "SUPABASE_SERVICE_ROLE_KEY"
 env_db_url_key = "SUPABASE_DB_URL"
+env_access_token_key = "SUPABASE_ACCESS_TOKEN"
+canonical_env_keys = [
+  "SUPABASE_PROJECT_REF",
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_DB_URL",
+  "SUPABASE_ACCESS_TOKEN",
+]
+required_env_keys = [
+  "SUPABASE_PROJECT_REF",
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+]
 migration_filename = "20260101000000_create_personal_schema.sql"
 profile_section_heading = "## Personal Supabase Schema"
 config_project_id_placeholder = "YOUR_SHARED_SUPABASE_PROJECT_REF"

@@ -2,8 +2,9 @@
 
 This repository is the standalone Daedalus TUI project. It contains the
 Textual application, local agent execution, Git worktree orchestration,
-verification, and tests. It does not depend on the Daedalus daemon, database,
-Supabase, or remote Git operations.
+verification, and tests. It does not depend on the Daedalus daemon or a
+database service; orchestration may invoke the locally installed Supabase CLI
+for registered projects. It does not perform remote Git operations.
 
 ## Task mode
 
