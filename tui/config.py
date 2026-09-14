@@ -27,16 +27,17 @@ class LayoutSettings:
 
     The wide controls are measured against their laid-out regions above this
     width; the guard keeps very narrow terminals in compact mode while those
-    regions are not usable yet. Settings selectors below ``wide_control_min_width``
-    use the compact category/value picker instead of shrinking into unreadable
-    controls.
+    regions are not usable yet. Compact mode moves the settings into a
+    three-column grid instead of shrinking them into unreadable controls and
+    uses the output and prompt heights as initial scrollable workspace sizes.
     """
 
     compact_width: int = 100
     short_height: int = 32
     compact_task_sidebar_height: int = 8
-    compact_prompt_height: int = 4
+    compact_prompt_height: int = 8
     wide_control_min_width: int = 13
+    compact_output_height: int = 16
 
 
 @dataclass(frozen=True)
@@ -99,8 +100,9 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
         compact_width=int(layout_values.get("compact_width", 100)),
         short_height=int(layout_values.get("short_height", 32)),
         compact_task_sidebar_height=int(layout_values.get("compact_task_sidebar_height", 8)),
-        compact_prompt_height=int(layout_values.get("compact_prompt_height", 4)),
+        compact_prompt_height=int(layout_values.get("compact_prompt_height", 8)),
         wide_control_min_width=int(layout_values.get("wide_control_min_width", 14)),
+        compact_output_height=int(layout_values.get("compact_output_height", 16)),
     )
     if any(value < 1 for value in (
         layout.compact_width,
@@ -108,6 +110,7 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
         layout.short_height,
         layout.compact_task_sidebar_height,
         layout.compact_prompt_height,
+        layout.compact_output_height,
     )):
         raise ValueError(f"{path} layout values must be positive.")
 

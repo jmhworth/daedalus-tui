@@ -13,7 +13,7 @@ from rich.text import Text
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, Log, Select, Static, TextArea
@@ -931,7 +931,7 @@ class DaedalusTuiApp(App[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="screen"):
+        with VerticalScroll(id="screen"):
             with Horizontal(id="workspace"):
                 with Vertical(id="task-sidebar"):
                     yield Static("Task updates", id="task-label")
@@ -1234,7 +1234,7 @@ class DaedalusTuiApp(App[None]):
         short = height < self.settings.layout.short_height
         self._compact_mode = compact
         self._short_height_mode = short
-        screen = self.query_one("#screen", Vertical)
+        screen = self.query_one("#screen", VerticalScroll)
         screen.set_class(compact, "compact-width")
         screen.set_class(short, "short-height")
         task_sidebar = self.query_one("#task-sidebar", Vertical)
@@ -1247,6 +1247,10 @@ class DaedalusTuiApp(App[None]):
             self.settings.layout.compact_prompt_height
             if compact or short
             else 7
+        )
+        output_panel = self.query_one("#output-panel", Vertical)
+        output_panel.styles.height = (
+            self.settings.layout.compact_output_height if compact else "1fr"
         )
         output.styles.width = "1fr" if compact else self.settings.output_width
         self._refresh_compact_setting_value()

@@ -300,7 +300,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(app._short_height_mode)
             self.assertEqual(app.query_one("#task-sidebar").styles.height.value, 6)
             self.assertEqual(app.query_one("#prompt-input").styles.height.value, 3)
-            self.assertEqual(app.query_one("#compact-settings").styles.display, "block")
+            self.assertEqual(app.query_one("#output-panel").styles.height.value, 16)
+            self.assertEqual(app.query_one("#settings").styles.display, "block")
+            self.assertEqual(app.query_one("#settings").styles.layout, "grid")
+            self.assertEqual(app.query_one("#compact-settings").styles.display, "none")
             self.assertEqual(app.query("#new-project-button").nodes, [])
 
             await pilot.resize_terminal(180, 40)
@@ -324,8 +327,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             self.assertTrue(app._compact_mode)
-            self.assertEqual(app.query_one("#settings").styles.display, "none")
-            self.assertEqual(app.query_one("#compact-settings").styles.display, "block")
+            self.assertEqual(app.query_one("#settings").styles.display, "block")
+            self.assertEqual(app.query_one("#settings").styles.layout, "grid")
+            self.assertEqual(app.query_one("#compact-settings").styles.display, "none")
 
             await pilot.resize_terminal(180, 40)
             await pilot.pause()

@@ -11,6 +11,7 @@ Screen {
 #screen {
     height: 1fr;
     padding: 1 2;
+    overflow-x: hidden;
 }
 
 #workspace {
@@ -309,13 +310,14 @@ Screen {
     color: $text-muted;
 }
 
-/* Narrow terminals use a vertical workspace and a two-level settings picker. */
+/* Narrow terminals use a scrollable vertical workspace and a three-column settings grid. */
 #screen.compact-width {
     padding: 1;
 }
 
 #screen.compact-width #workspace {
     layout: vertical;
+    height: auto;
 }
 
 #screen.compact-width #task-sidebar {
@@ -327,28 +329,31 @@ Screen {
 
 #screen.compact-width #project-main {
     width: 1fr;
-    height: 1fr;
-    min-height: 1;
+    height: auto;
     padding-left: 0;
 }
 
 #screen.compact-width #settings {
-    display: none;
+    display: block;
+    layout: grid;
+    width: 1fr;
+    height: auto;
+    grid-size: 3;
+    grid-columns: 1fr 1fr 1fr;
+    grid-gutter: 1;
 }
 
 #screen.compact-width #compact-settings {
-    display: block;
-    width: 1fr;
-    height: 7;
+    display: none;
 }
 
-#screen.compact-width #compact-settings Select {
+#screen.compact-width #settings > * {
     width: 1fr;
-    margin-bottom: 0;
+    margin-right: 0;
 }
 
-#screen.compact-width #compact-settings-category {
-    margin-bottom: 1;
+#screen.compact-width #settings Button {
+    width: 1fr;
 }
 
 #screen.compact-width #task-bar {
@@ -373,6 +378,10 @@ Screen {
 
 #screen.compact-width #output {
     width: 1fr;
+}
+
+#screen.compact-width #output-panel {
+    min-height: 8;
 }
 
 /* Short terminals keep the output flexible by reducing surrounding chrome. */

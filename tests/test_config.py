@@ -22,7 +22,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual([item.value for item in settings.modes], ["coding", "ask", "plan"])
         self.assertEqual(settings.output_width, "95%")
         self.assertEqual(settings.task_inbox_widths, (1, 9, 14, 7))
-        self.assertEqual(settings.layout, LayoutSettings(100, 32, 8, 4))
+        self.assertEqual(settings.layout, LayoutSettings(100, 32, 8, 8))
         self.assertEqual(orchestration.primary_branch, "main")
         self.assertEqual(orchestration.resolver_attempt_limit, 3)
         self.assertEqual(orchestration.max_concurrent_tasks, 4)

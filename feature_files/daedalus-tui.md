@@ -42,6 +42,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
 - **Keyboard-first actions**: Low-frequency actions stay out of the project toolbar and are available through `Ctrl+Shift+N` (new project), `Ctrl+Shift+T` (create topic), `Ctrl+Shift+S` (register Supabase schema), and `Ctrl+T` (new task); `Ctrl+U` opens coding statistics, while `Ctrl+K` opens the shortcut reference and is the only global binding shown in the bottom footer.
+- **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a three-column settings grid above the output and composer, giving the transcript and prompt larger starting heights while retaining independent scrolling inside each widget.
 
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
@@ -162,3 +163,4 @@ HACKING
 - 2026-09-13: Repaired Textual 8.2 compatibility for responsive styling and compact selector cascades, including delayed event filtering and Scalar-aware resize assertions.
 - 2026-09-14: Replaced low-frequency project-toolbar actions with keyboard shortcuts, moved coding statistics to `Ctrl+U`, and kept only the `Ctrl+K` shortcut-reference binding visible in the footer.
 - 2026-09-14: Repaired Textual 8 binding compatibility and priority handling so global shortcuts import cleanly and remain active while the prompt editor has focus.
+- 2026-09-14: Made compact-width mode a scrollable vertical workspace with a three-column settings grid and parameterized starting heights for the output transcript and prompt editor.
