@@ -75,7 +75,11 @@
   "73": "CandidateFeatureGroup",
   "74": "__init__.py",
   "75": "CallGraphRunnerTests",
+  "76": "IntegrationCoordinator",
+  "77": "update_repository",
+  "78": ".__init__",
   "79": ".nav_word_end",
   "80": ".edit_paste_after",
+  "81": ".on_data_table_row_selected",
   "82": ".on_resize"
 }
