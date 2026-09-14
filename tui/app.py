@@ -1397,7 +1397,14 @@ class DaedalusTuiApp(App[None]):
 
     def _schedule_responsive_measurement(self) -> None:
         """Run the wide-layout measurement after the next screen refresh."""
-        self.screen.call_after_refresh(self._apply_measured_responsive_layout)
+        # App.on_resize runs before Textual forwards the resize event to the
+        # default screen. Defer once more after the first refresh so the
+        # measurement cannot inspect the previous compact layout and switch
+        # back to compact mode during a resize to a wide terminal.
+        self.screen.call_after_refresh(
+            self.screen.call_after_refresh,
+            self._apply_measured_responsive_layout,
+        )
 
     def _apply_measured_responsive_layout(self) -> None:
         """Switch to compact mode when wide controls extend past their bars."""
