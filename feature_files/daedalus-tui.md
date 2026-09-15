@@ -5,9 +5,10 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 
 ## Key Points
 - **Independent project boundary**: The exported `tui` project owns its UI, provider execution, configuration, tests, and local orchestration modules without importing `local-daemon`.
-- **Provider controls**: Codex exposes Luna, Terra, and Sol with light, medium,
-  high, and extra-high reasoning; Cursor CLI is a provider-only choice with
-  model and reasoning disabled. The settings bar also exposes a per-project
+- **Provider controls**: Codex exposes GPT-6 Astra, Luna, Terra, and Sol with
+  light, medium, high, extra-high, and max reasoning; Cursor CLI is a
+  provider-only choice with model and reasoning disabled. The settings bar also
+  exposes a per-project
   Branch Select for the operating branch used by new task worktrees, with an
   operator Push control that publishes that branch to `origin`.
 - **Responsive layouts**: Terminal resize events switch narrow screens to a
@@ -167,3 +168,4 @@ HACKING
 - 2026-09-14: Made compact-width mode a scrollable vertical workspace with a three-column settings grid and parameterized starting heights for the output transcript and prompt editor.
 - 2026-09-14: Repaired the responsive-layout tests for Textual 8's Layout object API by asserting the grid layout name.
 - 2026-09-14: Replaced terminal-ambiguous Ctrl+Shift letter bindings with reliable F2/F3/F4 shortcuts and covered the New Project modal path.
+- 2026-09-15: Added selectable GPT-6 Astra support and mapped the new Max reasoning effort to Codex CLI's `max` value while preserving the Luna default.

@@ -14,10 +14,10 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.default_model, "gpt-5.6-luna")
         self.assertEqual(settings.default_reasoning, "high")
         self.assertEqual([item.value for item in settings.codex_models], [
-            "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+            "gpt-6-astra", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
         ])
         self.assertEqual([item.value for item in settings.codex_reasoning], [
-            "light", "medium", "high", "extra-high",
+            "light", "medium", "high", "extra-high", "max",
         ])
         self.assertEqual([item.value for item in settings.modes], ["coding", "ask", "plan"])
         self.assertEqual(settings.output_width, "95%")

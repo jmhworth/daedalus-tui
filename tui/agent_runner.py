@@ -47,6 +47,7 @@ REASONING_MAP = {
     "medium": "medium",
     "high": "high",
     "extra-high": "xhigh",
+    "max": "max",
 }
 
 

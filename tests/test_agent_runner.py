@@ -70,6 +70,16 @@ class AgentRunnerTests(unittest.TestCase):
             ],
         )
 
+    def test_builds_codex_command_with_max_reasoning(self):
+        self.assertEqual(
+            AgentRunner().command_for(self.request(model="gpt-6-astra", reasoning="max")),
+            [
+                "codex", "exec", "-m", "gpt-6-astra", "-c",
+                'model_reasoning_effort="max"', "--sandbox", "workspace-write",
+                "--add-dir", "/workspace/project", "--json", "Inspect this project",
+            ],
+        )
+
     def test_builds_exact_cursor_command(self):
         self.assertEqual(
             AgentRunner().command_for(self.request("cursor", "cursor", "")),
