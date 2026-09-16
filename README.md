@@ -32,7 +32,8 @@ immediate child directories; nested descendants are not traversed or listed.
 Folders with a `feature_files/` directory are listed first as Daedalus
 projects, and plain Git checkouts are listed after them so the TUI is not
 limited to projects you have already converted. The selector shows each
-project's plain directory name. Set `include_all_directories = true` in the `[projects]` table of
+project's plain directory name. Set `include_all_directories = true` in the
+`[projects]` table of
 `parameter_files/daedalus-tui.toml` to list every child directory, or
 `include_git_repositories = false` to show Daedalus projects only. If no
 eligible child project exists, the launch directory remains available as a
@@ -44,8 +45,8 @@ A project that lives somewhere else — created, cloned, or moved outside the
 launch root — is reachable through the project selector's trailing **Open
 directory…** entry. It asks for one path (absolute, `~`-relative, or relative
 to the launch root), then adds that directory to the selector and switches
-onto it. Opened directories are remembered in
-`.daedalus-memory.json` and return on the next launch, so the selector only
+onto it. Opened directories are remembered in `.daedalus-memory.json` and
+return on the next launch, so the selector only
 ever grows by the projects you actually open, and an opened directory that no
 longer exists is dropped and forgotten at startup.
 
