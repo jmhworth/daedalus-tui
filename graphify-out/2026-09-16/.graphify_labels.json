@@ -81,5 +81,9 @@
   "79": ".edit_paste_before",
   "80": ".edit_paste_after",
   "81": ".enter_insert_mode",
-  "82": ".nav_word_end"
+  "82": ".nav_word_end",
+  "83": "ProjectInitializerScreen",
+  "84": "._rebuild_plan_questions",
+  "85": ".__init__",
+  "86": "._on_topic_created"
 }
