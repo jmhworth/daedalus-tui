@@ -2265,6 +2265,14 @@ class DaedalusTuiApp(App[None]):
         # stopped or finished so one task never has two executing runs.
         nodes.first().disabled = record is not None and record.status in ACTIVE_RUN_STATUSES
 
+    @staticmethod
+    def _record_has_active_run(record: TaskRecord) -> bool:
+        """Treat inconsistent task and run metadata as active until it settles."""
+        if record.status in ACTIVE_RUN_STATUSES:
+            return True
+        runs = getattr(record, "runs", None) or ()
+        return bool(runs) and getattr(runs[-1], "status", None) in ACTIVE_RUN_STATUSES
+
     def _refresh_prompt_history(self, record: TaskRecord | None) -> None:
         nodes = self.query("#prompt-history-select")
         if not nodes:
@@ -2387,7 +2395,11 @@ class DaedalusTuiApp(App[None]):
         )
         self._submission_in_progress = True
         try:
-            if followup_record is not None and self._selected_task_id == followup_record.task_id:
+            if (
+                followup_record is not None
+                and self._selected_task_id == followup_record.task_id
+                and not self._record_has_active_run(followup_record)
+            ):
                 record = self._submit_followup(followup_record, raw_text, provider, model, reasoning, mode, topic)
             else:
                 record = self.coordinator.submit(raw_text, provider, model, reasoning, mode, topic=topic)
@@ -2586,9 +2598,11 @@ class DaedalusTuiApp(App[None]):
         if project_path is None:
             return
         pushed = parse_push_notice(message)
-        if pushed is not None and project_path == self._active_project_path:
-            self._push_confirmation_branch = pushed[0]
-            self._refresh_push_button()
+        if pushed is not None:
+            self._record_pushed_commit(project_path, *pushed)
+            if project_path == self._active_project_path:
+                self._push_confirmation_branch = pushed[0]
+                self._refresh_push_button()
         self._set_error("")
         self._set_status(message)
 
@@ -2612,7 +2626,7 @@ class DaedalusTuiApp(App[None]):
             coordinator = self._external_coordinator
             self._external_coordinator = None
             coordinator.settings = settings
-            if isinstance(coordinator, TaskCoordinator):
+            if hasattr(coordinator, "memory"):
                 # Keep injected coordinators on the same launch-root memory as
                 # coordinators created by the app, including push history.
                 coordinator.memory = self.memory
@@ -2774,6 +2788,45 @@ class DaedalusTuiApp(App[None]):
             exit_on_error=False,
         )
 
+    def _record_pushed_commit(
+        self,
+        project_path: Path,
+        branch: str,
+        remote: str,
+        commit: str,
+    ) -> Path | None:
+        """Persist push history, falling back when a target root is read-only."""
+        try:
+            self.memory.record_pushed_commit(project_path, branch, remote, commit)
+            return self.memory.path
+        except (OSError, ValueError) as error:
+            primary_error = error
+
+        fallback_path = self.storage.data_root / DEFAULT_MEMORY_FILE
+        if fallback_path.resolve() == self.memory.path.resolve():
+            LOGGER.warning(
+                "Could not persist pushed commit commit=%s error=%s",
+                commit,
+                primary_error,
+            )
+            return None
+        fallback = TaskMemoryStore(fallback_path)
+        try:
+            fallback.record_pushed_commit(project_path, branch, remote, commit)
+        except (OSError, ValueError) as fallback_error:
+            LOGGER.warning(
+                "Could not persist pushed commit commit=%s primary_error=%s fallback_error=%s",
+                commit,
+                primary_error,
+                fallback_error,
+            )
+            return None
+        self.memory = fallback
+        for coordinator in self._coordinators.values():
+            if hasattr(coordinator, "memory"):
+                coordinator.memory = fallback
+        return fallback.path
+
     def _on_push_finished(
         self,
         succeeded: bool,
@@ -2789,24 +2842,15 @@ class DaedalusTuiApp(App[None]):
         if succeeded:
             self._set_error("")
             if isinstance(commit, str) and commit:
-                recorded = False
-                try:
-                    self.memory.record_pushed_commit(
-                        project_path or self._active_project_path,
-                        branch,
-                        "origin",
-                        commit,
-                    )
-                    recorded = True
-                except (OSError, ValueError) as storage_error:
-                    LOGGER.warning(
-                        "Could not persist pushed commit commit=%s error=%s",
-                        commit,
-                        storage_error,
-                    )
-                if recorded:
+                recorded_path = self._record_pushed_commit(
+                    project_path or self._active_project_path,
+                    branch,
+                    "origin",
+                    commit,
+                )
+                if recorded_path is not None:
                     self._set_status(
-                        f"Pushed {branch} to origin (commit {commit[:12]}); recorded in {self.memory.path}"
+                        f"Pushed {branch} to origin (commit {commit[:12]}); recorded in {recorded_path}"
                     )
                 else:
                     self._set_status(

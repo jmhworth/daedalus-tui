@@ -26,7 +26,9 @@ daemon, a remote service, or a database server.
 - **Pushed commits**: A `pushed_commits` entry keeps each successful operating
   branch push's timestamp, project, remote, branch, and full commit SHA. The
   TUI exposes these records through its Push log view; duplicate notifications
-  for the same commit are ignored.
+  for the same commit are ignored. If a target launch root is read-only, the
+  TUI falls back to its configured local storage root so the push remains
+  browsable.
 - **Task history**: A single `tasks` entry maps each task worktree directory
   name to an ISO-8601 UTC submission `timestamp`, prompt, provider, model,
   reasoning, mode, current state, assistant outputs, non-negative token usage,
@@ -88,6 +90,7 @@ daemon, a remote service, or a database server.
 HACKING
 
 ## State Log
+- 2026-09-16: Kept push history browsable when a target launch root is read-only by falling back to the configured TUI storage root.
 - 2026-09-15: Added schema-version-2 conversation fields (title, turns, runs, active ids, prompt count, storage paths), stable logical task keys with one-time migration, `interrupted` restoration of runs active at shutdown, and a `ui_preferences` entry.
 - 2026-08-24: Persisted optional task `topic` slugs so tagged topics survive restart and rehydration.
 - 2026-08-23: Added a per-project `project_target_branches` map so Branch Select choices persist in launch-root memory without rewriting the orchestration parameter default.

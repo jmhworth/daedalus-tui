@@ -41,6 +41,7 @@ HACKING
 
 ## State Log
 
+- 2026-09-16: Kept deletion's cursor restoration compatible with consecutive submissions whose run metadata is still settling.
 - 2026-09-16: Added cursor-targeted `dd` deletion for inactive sidebar tasks,
   coordinator cleanup, and durable snapshot removal.
 - 2026-09-16: Preserved the sidebar cursor row after `dd` rebuilds the task

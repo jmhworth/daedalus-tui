@@ -147,6 +147,10 @@ Screen {
     margin-right: 1;
 }
 
+#settings Button {
+    min-width: 0;
+}
+
 #view-topic-button {
     width: 13;
     margin-right: 1;
