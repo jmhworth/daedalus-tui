@@ -30,11 +30,20 @@ class VerificationResult:
 
 
 def python_executable() -> str:
-    """Pick an interpreter that actually exists; many macOS setups only ship python3."""
-    for candidate in ("python", "python3"):
+    """Prefer the running interpreter's absolute path.
+
+    A bare ``python`` is resolved against the agent's PATH at discovery time but
+    executed later in the worktree with whatever PATH the child process inherits,
+    and it can also resolve to a version-manager shim that is executable yet fails
+    to exec. ``sys.executable`` is already running, so it is always a real
+    interpreter and needs no PATH lookup.
+    """
+    if sys.executable:
+        return sys.executable
+    for candidate in ("python3", "python"):
         if shutil.which(candidate):
             return candidate
-    return sys.executable
+    return "python3"
 
 
 def discover_commands(root: Path, configured: list[list[str]]) -> list[list[str]]:

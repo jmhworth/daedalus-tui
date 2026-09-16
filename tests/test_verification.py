@@ -23,23 +23,23 @@ class VerificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self._suite_tree(root)
-            with patch("tui.verification.shutil.which", return_value="/usr/bin/python"):
+            with patch("tui.verification.sys.executable", "/venv/bin/python"):
                 self.assertEqual(
                     discover_commands(root, []),
                     [
                         ["npm", "test"],
-                        ["python", "-m", "pytest"],
-                        ["python", "-m", "pytest", "child/tests"],
+                        ["/venv/bin/python", "-m", "pytest"],
+                        ["/venv/bin/python", "-m", "pytest", "child/tests"],
                     ],
                 )
 
-    def test_falls_back_to_python3_when_python_is_missing(self):
+    def test_falls_back_to_python3_when_the_interpreter_path_is_unknown(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self._suite_tree(root)
-            with patch(
+            with patch("tui.verification.sys.executable", ""), patch(
                 "tui.verification.shutil.which",
-                side_effect=lambda name: None if name == "python" else "/usr/bin/python3",
+                side_effect=lambda name: "/usr/bin/python3" if name == "python3" else None,
             ):
                 self.assertEqual(
                     discover_commands(root, []),
@@ -49,6 +49,13 @@ class VerificationTests(unittest.TestCase):
                         ["python3", "-m", "pytest", "child/tests"],
                     ],
                 )
+
+    def test_never_emits_a_bare_python_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._suite_tree(root)
+            for command in discover_commands(root, []):
+                self.assertNotEqual(command[0], "python")
 
     def test_python_executable_resolves_to_an_existing_interpreter(self):
         resolved = python_executable()
