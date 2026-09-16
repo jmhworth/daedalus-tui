@@ -893,8 +893,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_agent_runner",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "test_agent_runner.py"
     },
     {
@@ -904,8 +904,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "tests_test_agent_runner_fakestream",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "fakestream"
     },
     {
@@ -915,8 +915,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "tests_test_agent_runner_fakestream_init",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".__init__()"
     },
     {
@@ -926,8 +926,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "tests_test_agent_runner_fakestream_readline",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".readline()"
     },
     {
@@ -937,8 +937,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "tests_test_agent_runner_fakestream_close",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".close()"
     },
     {
@@ -959,8 +959,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "tests_test_agent_runner_fakeprocess_init",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".__init__()"
     },
     {
@@ -992,8 +992,8 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "tests_test_agent_runner_interruptibleprocess",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "interruptibleprocess"
     },
     {
@@ -1003,8 +1003,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "tests_test_agent_runner_interruptibleprocess_init",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".__init__()"
     },
     {
@@ -1014,8 +1014,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "tests_test_agent_runner_interruptibleprocess_poll",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".poll()"
     },
     {
@@ -1025,8 +1025,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "tests_test_agent_runner_interruptibleprocess_terminate",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".terminate()"
     },
     {
@@ -1124,8 +1124,8 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "tests_test_agent_runner_agentrunnertests_test_termination_kills_the_complete_agent_process_group",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".test_termination_kills_the_complete_agent_process_group()"
     },
     {
@@ -1223,8 +1223,8 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "tests_test_agent_runner_agentrunnertests_test_reads_cursor_env_file_without_requiring_python_dotenv",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".test_reads_cursor_env_file_without_requiring_python_dotenv()"
     },
     {
@@ -1234,8 +1234,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_app",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 57,
+      "community_name": "DescriptorEmbedder",
       "norm_label": "test_app.py"
     },
     {
@@ -1311,8 +1311,8 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "tests_test_app_fakecoordinator_tasks",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": ".tasks()"
     },
     {
@@ -1344,8 +1344,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "tests_test_app_fakecoordinator_finish",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 49,
+      "community_name": "._render_line_strip",
       "norm_label": ".finish()"
     },
     {
@@ -1509,8 +1509,8 @@
       "source_location": "L225",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_command_menu_register_supabase_opens_confirmation",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": ".test_command_menu_register_supabase_opens_confirmation()"
     },
     {
@@ -2180,8 +2180,8 @@
       "source_location": "L2005",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_revised_plan_options_do_not_remount_stale_select_values",
-      "community": 49,
-      "community_name": "._render_line_strip",
+      "community": 26,
+      "community_name": ".provider_split",
       "norm_label": ".test_revised_plan_options_do_not_remount_stale_select_values()"
     },
     {
@@ -2191,8 +2191,8 @@
       "source_location": "L2052",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_plan_answer_select_init_coerces_illegal_stale_value",
-      "community": 49,
-      "community_name": "._render_line_strip",
+      "community": 26,
+      "community_name": ".provider_split",
       "norm_label": ".test_plan_answer_select_init_coerces_illegal_stale_value()"
     },
     {
@@ -2323,8 +2323,8 @@
       "source_location": "L2380",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_output_log_supports_textual_selection",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 49,
+      "community_name": "._render_line_strip",
       "norm_label": ".test_output_log_supports_textual_selection()"
     },
     {
@@ -2422,8 +2422,8 @@
       "source_location": "L2526",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_multiple_tasks_keep_independent_snapshots_and_transcripts",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 49,
+      "community_name": "._render_line_strip",
       "norm_label": ".test_multiple_tasks_keep_independent_snapshots_and_transcripts()"
     },
     {
@@ -2444,8 +2444,8 @@
       "source_location": "L2583",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_background_completion_promotes_an_unselected_task",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 49,
+      "community_name": "._render_line_strip",
       "norm_label": ".test_background_completion_promotes_an_unselected_task()"
     },
     {
@@ -2477,8 +2477,8 @@
       "source_location": "L2006",
       "_origin": "ast",
       "id": "tests_test_app_rationale_2006",
-      "community": 49,
-      "community_name": "._render_line_strip",
+      "community": 26,
+      "community_name": ".provider_split",
       "norm_label": "follow-up questions must not crash when old option ids linger on widgets."
     },
     {
@@ -2488,8 +2488,8 @@
       "source_location": "L2053",
       "_origin": "ast",
       "id": "tests_test_app_rationale_2053",
-      "community": 49,
-      "community_name": "._render_line_strip",
+      "community": 26,
+      "community_name": ".provider_split",
       "norm_label": "deferred select init must not fatal-exit on a leftover option id."
     },
     {
@@ -2587,8 +2587,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 23,
+      "community_name": "update_repository",
       "norm_label": "test_call_graph_tree.py"
     },
     {
@@ -2631,8 +2631,8 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_build_tree_marks_cycles_and_respects_max_depth",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": ".test_build_tree_marks_cycles_and_respects_max_depth()"
     },
     {
@@ -2642,8 +2642,8 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_select_roots_prefers_entry_points",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": ".test_select_roots_prefers_entry_points()"
     },
     {
@@ -2653,8 +2653,8 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_select_roots_falls_back_to_orphan_nodes",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": ".test_select_roots_falls_back_to_orphan_nodes()"
     },
     {
@@ -2664,8 +2664,8 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_render_html_contains_expected_fqns_and_svg_tree",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": ".test_render_html_contains_expected_fqns_and_svg_tree()"
     },
     {
@@ -2675,8 +2675,8 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_layout_keeps_wide_sibling_labels_from_overlapping",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": ".test_layout_keeps_wide_sibling_labels_from_overlapping()"
     },
     {
@@ -2697,8 +2697,8 @@
       "source_location": "L165",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_tokenize_descriptor_splits_identifiers",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 23,
+      "community_name": "update_repository",
       "norm_label": ".test_tokenize_descriptor_splits_identifiers()"
     },
     {
@@ -2818,8 +2818,8 @@
       "source_location": "L412",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_similarity_disabled_html_has_no_candidate_feature_widget",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": ".test_similarity_disabled_html_has_no_candidate_feature_widget()"
     },
     {
@@ -2840,8 +2840,8 @@
       "source_location": "L442",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_render_call_graph_tree_writes_html_scores_and_json",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 72,
+      "community_name": "render_call_graph_tree.py",
       "norm_label": ".test_render_call_graph_tree_writes_html_scores_and_json()"
     },
     {
@@ -2851,8 +2851,8 @@
       "source_location": "L493",
       "_origin": "ast",
       "id": "tests_test_call_graph_tree_callgraphtreetests_test_render_html_includes_variable_lineage_when_provided",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": ".test_render_html_includes_variable_lineage_when_provided()"
     },
     {
@@ -2950,8 +2950,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_environment",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "test_environment.py"
     },
     {
@@ -2961,8 +2961,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "tests_test_environment_environmenttests",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "environmenttests"
     },
     {
@@ -2972,8 +2972,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "tests_test_environment_environmenttests_test_sync_preserves_comments_unrelated_values_and_is_idempotent",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".test_sync_preserves_comments_unrelated_values_and_is_idempotent()"
     },
     {
@@ -2983,8 +2983,8 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "tests_test_environment_environmenttests_test_conflict_does_not_modify_target",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".test_conflict_does_not_modify_target()"
     },
     {
@@ -2994,8 +2994,8 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "tests_test_environment_environmenttests_test_process_environment_is_not_written_by_sync",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".test_process_environment_is_not_written_by_sync()"
     },
     {
@@ -3005,8 +3005,8 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "tests_test_environment_environmenttests_test_resolved_values_overlay_satisfies_required_keys",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".test_resolved_values_overlay_satisfies_required_keys()"
     },
     {
@@ -3522,8 +3522,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_orchestrator",
-      "community": 4,
-      "community_name": "app.py",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "test_orchestrator.py"
     },
     {
@@ -4300,7 +4300,7 @@
       "label": ".test_failure_cleans_temporary_directory_without_touching_existing_destination()",
       "file_type": "code",
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L110",
+      "source_location": "L119",
       "_origin": "ast",
       "id": "tests_test_project_initializer_projectinitializertests_test_failure_cleans_temporary_directory_without_touching_existing_destination",
       "community": 20,
@@ -4311,7 +4311,7 @@
       "label": ".test_github_failure_keeps_local_repository_and_uses_explicit_arguments()",
       "file_type": "code",
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L144",
+      "source_location": "L153",
       "_origin": "ast",
       "id": "tests_test_project_initializer_projectinitializertests_test_github_failure_keeps_local_repository_and_uses_explicit_arguments",
       "community": 20,
@@ -4322,7 +4322,7 @@
       "label": ".test_optional_personal_supabase_registration_is_no_longer_supported()",
       "file_type": "code",
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L174",
+      "source_location": "L183",
       "_origin": "ast",
       "id": "tests_test_project_initializer_projectinitializertests_test_optional_personal_supabase_registration_is_no_longer_supported",
       "community": 20,
@@ -4333,7 +4333,7 @@
       "label": ".test_matching_request_recovery_does_not_repeat_local_initialization()",
       "file_type": "code",
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L203",
+      "source_location": "L212",
       "_origin": "ast",
       "id": "tests_test_project_initializer_projectinitializertests_test_matching_request_recovery_does_not_repeat_local_initialization",
       "community": 20,
@@ -4622,8 +4622,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_task_coordinator",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": "test_task_coordinator.py"
     },
     {
@@ -4633,8 +4633,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_fakeorchestrator",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": "fakeorchestrator"
     },
     {
@@ -4644,8 +4644,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_fakeorchestrator_init",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": ".__init__()"
     },
     {
@@ -4655,8 +4655,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_fakeorchestrator_run",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": ".run()"
     },
     {
@@ -4710,8 +4710,8 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_first_ready_integration_is_serialized",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": ".test_first_ready_integration_is_serialized()"
     },
     {
@@ -5117,8 +5117,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "tests_test_variable_lineage_sample_files",
-      "community": 35,
-      "community_name": "agent_runner.py",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "_sample_files()"
     },
     {
@@ -5128,8 +5128,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_variable_lineage_py_path",
-      "community": 35,
-      "community_name": "agent_runner.py",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "path"
     },
     {
@@ -5150,8 +5150,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "tests_test_variable_lineage_variablelineagetests_setupclass",
-      "community": 35,
-      "community_name": "agent_runner.py",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": ".setupclass()"
     },
     {
@@ -5293,8 +5293,8 @@
       "source_location": "L222",
       "_origin": "ast",
       "id": "tests_test_variable_lineage_variablelineagetests_test_json_sidecar_roundtrip",
-      "community": 35,
-      "community_name": "agent_runner.py",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": ".test_json_sidecar_roundtrip()"
     },
     {
@@ -5304,8 +5304,8 @@
       "source_location": "L232",
       "_origin": "ast",
       "id": "tests_test_variable_lineage_variablelineagetests_test_html_panel_renders_variable_lineage_section",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": ".test_html_panel_renders_variable_lineage_section()"
     },
     {
@@ -5315,8 +5315,8 @@
       "source_location": "L262",
       "_origin": "ast",
       "id": "tests_test_variable_lineage_variablelineagetests_test_render_call_graph_tree_writes_lineage_json",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 72,
+      "community_name": "render_call_graph_tree.py",
       "norm_label": ".test_render_call_graph_tree_writes_lineage_json()"
     },
     {
@@ -5403,8 +5403,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_init",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "__init__.py"
     },
     {
@@ -5414,8 +5414,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "tui_init_getattr",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "__getattr__()"
     },
     {
@@ -5425,8 +5425,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_init_rationale_1",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "standalone textual interface and local agent orchestration."
     },
     {
@@ -5436,8 +5436,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_main",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "__main__.py"
     },
     {
@@ -5447,8 +5447,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "tui_main_main",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "main()"
     },
     {
@@ -5458,8 +5458,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_agent_runner",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "agent_runner.py"
     },
     {
@@ -5469,8 +5469,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "tui_agent_runner_agentlogevent",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "agentlogevent"
     },
     {
@@ -5480,8 +5480,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "tui_agent_runner_timeouttracker",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "_timeouttracker"
     },
     {
@@ -5491,8 +5491,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "tui_agent_runner_timeouttracker_init",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".__init__()"
     },
     {
@@ -5502,8 +5502,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "tui_agent_runner_timeouttracker_reset",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".reset()"
     },
     {
@@ -5513,8 +5513,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "tui_agent_runner_timeouttracker_expired",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".expired()"
     },
     {
@@ -5634,8 +5634,8 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_run",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".run()"
     },
     {
@@ -5645,8 +5645,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "outputcallback",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "outputcallback"
     },
     {
@@ -5656,8 +5656,8 @@
       "source_location": "L308",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_wait_for_process",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._wait_for_process()"
     },
     {
@@ -5667,8 +5667,8 @@
       "source_location": "L332",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_terminate_process",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._terminate_process()"
     },
     {
@@ -5678,8 +5678,8 @@
       "source_location": "L358",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_stream_stdout",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._stream_stdout()"
     },
     {
@@ -5689,8 +5689,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "thread",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "thread"
     },
     {
@@ -5700,8 +5700,8 @@
       "source_location": "L392",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_forward_event",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._forward_event()"
     },
     {
@@ -5711,8 +5711,8 @@
       "source_location": "L400",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_stream",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._stream()"
     },
     {
@@ -5733,8 +5733,8 @@
       "source_location": "L428",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_parse_cursor_event",
-      "community": 79,
-      "community_name": ".edit_paste_before",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".parse_cursor_event()"
     },
     {
@@ -5744,8 +5744,8 @@
       "source_location": "L453",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_normalize_output",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._normalize_output()"
     },
     {
@@ -5755,8 +5755,8 @@
       "source_location": "L472",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_json_payloads",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._json_payloads()"
     },
     {
@@ -5766,8 +5766,8 @@
       "source_location": "L488",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_extract_token_usage",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._extract_token_usage()"
     },
     {
@@ -5777,8 +5777,8 @@
       "source_location": "L516",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_tokens_from_usage",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._tokens_from_usage()"
     },
     {
@@ -5788,8 +5788,8 @@
       "source_location": "L539",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_first_integer",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._first_integer()"
     },
     {
@@ -5799,8 +5799,8 @@
       "source_location": "L547",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_failure_diagnostics",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._failure_diagnostics()"
     },
     {
@@ -5810,8 +5810,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_agent_runner_rationale_1",
-      "community": 44,
-      "community_name": "CandidateFeatureGroup",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "provider-specific subprocess execution with normalized agent messages."
     },
     {
@@ -5821,8 +5821,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "tui_agent_runner_rationale_30",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "track an inactivity deadline that agent stdout can refresh."
     },
     {
@@ -5854,8 +5854,8 @@
       "source_location": "L429",
       "_origin": "ast",
       "id": "tui_agent_runner_rationale_429",
-      "community": 79,
-      "community_name": ".edit_paste_before",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "return assistant text deltas from cursor's stream-json events."
     },
     {
@@ -5865,8 +5865,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_app",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "app.py"
     },
     {
@@ -5876,8 +5876,8 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "tui_app_literal_select_options",
-      "community": 83,
-      "community_name": "ProjectInitializerScreen",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "_literal_select_options()"
     },
     {
@@ -5887,8 +5887,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "text",
-      "community": 83,
-      "community_name": "ProjectInitializerScreen",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "text"
     },
     {
@@ -5898,8 +5898,8 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "tui_app_redact_supabase_diagnostic",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "_redact_supabase_diagnostic()"
     },
     {
@@ -5931,8 +5931,8 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "tui_app_unregister_app_for_thread_exit",
-      "community": 74,
-      "community_name": "__init__.py",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "_unregister_app_for_thread_exit()"
     },
     {
@@ -5942,8 +5942,8 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "tui_app_shortcut_binding_key",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "_shortcut_binding_key()"
     },
     {
@@ -6008,8 +6008,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "select",
-      "community": 54,
-      "community_name": "update_repository",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "select"
     },
     {
@@ -6041,8 +6041,8 @@
       "source_location": "L252",
       "_origin": "ast",
       "id": "tui_app_plananswerselect_initialize_after_mount",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "._initialize_after_mount()"
     },
     {
@@ -6052,8 +6052,8 @@
       "source_location": "L282",
       "_origin": "ast",
       "id": "tui_app_compactsettingsselect",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "compactsettingsselect"
     },
     {
@@ -6063,8 +6063,8 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "tui_app_compactsettingsselect_watch_value",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "._watch_value()"
     },
     {
@@ -6074,8 +6074,8 @@
       "source_location": "L300",
       "_origin": "ast",
       "id": "tui_app_compactsettingsselect_validate_value",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "._validate_value()"
     },
     {
@@ -6096,8 +6096,8 @@
       "source_location": "L313",
       "_origin": "ast",
       "id": "tui_app_planclarificationscreen_init",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".__init__()"
     },
     {
@@ -6107,8 +6107,8 @@
       "source_location": "L317",
       "_origin": "ast",
       "id": "tui_app_planclarificationscreen_compose",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".compose()"
     },
     {
@@ -6118,8 +6118,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "composeresult",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "composeresult"
     },
     {
@@ -6140,8 +6140,8 @@
       "source_location": "L336",
       "_origin": "ast",
       "id": "tui_app_planclarificationscreen_on_button_pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_button_pressed()"
     },
     {
@@ -6151,8 +6151,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "pressed"
     },
     {
@@ -6206,8 +6206,8 @@
       "source_location": "L370",
       "_origin": "ast",
       "id": "tui_app_commandmenuscreen",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": "commandmenuscreen"
     },
     {
@@ -6228,8 +6228,8 @@
       "source_location": "L382",
       "_origin": "ast",
       "id": "tui_app_commandmenuscreen_compose",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": ".compose()"
     },
     {
@@ -6239,8 +6239,8 @@
       "source_location": "L413",
       "_origin": "ast",
       "id": "tui_app_commandmenuscreen_on_mount",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": ".on_mount()"
     },
     {
@@ -6250,8 +6250,8 @@
       "source_location": "L417",
       "_origin": "ast",
       "id": "tui_app_commandmenuscreen_on_button_pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_button_pressed()"
     },
     {
@@ -6261,8 +6261,8 @@
       "source_location": "L430",
       "_origin": "ast",
       "id": "tui_app_commandmenuscreen_action_close_command_menu",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": ".action_close_command_menu()"
     },
     {
@@ -6272,8 +6272,8 @@
       "source_location": "L434",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "personalsupabaseconfirmationscreen"
     },
     {
@@ -6294,8 +6294,8 @@
       "source_location": "L446",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen_compose",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".compose()"
     },
     {
@@ -6305,8 +6305,8 @@
       "source_location": "L476",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen_on_mount",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_mount()"
     },
     {
@@ -6316,8 +6316,8 @@
       "source_location": "L479",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen_on_input_changed",
-      "community": 54,
-      "community_name": "update_repository",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_input_changed()"
     },
     {
@@ -6327,8 +6327,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "changed",
-      "community": 54,
-      "community_name": "update_repository",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "changed"
     },
     {
@@ -6338,8 +6338,8 @@
       "source_location": "L487",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen_on_input_submitted",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_input_submitted()"
     },
     {
@@ -6349,8 +6349,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "submitted",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "submitted"
     },
     {
@@ -6360,8 +6360,8 @@
       "source_location": "L491",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen_on_button_pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_button_pressed()"
     },
     {
@@ -6371,8 +6371,8 @@
       "source_location": "L497",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen_action_cancel_registration",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".action_cancel_registration()"
     },
     {
@@ -6382,8 +6382,8 @@
       "source_location": "L500",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen_confirm",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "._confirm()"
     },
     {
@@ -6393,8 +6393,8 @@
       "source_location": "L511",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "personalsupabaseremovalconfirmationscreen"
     },
     {
@@ -6404,8 +6404,8 @@
       "source_location": "L518",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_init",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 57,
+      "community_name": "DescriptorEmbedder",
       "norm_label": ".__init__()"
     },
     {
@@ -6415,8 +6415,8 @@
       "source_location": "L522",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_compose",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".compose()"
     },
     {
@@ -6426,8 +6426,8 @@
       "source_location": "L549",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_on_mount",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_mount()"
     },
     {
@@ -6437,8 +6437,8 @@
       "source_location": "L552",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_on_input_changed",
-      "community": 54,
-      "community_name": "update_repository",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_input_changed()"
     },
     {
@@ -6448,8 +6448,8 @@
       "source_location": "L560",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_on_input_submitted",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_input_submitted()"
     },
     {
@@ -6459,8 +6459,8 @@
       "source_location": "L564",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_on_button_pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_button_pressed()"
     },
     {
@@ -6470,8 +6470,8 @@
       "source_location": "L570",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_action_cancel_removal",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".action_cancel_removal()"
     },
     {
@@ -6481,8 +6481,8 @@
       "source_location": "L573",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_confirm",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "._confirm()"
     },
     {
@@ -6492,8 +6492,8 @@
       "source_location": "L584",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": "personalsupabaseactivationprogressscreen"
     },
     {
@@ -6514,8 +6514,8 @@
       "source_location": "L613",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_running",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": ".running()"
     },
     {
@@ -6525,8 +6525,8 @@
       "source_location": "L617",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_compose",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".compose()"
     },
     {
@@ -6580,8 +6580,8 @@
       "source_location": "L726",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_on_button_pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_button_pressed()"
     },
     {
@@ -6591,8 +6591,8 @@
       "source_location": "L730",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_action_close_activation_progress",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": ".action_close_activation_progress()"
     },
     {
@@ -6602,8 +6602,8 @@
       "source_location": "L735",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "projectinitializerscreen"
     },
     {
@@ -6613,8 +6613,8 @@
       "source_location": "L742",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen_init",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 57,
+      "community_name": "DescriptorEmbedder",
       "norm_label": ".__init__()"
     },
     {
@@ -6635,8 +6635,8 @@
       "source_location": "L747",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen_compose",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".compose()"
     },
     {
@@ -6646,8 +6646,8 @@
       "source_location": "L762",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen_on_mount",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_mount()"
     },
     {
@@ -6657,8 +6657,8 @@
       "source_location": "L765",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen_on_button_pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_button_pressed()"
     },
     {
@@ -6668,8 +6668,8 @@
       "source_location": "L771",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen_on_input_submitted",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_input_submitted()"
     },
     {
@@ -6679,8 +6679,8 @@
       "source_location": "L775",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen_action_cancel_initializer",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".action_cancel_initializer()"
     },
     {
@@ -6690,8 +6690,8 @@
       "source_location": "L779",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen_create_project",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "._create_project()"
     },
     {
@@ -6701,8 +6701,8 @@
       "source_location": "L798",
       "_origin": "ast",
       "id": "tui_app_projectinitializerscreen_initialize_project",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "._initialize_project()"
     },
     {
@@ -6723,8 +6723,8 @@
       "source_location": "L838",
       "_origin": "ast",
       "id": "tui_app_createtopicscreen_init",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".__init__()"
     },
     {
@@ -6734,8 +6734,8 @@
       "source_location": "L842",
       "_origin": "ast",
       "id": "tui_app_createtopicscreen_compose",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".compose()"
     },
     {
@@ -6756,8 +6756,8 @@
       "source_location": "L867",
       "_origin": "ast",
       "id": "tui_app_createtopicscreen_on_button_pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_button_pressed()"
     },
     {
@@ -6767,8 +6767,8 @@
       "source_location": "L873",
       "_origin": "ast",
       "id": "tui_app_createtopicscreen_on_input_submitted",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_input_submitted()"
     },
     {
@@ -6800,8 +6800,8 @@
       "source_location": "L916",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "topicviewerscreen"
     },
     {
@@ -6811,8 +6811,8 @@
       "source_location": "L923",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen_init",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".__init__()"
     },
     {
@@ -6822,8 +6822,8 @@
       "source_location": "L928",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen_compose",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".compose()"
     },
     {
@@ -6833,8 +6833,8 @@
       "source_location": "L944",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen_on_mount",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".on_mount()"
     },
     {
@@ -6844,8 +6844,8 @@
       "source_location": "L947",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen_on_button_pressed",
-      "community": 20,
-      "community_name": "TaskRecord",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".on_button_pressed()"
     },
     {
@@ -6855,8 +6855,8 @@
       "source_location": "L951",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen_action_close_topic_viewer",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".action_close_topic_viewer()"
     },
     {
@@ -6888,8 +6888,8 @@
       "source_location": "L978",
       "_origin": "ast",
       "id": "tui_app_codingstatisticsscreen_compose",
-      "community": 54,
-      "community_name": "update_repository",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": ".compose()"
     },
     {
@@ -7009,8 +7009,8 @@
       "source_location": "L1211",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_compose",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": ".compose()"
     },
     {
@@ -7020,8 +7020,8 @@
       "source_location": "L1325",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_personal_supabase_bootstrap",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._start_personal_supabase_bootstrap()"
     },
     {
@@ -7031,8 +7031,8 @@
       "source_location": "L1406",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_bootstrap_finished",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._on_personal_supabase_bootstrap_finished()"
     },
     {
@@ -7042,8 +7042,8 @@
       "source_location": "L1433",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_mount",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": ".on_mount()"
     },
     {
@@ -7053,8 +7053,8 @@
       "source_location": "L1451",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_key",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": ".on_key()"
     },
     {
@@ -7064,8 +7064,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tui_app_py_key",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "key"
     },
     {
@@ -7075,8 +7075,8 @@
       "source_location": "L1481",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_unmount",
-      "community": 74,
-      "community_name": "__init__.py",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": ".on_unmount()"
     },
     {
@@ -7086,8 +7086,8 @@
       "source_location": "L1489",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_resize",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": ".on_resize()"
     },
     {
@@ -7097,8 +7097,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tui_app_py_resize",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "resize"
     },
     {
@@ -7108,8 +7108,8 @@
       "source_location": "L1493",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_apply_responsive_layout",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._apply_responsive_layout()"
     },
     {
@@ -7119,8 +7119,8 @@
       "source_location": "L1540",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_queue_responsive_measurement",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._queue_responsive_measurement()"
     },
     {
@@ -7141,8 +7141,8 @@
       "source_location": "L1558",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_apply_measured_responsive_layout",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 70,
+      "community_name": "TranscriptLog",
       "norm_label": "._apply_measured_responsive_layout()"
     },
     {
@@ -7152,8 +7152,8 @@
       "source_location": "L1569",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_wide_controls_overflow",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 70,
+      "community_name": "TranscriptLog",
       "norm_label": "._wide_controls_overflow()"
     },
     {
@@ -7207,8 +7207,8 @@
       "source_location": "L1630",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_remove_exit_diagnostics",
-      "community": 74,
-      "community_name": "__init__.py",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "._remove_exit_diagnostics()"
     },
     {
@@ -7218,8 +7218,8 @@
       "source_location": "L1637",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_log_asyncio_exception",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "._log_asyncio_exception()"
     },
     {
@@ -7229,8 +7229,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "abstracteventloop",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "abstracteventloop"
     },
     {
@@ -7284,8 +7284,8 @@
       "source_location": "L1686",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_toggle_plan_mode",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": ".action_toggle_plan_mode()"
     },
     {
@@ -7295,8 +7295,8 @@
       "source_location": "L1691",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_new_task",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": ".action_new_task()"
     },
     {
@@ -7306,8 +7306,8 @@
       "source_location": "L1694",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_copy_selection",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": ".action_copy_selection()"
     },
     {
@@ -7394,8 +7394,8 @@
       "source_location": "L1718",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_show_command_menu",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": ".action_show_command_menu()"
     },
     {
@@ -7416,8 +7416,8 @@
       "source_location": "L1740",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_show_statistics",
-      "community": 54,
-      "community_name": "update_repository",
+      "community": 30,
+      "community_name": "calculate_token_usage",
       "norm_label": ".action_show_statistics()"
     },
     {
@@ -7427,8 +7427,8 @@
       "source_location": "L1743",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_show_new_project",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".action_show_new_project()"
     },
     {
@@ -7449,8 +7449,8 @@
       "source_location": "L1749",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_register_personal_supabase",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": ".action_register_personal_supabase()"
     },
     {
@@ -7460,8 +7460,8 @@
       "source_location": "L1787",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_remove_personal_supabase",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": ".action_remove_personal_supabase()"
     },
     {
@@ -7471,8 +7471,8 @@
       "source_location": "L1806",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_removal_confirmation",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._on_personal_supabase_removal_confirmation()"
     },
     {
@@ -7482,8 +7482,8 @@
       "source_location": "L1822",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_confirmation",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._on_personal_supabase_confirmation()"
     },
     {
@@ -7493,8 +7493,8 @@
       "source_location": "L1845",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_personal_supabase_activate",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._start_personal_supabase_activate()"
     },
     {
@@ -7504,8 +7504,8 @@
       "source_location": "L1895",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_activation_progress",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 78,
+      "community_name": "load_project_worktree_settings",
       "norm_label": "._on_personal_supabase_activation_progress()"
     },
     {
@@ -7515,8 +7515,8 @@
       "source_location": "L1902",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_activate_finished",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._on_personal_supabase_activate_finished()"
     },
     {
@@ -7537,8 +7537,8 @@
       "source_location": "L1947",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_view_topic",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 51,
+      "community_name": "CompactSettingsSelect",
       "norm_label": ".action_view_topic()"
     },
     {
@@ -7559,8 +7559,8 @@
       "source_location": "L1989",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_select_changed",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": ".on_select_changed()"
     },
     {
@@ -7570,8 +7570,8 @@
       "source_location": "L2074",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_apply_provider_selection",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._apply_provider_selection()"
     },
     {
@@ -7581,8 +7581,8 @@
       "source_location": "L2111",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_set_select_options_if_changed",
-      "community": 54,
-      "community_name": "update_repository",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._set_select_options_if_changed()"
     },
     {
@@ -7592,8 +7592,8 @@
       "source_location": "L2129",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_compact_setting_options",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._compact_setting_options()"
     },
     {
@@ -7603,8 +7603,8 @@
       "source_location": "L2158",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_compact_setting_current_value",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._compact_setting_current_value()"
     },
     {
@@ -7614,8 +7614,8 @@
       "source_location": "L2171",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_refresh_compact_setting_value",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._refresh_compact_setting_value()"
     },
     {
@@ -7625,8 +7625,8 @@
       "source_location": "L2206",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_apply_compact_setting",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._apply_compact_setting()"
     },
     {
@@ -7636,8 +7636,8 @@
       "source_location": "L2235",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_current_submission_settings",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 73,
+      "community_name": "._on_personal_supabase_activation_progress",
       "norm_label": "._current_submission_settings()"
     },
     {
@@ -7669,8 +7669,8 @@
       "source_location": "L2302",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_toggle_plan_mode",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._toggle_plan_mode()"
     },
     {
@@ -7680,8 +7680,8 @@
       "source_location": "L2319",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_topic_created",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 73,
+      "community_name": "._on_personal_supabase_activation_progress",
       "norm_label": "._on_topic_created()"
     },
     {
@@ -7713,8 +7713,8 @@
       "source_location": "L2354",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_task_event",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "._on_task_event()"
     },
     {
@@ -7724,8 +7724,8 @@
       "source_location": "L2386",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_flush_task_events",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "._flush_task_events()"
     },
     {
@@ -7735,8 +7735,8 @@
       "source_location": "L2395",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_apply_task_event",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "._apply_task_event()"
     },
     {
@@ -7746,8 +7746,8 @@
       "source_location": "L2425",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_should_promote_task_update",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "._should_promote_task_update()"
     },
     {
@@ -7790,8 +7790,8 @@
       "source_location": "L2487",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_target_branch_selected",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._on_target_branch_selected()"
     },
     {
@@ -7801,8 +7801,8 @@
       "source_location": "L2500",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_topic_selected",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._on_topic_selected()"
     },
     {
@@ -7812,8 +7812,8 @@
       "source_location": "L2510",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_refresh_target_branch_select",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._refresh_target_branch_select()"
     },
     {
@@ -7823,8 +7823,8 @@
       "source_location": "L2544",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_selected_operating_branch",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._selected_operating_branch()"
     },
     {
@@ -7834,8 +7834,8 @@
       "source_location": "L2550",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_refresh_push_button",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._refresh_push_button()"
     },
     {
@@ -7845,8 +7845,8 @@
       "source_location": "L2563",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_push_selected_branch",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._push_selected_branch()"
     },
     {
@@ -7856,8 +7856,8 @@
       "source_location": "L2602",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_push_finished",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._on_push_finished()"
     },
     {
@@ -7867,8 +7867,8 @@
       "source_location": "L2612",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_refresh_topic_select",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._refresh_topic_select()"
     },
     {
@@ -7878,8 +7878,8 @@
       "source_location": "L2638",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_selected_topic",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 51,
+      "community_name": "CompactSettingsSelect",
       "norm_label": "._selected_topic()"
     },
     {
@@ -7889,8 +7889,8 @@
       "source_location": "L2645",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_refresh_topic_view_button",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "._refresh_topic_view_button()"
     },
     {
@@ -7911,8 +7911,8 @@
       "source_location": "L2665",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_remembered_project",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 82,
+      "community_name": ".nav_word_end",
       "norm_label": "._remembered_project()"
     },
     {
@@ -7944,8 +7944,8 @@
       "source_location": "L2715",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_project_initialized",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._on_project_initialized()"
     },
     {
@@ -8109,8 +8109,8 @@
       "source_location": "L2926",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_render_selected_task_safely",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "._render_selected_task_safely()"
     },
     {
@@ -8285,8 +8285,8 @@
       "source_location": "L3353",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_implement_plan",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 82,
+      "community_name": ".nav_word_end",
       "norm_label": "._implement_plan()"
     },
     {
@@ -8296,8 +8296,8 @@
       "source_location": "L3369",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_new_task",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._start_new_task()"
     },
     {
@@ -8318,8 +8318,8 @@
       "source_location": "L3393",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_copy_selection",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._copy_selection()"
     },
     {
@@ -8329,8 +8329,8 @@
       "source_location": "L3401",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_handle_vim_key",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._handle_vim_key()"
     },
     {
@@ -8340,8 +8340,8 @@
       "source_location": "L3420",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_scroll_output",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._scroll_output()"
     },
     {
@@ -8362,8 +8362,8 @@
       "source_location": "L3459",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_paste_into_prompt",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._paste_into_prompt()"
     },
     {
@@ -8373,8 +8373,8 @@
       "source_location": "L3474",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_get_selected_text",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._get_selected_text()"
     },
     {
@@ -8472,8 +8472,8 @@
       "source_location": "L3547",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_set_status",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._set_status()"
     },
     {
@@ -8483,8 +8483,8 @@
       "source_location": "L3550",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_set_error",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._set_error()"
     },
     {
@@ -8494,8 +8494,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_app_rationale_1",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "textual interface for concurrent local agent tasks."
     },
     {
@@ -8505,8 +8505,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "tui_app_rationale_92",
-      "community": 83,
-      "community_name": "ProjectInitializerScreen",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "build select prompts that rich will not parse as markup."
     },
     {
@@ -8516,8 +8516,8 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "tui_app_rationale_97",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "remove known credential values before diagnostics reach the ui or log."
     },
     {
@@ -8538,8 +8538,8 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "tui_app_rationale_160",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "return textual's event name for a user-facing shortcut label."
     },
     {
@@ -8571,8 +8571,8 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "tui_app_rationale_253",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "finish select setup without allowing a stale value to exit the tui.          pla"
     },
     {
@@ -8582,8 +8582,8 @@
       "source_location": "L283",
       "_origin": "ast",
       "id": "tui_app_rationale_283",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "keep only the latest value-change event for rebuilt compact controls."
     },
     {
@@ -8615,8 +8615,8 @@
       "source_location": "L371",
       "_origin": "ast",
       "id": "tui_app_rationale_371",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": "offer low-frequency actions as discoverable buttons."
     },
     {
@@ -8626,8 +8626,8 @@
       "source_location": "L435",
       "_origin": "ast",
       "id": "tui_app_rationale_435",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "require an explicit confirmation before scaffolding/activating a shared schema."
     },
     {
@@ -8637,8 +8637,8 @@
       "source_location": "L512",
       "_origin": "ast",
       "id": "tui_app_rationale_512",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "require an exact project-name confirmation before local cleanup."
     },
     {
@@ -8648,8 +8648,8 @@
       "source_location": "L585",
       "_origin": "ast",
       "id": "tui_app_rationale_585",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": "show the durable activation phases while the worker runs."
     },
     {
@@ -8659,8 +8659,8 @@
       "source_location": "L614",
       "_origin": "ast",
       "id": "tui_app_rationale_614",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": "whether the activation worker still owns this progress surface."
     },
     {
@@ -8725,8 +8725,8 @@
       "source_location": "L736",
       "_origin": "ast",
       "id": "tui_app_rationale_736",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "collect a project slug and create a daedalus-compatible directory."
     },
     {
@@ -8747,8 +8747,8 @@
       "source_location": "L917",
       "_origin": "ast",
       "id": "tui_app_rationale_917",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 47,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "display a topic markdown file without allowing edits."
     },
     {
@@ -8769,8 +8769,8 @@
       "source_location": "L1326",
       "_origin": "ast",
       "id": "tui_app_rationale_1326",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "synchronize registered projects; push migrations only when activated."
     },
     {
@@ -8780,8 +8780,8 @@
       "source_location": "L1452",
       "_origin": "ast",
       "id": "tui_app_rationale_1452",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "add vim-like navigation without changing textarea insert behavior."
     },
     {
@@ -8791,8 +8791,8 @@
       "source_location": "L1490",
       "_origin": "ast",
       "id": "tui_app_rationale_1490",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "apply the viewport-aware layout whenever the terminal changes size."
     },
     {
@@ -8802,8 +8802,8 @@
       "source_location": "L1499",
       "_origin": "ast",
       "id": "tui_app_rationale_1499",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "toggle responsive classes and dimensions after a viewport change.          ``com"
     },
     {
@@ -8813,8 +8813,8 @@
       "source_location": "L1541",
       "_origin": "ast",
       "id": "tui_app_rationale_1541",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "measure wide controls after their current layout pass completes."
     },
     {
@@ -8835,8 +8835,8 @@
       "source_location": "L1559",
       "_origin": "ast",
       "id": "tui_app_rationale_1559",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 70,
+      "community_name": "TranscriptLog",
       "norm_label": "switch to compact mode when wide controls extend past their bars."
     },
     {
@@ -8846,8 +8846,8 @@
       "source_location": "L1570",
       "_origin": "ast",
       "id": "tui_app_rationale_1570",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 70,
+      "community_name": "TranscriptLog",
       "norm_label": "return whether wide-layout controls are clipped or too narrow."
     },
     {
@@ -8934,8 +8934,8 @@
       "source_location": "L1750",
       "_origin": "ast",
       "id": "tui_app_rationale_1750",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "confirm, then scaffold (if needed) and activate personal supabase."
     },
     {
@@ -8945,8 +8945,8 @@
       "source_location": "L1788",
       "_origin": "ast",
       "id": "tui_app_rationale_1788",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "confirm, then remove local personal-supabase artifacts for the project."
     },
     {
@@ -8956,8 +8956,8 @@
       "source_location": "L1851",
       "_origin": "ast",
       "id": "tui_app_rationale_1851",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "run scaffold+activate in a background worker so the tui stays responsive."
     },
     {
@@ -8967,8 +8967,8 @@
       "source_location": "L1896",
       "_origin": "ast",
       "id": "tui_app_rationale_1896",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 78,
+      "community_name": "load_project_worktree_settings",
       "norm_label": "forward worker phases to the modal and the main status line."
     },
     {
@@ -8989,8 +8989,8 @@
       "source_location": "L1948",
       "_origin": "ast",
       "id": "tui_app_rationale_1948",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 51,
+      "community_name": "CompactSettingsSelect",
       "norm_label": "open the selected project topic in a read-only modal."
     },
     {
@@ -9000,8 +9000,8 @@
       "source_location": "L2075",
       "_origin": "ast",
       "id": "tui_app_rationale_2075",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "apply provider-specific model and reasoning choices to all controls."
     },
     {
@@ -9011,8 +9011,8 @@
       "source_location": "L2117",
       "_origin": "ast",
       "id": "tui_app_rationale_2117",
-      "community": 54,
-      "community_name": "update_repository",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "avoid posting select.changed events when the options are unchanged."
     },
     {
@@ -9022,8 +9022,8 @@
       "source_location": "L2130",
       "_origin": "ast",
       "id": "tui_app_rationale_2130",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "return labels and values for one compact settings category."
     },
     {
@@ -9033,8 +9033,8 @@
       "source_location": "L2159",
       "_origin": "ast",
       "id": "tui_app_rationale_2159",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "read the current value from the same selectors used for submission."
     },
     {
@@ -9044,8 +9044,8 @@
       "source_location": "L2177",
       "_origin": "ast",
       "id": "tui_app_rationale_2177",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "populate the compact value select while retaining its active category."
     },
     {
@@ -9055,8 +9055,8 @@
       "source_location": "L2207",
       "_origin": "ast",
       "id": "tui_app_rationale_2207",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "apply a compact value through the existing wide-control state."
     },
     {
@@ -9066,8 +9066,8 @@
       "source_location": "L2236",
       "_origin": "ast",
       "id": "tui_app_rationale_2236",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 73,
+      "community_name": "._on_personal_supabase_activation_progress",
       "norm_label": "return provider metadata from the shared controls for a new task."
     },
     {
@@ -9077,8 +9077,8 @@
       "source_location": "L2320",
       "_origin": "ast",
       "id": "tui_app_rationale_2320",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 73,
+      "community_name": "._on_personal_supabase_activation_progress",
       "norm_label": "queue a coding task that writes and expands the requested topic file."
     },
     {
@@ -9099,8 +9099,8 @@
       "source_location": "L2387",
       "_origin": "ast",
       "id": "tui_app_rationale_2387",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "apply only the newest event per task to keep the ui responsive."
     },
     {
@@ -9110,8 +9110,8 @@
       "source_location": "L2426",
       "_origin": "ast",
       "id": "tui_app_rationale_2426",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "promote only events that need the user's attention in the inbox."
     },
     {
@@ -9143,8 +9143,8 @@
       "source_location": "L2501",
       "_origin": "ast",
       "id": "tui_app_rationale_2501",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "remember the selected topic as the default for the active project."
     },
     {
@@ -9154,8 +9154,8 @@
       "source_location": "L2511",
       "_origin": "ast",
       "id": "tui_app_rationale_2511",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "refresh branch select options for the active project and sync coordinator."
     },
     {
@@ -9165,8 +9165,8 @@
       "source_location": "L2551",
       "_origin": "ast",
       "id": "tui_app_rationale_2551",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "enable push only when an origin remote and operating branch are available."
     },
     {
@@ -9176,8 +9176,8 @@
       "source_location": "L2564",
       "_origin": "ast",
       "id": "tui_app_rationale_2564",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "push the branch select value for the active project to origin."
     },
     {
@@ -9187,8 +9187,8 @@
       "source_location": "L2613",
       "_origin": "ast",
       "id": "tui_app_rationale_2613",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "refresh topics and restore the active project's remembered default."
     },
     {
@@ -9198,8 +9198,8 @@
       "source_location": "L2639",
       "_origin": "ast",
       "id": "tui_app_rationale_2639",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 51,
+      "community_name": "CompactSettingsSelect",
       "norm_label": "return the selected topic slug, or none for the blank option."
     },
     {
@@ -9209,8 +9209,8 @@
       "source_location": "L2646",
       "_origin": "ast",
       "id": "tui_app_rationale_2646",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "enable topic viewing only when the selector has a real topic."
     },
     {
@@ -9297,8 +9297,8 @@
       "source_location": "L2927",
       "_origin": "ast",
       "id": "tui_app_rationale_2927",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "keep one bad dynamic widget update from closing the entire tui."
     },
     {
@@ -9341,8 +9341,8 @@
       "source_location": "L3370",
       "_origin": "ast",
       "id": "tui_app_rationale_3370",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "clear the selected task and unlock a fresh prompt editor."
     },
     {
@@ -9363,8 +9363,8 @@
       "source_location": "L3475",
       "_origin": "ast",
       "id": "tui_app_rationale_3475",
-      "community": 38,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "return a textarea selection or the active screen selection."
     },
     {
@@ -9418,8 +9418,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_candidatefeaturegroup",
-      "community": 73,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "candidatefeaturegroup"
     },
     {
@@ -9429,8 +9429,8 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_candidatefeaturegroup_id",
-      "community": 73,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": ".id()"
     },
     {
@@ -9440,8 +9440,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_candidatefeaturegroup_relations",
-      "community": 73,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": ".relations()"
     },
     {
@@ -9451,8 +9451,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_similarityresult",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "similarityresult"
     },
     {
@@ -9605,8 +9605,8 @@
       "source_location": "L277",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_tokenize_descriptor",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 23,
+      "community_name": "update_repository",
       "norm_label": "tokenize_descriptor()"
     },
     {
@@ -9638,8 +9638,8 @@
       "source_location": "L312",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_descriptorembedder_init",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 23,
+      "community_name": "update_repository",
       "norm_label": ".__init__()"
     },
     {
@@ -9737,8 +9737,8 @@
       "source_location": "L606",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_parent_child_score_map",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "parent_child_score_map()"
     },
     {
@@ -9748,8 +9748,8 @@
       "source_location": "L614",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_write_similarity_json",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 23,
+      "community_name": "update_repository",
       "norm_label": "write_similarity_json()"
     },
     {
@@ -9792,8 +9792,8 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_rationale_45",
-      "community": 73,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "a deterministic connected component of qualifying similarity relations."
     },
     {
@@ -9803,8 +9803,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_rationale_55",
-      "community": 73,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "return the stable identifier using the concise ``id`` spelling."
     },
     {
@@ -9814,8 +9814,8 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_rationale_60",
-      "community": 73,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "compatibility alias for callers that refer to group relations directly."
     },
     {
@@ -9891,8 +9891,8 @@
       "source_location": "L278",
       "_origin": "ast",
       "id": "tui_call_graph_similarity_rationale_278",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 23,
+      "community_name": "update_repository",
       "norm_label": "lowercase and split identifiers on `.` / `_` while keeping word tokens."
     },
     {
@@ -9957,8 +9957,8 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "tui_call_graph_tree_callgraphconfig",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 72,
+      "community_name": "render_call_graph_tree.py",
       "norm_label": "callgraphconfig"
     },
     {
@@ -10045,8 +10045,8 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "tui_call_graph_tree_safecallgraphvisitor",
-      "community": 71,
-      "community_name": "_collapse_inner_safe",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "_safecallgraphvisitor"
     },
     {
@@ -10089,8 +10089,8 @@
       "source_location": "L209",
       "_origin": "ast",
       "id": "tui_call_graph_tree_select_roots",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "select_roots()"
     },
     {
@@ -10100,8 +10100,8 @@
       "source_location": "L228",
       "_origin": "ast",
       "id": "tui_call_graph_tree_build_tree",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "build_tree()"
     },
     {
@@ -10254,8 +10254,8 @@
       "source_location": "L630",
       "_origin": "ast",
       "id": "tui_call_graph_tree_feature_ids_by_member",
-      "community": 73,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "_feature_ids_by_member()"
     },
     {
@@ -10265,8 +10265,8 @@
       "source_location": "L641",
       "_origin": "ast",
       "id": "tui_call_graph_tree_render_candidate_features_panel",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "_render_candidate_features_panel()"
     },
     {
@@ -10276,8 +10276,8 @@
       "source_location": "L700",
       "_origin": "ast",
       "id": "tui_call_graph_tree_render_html",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "render_html()"
     },
     {
@@ -10287,8 +10287,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tui_call_graph_tree_py_datetime",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "datetime"
     },
     {
@@ -10298,8 +10298,8 @@
       "source_location": "L986",
       "_origin": "ast",
       "id": "tui_call_graph_tree_render_call_graph_tree",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 72,
+      "community_name": "render_call_graph_tree.py",
       "norm_label": "render_call_graph_tree()"
     },
     {
@@ -10342,8 +10342,8 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "tui_call_graph_tree_rationale_148",
-      "community": 71,
-      "community_name": "_collapse_inner_safe",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "callgraphvisitor with a collapse_inner guard for namespace-less anonymous nodes."
     },
     {
@@ -10364,8 +10364,8 @@
       "source_location": "L214",
       "_origin": "ast",
       "id": "tui_call_graph_tree_rationale_214",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "choose tree roots from configured entry points or orphan graph nodes."
     },
     {
@@ -10375,8 +10375,8 @@
       "source_location": "L233",
       "_origin": "ast",
       "id": "tui_call_graph_tree_rationale_233",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "build a call tree from *root* with cycle and depth limits."
     },
     {
@@ -10430,8 +10430,8 @@
       "source_location": "L633",
       "_origin": "ast",
       "id": "tui_call_graph_tree_rationale_633",
-      "community": 73,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "map each grouped symbol to its stable candidate-feature id."
     },
     {
@@ -10441,8 +10441,8 @@
       "source_location": "L642",
       "_origin": "ast",
       "id": "tui_call_graph_tree_rationale_642",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 0,
+      "community_name": "PlanQuestion",
       "norm_label": "render candidate features independently from the similarity panel."
     },
     {
@@ -10452,8 +10452,8 @@
       "source_location": "L713",
       "_origin": "ast",
       "id": "tui_call_graph_tree_rationale_713",
-      "community": 43,
-      "community_name": "._rebuild_plan_questions",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "render a self-contained html page for the call trees."
     },
     {
@@ -10463,8 +10463,8 @@
       "source_location": "L987",
       "_origin": "ast",
       "id": "tui_call_graph_tree_rationale_987",
-      "community": 70,
-      "community_name": "TranscriptLog",
+      "community": 72,
+      "community_name": "render_call_graph_tree.py",
       "norm_label": "analyze the project at *project_root* and write the html call tree."
     },
     {
@@ -10474,8 +10474,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_clipboard",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "clipboard.py"
     },
     {
@@ -10485,8 +10485,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "tui_clipboard_copy_to_system_clipboard",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "copy_to_system_clipboard()"
     },
     {
@@ -10496,8 +10496,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "tui_clipboard_paste_from_system_clipboard",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "paste_from_system_clipboard()"
     },
     {
@@ -10507,8 +10507,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_clipboard_rationale_1",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "system clipboard helpers for terminals without osc 52 support."
     },
     {
@@ -10518,8 +10518,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "tui_clipboard_rationale_37",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "read clipboard text using the native command available on the host."
     },
     {
@@ -10562,8 +10562,8 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "tui_config_tuisettings",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 57,
+      "community_name": "DescriptorEmbedder",
       "norm_label": "tuisettings"
     },
     {
@@ -10573,8 +10573,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "tui_config_codingstatisticssettings",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "codingstatisticssettings"
     },
     {
@@ -10584,8 +10584,8 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "tui_config_commandmenusettings",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 57,
+      "community_name": "DescriptorEmbedder",
       "norm_label": "commandmenusettings"
     },
     {
@@ -10650,8 +10650,8 @@
       "source_location": "L232",
       "_origin": "ast",
       "id": "tui_config_options",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 2,
+      "community_name": "AgentRunner",
       "norm_label": "_options()"
     },
     {
@@ -10727,8 +10727,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "tui_debug_log_close_fault_handler",
-      "community": 74,
-      "community_name": "__init__.py",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "close_fault_handler()"
     },
     {
@@ -10738,8 +10738,8 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "tui_debug_log_log_exception",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "log_exception()"
     },
     {
@@ -10749,8 +10749,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "baseexception",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 74,
+      "community_name": "__init__.py",
       "norm_label": "baseexception"
     },
     {
@@ -10804,8 +10804,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_environment",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "environment.py"
     },
     {
@@ -10815,8 +10815,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "tui_environment_cursor_environment",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "cursor_environment()"
     },
     {
@@ -10826,8 +10826,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tui_environment_py_path",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "path"
     },
     {
@@ -10837,8 +10837,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tui_environment_read_env_file",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "read_env_file()"
     },
     {
@@ -10859,8 +10859,8 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "tui_environment_environmentsyncresult",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "environmentsyncresult"
     },
     {
@@ -10870,8 +10870,8 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "tui_environment_synchronize_env_file",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "synchronize_env_file()"
     },
     {
@@ -10881,8 +10881,8 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "tui_environment_update_env_text",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "_update_env_text()"
     },
     {
@@ -10892,8 +10892,8 @@
       "source_location": "L209",
       "_origin": "ast",
       "id": "tui_environment_env_value",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "_env_value()"
     },
     {
@@ -10903,8 +10903,8 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "tui_environment_atomic_write",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "_atomic_write()"
     },
     {
@@ -10914,8 +10914,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_environment_rationale_1",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "small, dependency-free environment-file loading for local cli providers."
     },
     {
@@ -10925,8 +10925,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "tui_environment_rationale_14",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "return the process environment plus local cursor credentials.      explicit proc"
     },
     {
@@ -10947,8 +10947,8 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "tui_environment_rationale_73",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "safe, redacted outcome of copying shared values into a project env file."
     },
     {
@@ -10958,8 +10958,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "tui_environment_rationale_90",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "synchronize selected values from a canonical env file into a target.      the so"
     },
     {
@@ -10969,8 +10969,8 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "tui_environment_rationale_184",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "replace known assignments in place and append missing assignments."
     },
     {
@@ -10980,8 +10980,8 @@
       "source_location": "L216",
       "_origin": "ast",
       "id": "tui_environment_rationale_216",
-      "community": 47,
-      "community_name": "DaedalusTuiApp",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "replace one env file without exposing a partially written file."
     },
     {
@@ -10991,8 +10991,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_git_worktree",
-      "community": 11,
-      "community_name": "Key",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "git_worktree.py"
     },
     {
@@ -11354,8 +11354,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_git_worktree_rationale_1",
-      "community": 11,
-      "community_name": "Key",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "local git worktree lifecycle used by the standalone orchestrator."
     },
     {
@@ -11519,8 +11519,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "tui_graphify_graphifyresult",
-      "community": 4,
-      "community_name": "app.py",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "graphifyresult"
     },
     {
@@ -11574,8 +11574,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_memory",
-      "community": 30,
-      "community_name": "calculate_token_usage",
+      "community": 42,
+      "community_name": "debug_log.py",
       "norm_label": "memory.py"
     },
     {
@@ -11761,8 +11761,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_memory_rationale_1",
-      "community": 30,
-      "community_name": "calculate_token_usage",
+      "community": 42,
+      "community_name": "debug_log.py",
       "norm_label": "small local json stores for persistent task history."
     },
     {
@@ -11904,8 +11904,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_orchestrator",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "orchestrator.py"
     },
     {
@@ -11926,8 +11926,8 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "tui_orchestrator_orchestrationresult",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": "orchestrationresult"
     },
     {
@@ -12168,8 +12168,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_orchestrator_rationale_1",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 29,
+      "community_name": "CodingStatisticsScreen",
       "norm_label": "single-run local agent orchestration without daemon or database dependencies."
     },
     {
@@ -12278,8 +12278,8 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "tui_personal_supabase_activationresult",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": "activationresult"
     },
     {
@@ -12894,8 +12894,8 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "tui_personal_supabase_rationale_79",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 69,
+      "community_name": "PersonalSupabaseActivationProgressScreen",
       "norm_label": "outcome of phase 2 activate (and optional phase 1 scaffold)."
     },
     {
@@ -13312,8 +13312,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "tui_plan_is_valid_plan_answer",
-      "community": 26,
-      "community_name": ".provider_split",
+      "community": 48,
+      "community_name": "._persist_task",
       "norm_label": "is_valid_plan_answer()"
     },
     {
@@ -13455,8 +13455,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "tui_plan_rationale_76",
-      "community": 26,
-      "community_name": ".provider_split",
+      "community": 48,
+      "community_name": "._persist_task",
       "norm_label": "validate agent option ids and the software-owned custom answer format."
     },
     {
@@ -13724,10 +13724,21 @@
       "norm_label": "materialize_templates()"
     },
     {
-      "label": "find_github_url()",
+      "label": "copy_launch_environment()",
       "file_type": "code",
       "source_file": "tui/project_initializer.py",
       "source_location": "L153",
+      "_origin": "ast",
+      "id": "tui_project_initializer_copy_launch_environment",
+      "community": 20,
+      "community_name": "TaskRecord",
+      "norm_label": "copy_launch_environment()"
+    },
+    {
+      "label": "find_github_url()",
+      "file_type": "code",
+      "source_file": "tui/project_initializer.py",
+      "source_location": "L162",
       "_origin": "ast",
       "id": "tui_project_initializer_find_github_url",
       "community": 20,
@@ -13738,7 +13749,7 @@
       "label": "normalize_github_url()",
       "file_type": "code",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L170",
+      "source_location": "L179",
       "_origin": "ast",
       "id": "tui_project_initializer_normalize_github_url",
       "community": 20,
@@ -13749,7 +13760,7 @@
       "label": "initialize_project()",
       "file_type": "code",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L179",
+      "source_location": "L188",
       "_origin": "ast",
       "id": "tui_project_initializer_initialize_project",
       "community": 20,
@@ -13766,6 +13777,17 @@
       "community": 20,
       "community_name": "TaskRecord",
       "norm_label": "initialize a daedalus-compatible project under the tui launch root."
+    },
+    {
+      "label": "Copy the launch-root environment into a newly materialized project.",
+      "file_type": "rationale",
+      "source_file": "tui/project_initializer.py",
+      "source_location": "L154",
+      "_origin": "ast",
+      "id": "tui_project_initializer_rationale_154",
+      "community": 20,
+      "community_name": "TaskRecord",
+      "norm_label": "copy the launch-root environment into a newly materialized project."
     },
     {
       "label": "projects.py",
@@ -13818,8 +13840,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "tui_projects_is_direct_child_project",
-      "community": 33,
-      "community_name": ".on_button_pressed",
+      "community": 82,
+      "community_name": ".nav_word_end",
       "norm_label": "is_direct_child_project()"
     },
     {
@@ -13873,8 +13895,8 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "tui_projects_rationale_39",
-      "community": 33,
-      "community_name": ".on_button_pressed",
+      "community": 82,
+      "community_name": ".nav_word_end",
       "norm_label": "return whether ``path`` is an immediate child of ``launch_root``."
     },
     {
@@ -14192,8 +14214,8 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "tui_task_coordinator_integrationcoordinator",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": "integrationcoordinator"
     },
     {
@@ -14203,8 +14225,8 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "tui_task_coordinator_integrationcoordinator_init",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": ".__init__()"
     },
     {
@@ -14214,8 +14236,8 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "tui_task_coordinator_integrationcoordinator_shutdown",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": ".shutdown()"
     },
     {
@@ -14225,8 +14247,8 @@
       "source_location": "L165",
       "_origin": "ast",
       "id": "tui_task_coordinator_integrationcoordinator_run_when_ready",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": ".run_when_ready()"
     },
     {
@@ -14566,8 +14588,8 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_151",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 1,
+      "community_name": "DaedalusVimTextArea",
       "norm_label": "run ready integration operations one at a time in ready order."
     },
     {
@@ -15226,8 +15248,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_transcript",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "transcript.py"
     },
     {
@@ -15237,8 +15259,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "tui_transcript_transcriptlog",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "transcriptlog"
     },
     {
@@ -15248,8 +15270,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "log",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "log"
     },
     {
@@ -15259,8 +15281,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "tui_transcript_transcriptlog_init",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": ".__init__()"
     },
     {
@@ -15270,8 +15292,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "tui_transcript_transcriptlog_line_tones",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": ".line_tones()"
     },
     {
@@ -15435,8 +15457,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_transcript_rationale_1",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "selectable transcript rendering with semantic assistant-message emphasis."
     },
     {
@@ -15446,8 +15468,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "tui_transcript_rationale_16",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "a selectable log that can emphasize a task's final assistant message.      ``log"
     },
     {
@@ -15457,8 +15479,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tui_transcript_rationale_33",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 6,
+      "community_name": "GitWorktreeManager",
       "norm_label": "return the tone assigned to each rendered transcript line."
     },
     {
@@ -15578,8 +15600,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_variable_lineage",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "variable_lineage.py"
     },
     {
@@ -15589,8 +15611,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "tui_variable_lineage_graphnode",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "graphnode"
     },
     {
@@ -15600,8 +15622,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "tui_variable_lineage_graphedge",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "graphedge"
     },
     {
@@ -15611,8 +15633,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "tui_variable_lineage_functionsummary",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "functionsummary"
     },
     {
@@ -15622,8 +15644,8 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablestats",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "variablestats"
     },
     {
@@ -15633,8 +15655,8 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineageresult",
-      "community": 0,
-      "community_name": "PlanQuestion",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "variablelineageresult"
     },
     {
@@ -15644,8 +15666,8 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "tui_variable_lineage_functioninfo",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "_functioninfo"
     },
     {
@@ -15655,8 +15677,8 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "tui_variable_lineage_scopeframe",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "_scopeframe"
     },
     {
@@ -15666,8 +15688,8 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "tui_variable_lineage_pendingcall",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "_pendingcall"
     },
     {
@@ -15677,8 +15699,8 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "tui_variable_lineage_module_fqn_from_path",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "module_fqn_from_path()"
     },
     {
@@ -15688,8 +15710,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tui_variable_lineage_py_path",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "path"
     },
     {
@@ -15721,8 +15743,8 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "tui_variable_lineage_return_node_id",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "return_node_id()"
     },
     {
@@ -15743,8 +15765,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tui_variable_lineage_py_ast",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "ast"
     },
     {
@@ -15754,8 +15776,8 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "tui_variable_lineage_truncate_list",
-      "community": 0,
-      "community_name": "PlanQuestion",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "_truncate_list()"
     },
     {
@@ -15765,8 +15787,8 @@
       "source_location": "L200",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "variablelineagevisitor"
     },
     {
@@ -15776,8 +15798,8 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_init",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".__init__()"
     },
     {
@@ -15787,8 +15809,8 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_push_scope",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._push_scope()"
     },
     {
@@ -15798,8 +15820,8 @@
       "source_location": "L245",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_pop_scope",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._pop_scope()"
     },
     {
@@ -15809,8 +15831,8 @@
       "source_location": "L248",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_current",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._current()"
     },
     {
@@ -15831,8 +15853,8 @@
       "source_location": "L257",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_current_qualname_for_binding",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._current_qualname_for_binding()"
     },
     {
@@ -15908,8 +15930,8 @@
       "source_location": "L444",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_bind_store",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._bind_store()"
     },
     {
@@ -15919,8 +15941,8 @@
       "source_location": "L465",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_module",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_module()"
     },
     {
@@ -15930,8 +15952,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "module",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "module"
     },
     {
@@ -15941,8 +15963,8 @@
       "source_location": "L470",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_classdef",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_classdef()"
     },
     {
@@ -15952,8 +15974,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "classdef",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "classdef"
     },
     {
@@ -15963,8 +15985,8 @@
       "source_location": "L485",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_functiondef",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_functiondef()"
     },
     {
@@ -15974,8 +15996,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "functiondef",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "functiondef"
     },
     {
@@ -15985,8 +16007,8 @@
       "source_location": "L488",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_asyncfunctiondef",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_asyncfunctiondef()"
     },
     {
@@ -15996,8 +16018,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "asyncfunctiondef",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "asyncfunctiondef"
     },
     {
@@ -16007,8 +16029,8 @@
       "source_location": "L491",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_function",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._visit_function()"
     },
     {
@@ -16018,8 +16040,8 @@
       "source_location": "L607",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_global",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_global()"
     },
     {
@@ -16029,8 +16051,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "global",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "global"
     },
     {
@@ -16040,8 +16062,8 @@
       "source_location": "L612",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_nonlocal",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_nonlocal()"
     },
     {
@@ -16051,8 +16073,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nonlocal",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "nonlocal"
     },
     {
@@ -16062,8 +16084,8 @@
       "source_location": "L617",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_assign",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_assign()"
     },
     {
@@ -16073,8 +16095,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "assign",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "assign"
     },
     {
@@ -16084,8 +16106,8 @@
       "source_location": "L634",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_annassign",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_annassign()"
     },
     {
@@ -16095,8 +16117,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "annassign",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "annassign"
     },
     {
@@ -16128,8 +16150,8 @@
       "source_location": "L674",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_value_for_nested",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._visit_value_for_nested()"
     },
     {
@@ -16139,8 +16161,8 @@
       "source_location": "L699",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_collect_rhs_sources",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._collect_rhs_sources()"
     },
     {
@@ -16194,8 +16216,8 @@
       "source_location": "L917",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_record_assignment",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._record_assignment()"
     },
     {
@@ -16227,8 +16249,8 @@
       "source_location": "L1028",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_nested_calls",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._visit_nested_calls()"
     },
     {
@@ -16238,8 +16260,8 @@
       "source_location": "L1046",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_callee_simple_name",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._callee_simple_name()"
     },
     {
@@ -16249,8 +16271,8 @@
       "source_location": "L1053",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_return",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": ".visit_return()"
     },
     {
@@ -16260,8 +16282,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "return",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "return"
     },
     {
@@ -16326,8 +16348,8 @@
       "source_location": "L1214",
       "_origin": "ast",
       "id": "tui_variable_lineage_variablelineagevisitor_visit_comprehension",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "._visit_comprehension()"
     },
     {
@@ -16337,8 +16359,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "comprehension",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "comprehension"
     },
     {
@@ -16348,8 +16370,8 @@
       "source_location": "L1230",
       "_origin": "ast",
       "id": "tui_variable_lineage_unique_callee",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "_unique_callee()"
     },
     {
@@ -16359,8 +16381,8 @@
       "source_location": "L1244",
       "_origin": "ast",
       "id": "tui_variable_lineage_resolve_pending_calls",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "resolve_pending_calls()"
     },
     {
@@ -16370,8 +16392,8 @@
       "source_location": "L1342",
       "_origin": "ast",
       "id": "tui_variable_lineage_transitive_derivatives",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "_transitive_derivatives()"
     },
     {
@@ -16381,8 +16403,8 @@
       "source_location": "L1356",
       "_origin": "ast",
       "id": "tui_variable_lineage_compute_variable_stats",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "compute_variable_stats()"
     },
     {
@@ -16392,8 +16414,8 @@
       "source_location": "L1438",
       "_origin": "ast",
       "id": "tui_variable_lineage_analyze_sources",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "analyze_sources()"
     },
     {
@@ -16403,8 +16425,8 @@
       "source_location": "L1507",
       "_origin": "ast",
       "id": "tui_variable_lineage_variable_lineage_json_path",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "variable_lineage_json_path()"
     },
     {
@@ -16425,8 +16447,8 @@
       "source_location": "L1580",
       "_origin": "ast",
       "id": "tui_variable_lineage_render_variable_lineage_panel",
-      "community": 0,
-      "community_name": "PlanQuestion",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "render_variable_lineage_panel()"
     },
     {
@@ -16436,8 +16458,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_variable_lineage_rationale_1",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "ast variable-lineage pass for call-graph import evidence.  collects scoped name/"
     },
     {
@@ -16447,8 +16469,8 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "tui_variable_lineage_rationale_150",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "map a project-relative python path to a dotted module fqn."
     },
     {
@@ -16469,8 +16491,8 @@
       "source_location": "L201",
       "_origin": "ast",
       "id": "tui_variable_lineage_rationale_201",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "collect scoped variable/attribute lineage for one module."
     },
     {
@@ -16480,8 +16502,8 @@
       "source_location": "L258",
       "_origin": "ast",
       "id": "tui_variable_lineage_rationale_258",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "qualname used for store binding identity in the current scope."
     },
     {
@@ -16524,8 +16546,8 @@
       "source_location": "L675",
       "_origin": "ast",
       "id": "tui_variable_lineage_rationale_675",
-      "community": 51,
-      "community_name": "CompactSettingsSelect",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "visit nested function/class/call constructs inside expressions."
     },
     {
@@ -16557,8 +16579,8 @@
       "source_location": "L1442",
       "_origin": "ast",
       "id": "tui_variable_lineage_rationale_1442",
-      "community": 22,
-      "community_name": "._set_status",
+      "community": 3,
+      "community_name": "DaedalusTuiApp",
       "norm_label": "analyze python sources and return lineage graph, summaries, and stats."
     },
     {
@@ -16568,8 +16590,8 @@
       "source_location": "L1585",
       "_origin": "ast",
       "id": "tui_variable_lineage_rationale_1585",
-      "community": 0,
-      "community_name": "PlanQuestion",
+      "community": 22,
+      "community_name": "._set_status",
       "norm_label": "render the html section for variable lineage statistics."
     },
     {
@@ -16711,8 +16733,8 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "tui_verification_truncate_diagnostic",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 42,
+      "community_name": "debug_log.py",
       "norm_label": "truncate_diagnostic()"
     },
     {
@@ -16777,8 +16799,8 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "tui_verification_rationale_157",
-      "community": 82,
-      "community_name": ".nav_word_end",
+      "community": 42,
+      "community_name": "debug_log.py",
       "norm_label": "bound persisted diagnostics while retaining their beginning and end."
     },
     {
@@ -16788,8 +16810,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_vim_text_area",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "vim_text_area.py"
     },
     {
@@ -17019,8 +17041,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_vim_text_area_rationale_1",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 54,
+      "community_name": "update_repository",
       "norm_label": "the daedalus prompt's incremental vim editing adapter."
     },
     {
@@ -18116,7 +18138,7 @@
       "label": "Relevant Files",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-project-initialization.md",
-      "source_location": "L15",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_project_initialization_relevant_files",
       "community": 31,
@@ -18127,7 +18149,7 @@
       "label": "Dev Mode",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-project-initialization.md",
-      "source_location": "L23",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_project_initialization_dev_mode",
       "community": 31,
@@ -18138,7 +18160,7 @@
       "label": "State Log",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-project-initialization.md",
-      "source_location": "L26",
+      "source_location": "L27",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_project_initialization_state_log",
       "community": 31,
@@ -34677,7 +34699,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L110",
+      "source_location": "L119",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests",
@@ -34688,7 +34710,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L144",
+      "source_location": "L153",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests",
@@ -34699,7 +34721,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L203",
+      "source_location": "L212",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests",
@@ -34721,7 +34743,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L174",
+      "source_location": "L183",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests",
@@ -34804,7 +34826,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L88",
+      "source_location": "L97",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests_test_creates_templates_runs_commands_in_order_and_renames_atomically",
@@ -34816,7 +34838,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L67",
+      "source_location": "L72",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests_test_creates_templates_runs_commands_in_order_and_renames_atomically",
@@ -34828,7 +34850,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L120",
+      "source_location": "L129",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests_test_failure_cleans_temporary_directory_without_touching_existing_destination",
@@ -34840,7 +34862,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L159",
+      "source_location": "L168",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests_test_github_failure_keeps_local_repository_and_uses_explicit_arguments",
@@ -34852,7 +34874,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L185",
+      "source_location": "L194",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests_test_optional_personal_supabase_registration_is_no_longer_supported",
@@ -34864,7 +34886,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_project_initializer.py",
-      "source_location": "L212",
+      "source_location": "L221",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_project_initializer_projectinitializertests_test_matching_request_recovery_does_not_repeat_local_initialization",
@@ -63103,6 +63125,17 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer",
+      "target": "tui_project_initializer_copy_launch_environment",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tui/project_initializer.py",
+      "source_location": "L162",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tui_project_initializer",
       "target": "tui_project_initializer_find_github_url",
       "confidence_score": 1.0
     },
@@ -63110,7 +63143,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L179",
+      "source_location": "L188",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer",
@@ -63154,7 +63187,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L170",
+      "source_location": "L179",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer",
@@ -63254,7 +63287,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L186",
+      "source_location": "L195",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63266,7 +63299,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L193",
+      "source_location": "L202",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63278,7 +63311,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L202",
+      "source_location": "L211",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63305,6 +63338,18 @@
       "source_location": "L153",
       "weight": 1.0,
       "_origin": "ast",
+      "source": "tui_project_initializer_copy_launch_environment",
+      "target": "tui_project_initializer_py_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tui/project_initializer.py",
+      "source_location": "L162",
+      "weight": 1.0,
+      "_origin": "ast",
       "source": "tui_project_initializer_find_github_url",
       "target": "tui_project_initializer_py_path",
       "confidence_score": 1.0
@@ -63314,7 +63359,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L179",
+      "source_location": "L188",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63386,7 +63431,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L217",
+      "source_location": "L226",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63398,7 +63443,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L211",
+      "source_location": "L220",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63410,7 +63455,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L278",
+      "source_location": "L288",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63446,7 +63491,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L179",
+      "source_location": "L188",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63470,7 +63515,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L232",
+      "source_location": "L241",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63482,7 +63527,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L239",
+      "source_location": "L248",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63494,7 +63539,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L247",
+      "source_location": "L256",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63506,7 +63551,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L251",
+      "source_location": "L260",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -63518,7 +63563,30 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L156",
+      "source_location": "L261",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tui_project_initializer_initialize_project",
+      "target": "tui_project_initializer_copy_launch_environment",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tui/project_initializer.py",
+      "source_location": "L154",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tui_project_initializer_rationale_154",
+      "target": "tui_project_initializer_copy_launch_environment",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tui/project_initializer.py",
+      "source_location": "L165",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_find_github_url",
@@ -63530,7 +63598,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/project_initializer.py",
-      "source_location": "L281",
+      "source_location": "L291",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_project_initializer_initialize_project",
@@ -71231,7 +71299,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-project-initialization.md",
-      "source_location": "L23",
+      "source_location": "L24",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_project_initialization_daedalus_tui_project_initialization",
@@ -71253,7 +71321,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-project-initialization.md",
-      "source_location": "L15",
+      "source_location": "L16",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_project_initialization_daedalus_tui_project_initialization",
@@ -71264,7 +71332,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-project-initialization.md",
-      "source_location": "L26",
+      "source_location": "L27",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_project_initialization_daedalus_tui_project_initialization",
@@ -71834,5 +71902,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "7ab7496851cf3034795b65f3de983f0bb08ffd36"
+  "built_at_commit": "d65886f3b9eecae0f5f48f1d321895d0bae6bc89"
 }
