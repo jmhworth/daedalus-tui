@@ -1135,6 +1135,9 @@ class DaedalusTuiApp(App[None]):
         statistics_settings: CodingStatisticsSettings | None = None,
     ) -> None:
         super().__init__()
+        self._initial_directory_path = (
+            directory.expanduser().absolute() if directory is not None else None
+        )
         self.launch_root = (directory or Path.cwd()).resolve()
         self.memory = TaskMemoryStore(self.launch_root / DEFAULT_MEMORY_FILE)
         self.settings = settings or load_tui_settings()
@@ -1782,6 +1785,14 @@ class DaedalusTuiApp(App[None]):
     def action_remove_personal_supabase(self) -> None:
         """Confirm, then remove local personal-Supabase artifacts for the project."""
         project_path = self._active_project_path
+        if (
+            self._initial_directory_path is not None
+            and project_path == self._initial_directory_path.resolve()
+        ):
+            # Keep the caller's spelling at this boundary. The cleanup helper
+            # resolves it before touching files, while preserving this path
+            # avoids changing an operator-supplied project path via symlinks.
+            project_path = self._initial_directory_path
         self.push_screen(
             PersonalSupabaseRemovalConfirmationScreen(project_path.name),
             lambda confirmed: self._on_personal_supabase_removal_confirmation(

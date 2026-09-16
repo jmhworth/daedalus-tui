@@ -252,7 +252,7 @@ def _remove_personal_supabase_env_example(path: Path) -> bool:
     )
     if start is not None:
         end_match = re.search(
-            r"(?m)^# After migrations apply, allow-list schema .*?settings\.\s*$",
+            r"(?m)^# After migrations apply, allow-list schema .*$",
             updated[start:],
         )
         if end_match is not None:
@@ -262,7 +262,7 @@ def _remove_personal_supabase_env_example(path: Path) -> bool:
     # Older or hand-edited examples may have the schema assignments without
     # the generated block marker; remove those assignments too.
     updated = re.sub(
-        r"(?m)^# After migrations apply, allow-list schema .*?settings\.\s*\n?",
+        r"(?m)^# After migrations apply, allow-list schema .*$\n?",
         "",
         updated,
     )
