@@ -29,33 +29,15 @@ class VerificationResult:
     output: str
 
 
-def python_executable() -> str:
-    """Prefer the running interpreter's absolute path.
-
-    A bare ``python`` is resolved against the agent's PATH at discovery time but
-    executed later in the worktree with whatever PATH the child process inherits,
-    and it can also resolve to a version-manager shim that is executable yet fails
-    to exec. ``sys.executable`` is already running, so it is always a real
-    interpreter and needs no PATH lookup.
-    """
-    if sys.executable:
-        return sys.executable
-    for candidate in ("python3", "python"):
-        if shutil.which(candidate):
-            return candidate
-    return "python3"
-
-
 def discover_commands(root: Path, configured: list[list[str]]) -> list[list[str]]:
     if configured:
         return configured
 
-    python = python_executable()
     commands: list[list[str]] = []
     if package_has_test_script(root / "package.json"):
         commands.append(["npm", "test"])
     if (root / "tests").is_dir():
-        commands.append([python, "-m", "pytest"])
+        commands.append([python_executable(root), "-m", "pytest"])
 
     for child in sorted(root.iterdir()):
         if not child.is_dir() or child.name.startswith("."):
@@ -63,8 +45,44 @@ def discover_commands(root: Path, configured: list[list[str]]) -> list[list[str]
         if package_has_test_script(child / "package.json"):
             commands.append(["npm", "--prefix", child.name, "test"])
         if (child / "tests").is_dir():
-            commands.append([python, "-m", "pytest", str(Path(child.name) / "tests")])
+            commands.append(
+                [python_executable(child, root), "-m", "pytest", str(Path(child.name) / "tests")]
+            )
     return commands
+
+
+def python_executable(*roots: Path) -> str:
+    """Resolve a Python interpreter that exists as a real file.
+
+    Verification commands run without a shell, so a bare "python" fails outright on
+    machines where it is only a shell alias or absent entirely. Prefer a virtual
+    environment belonging to the code under test, then whatever is on PATH, and fall
+    back to the interpreter running Daedalus itself.
+    """
+    for root in roots:
+        for directory in (".venv", "venv"):
+            candidate = venv_interpreter(root / directory)
+            if candidate is not None:
+                return candidate
+    active = os.environ.get("VIRTUAL_ENV")
+    if active:
+        candidate = venv_interpreter(Path(active))
+        if candidate is not None:
+            return candidate
+    for name in ("python3", "python"):
+        found = shutil.which(name)
+        if found:
+            return found
+    return sys.executable
+
+
+def venv_interpreter(directory: Path) -> str | None:
+    """Return the interpreter inside a virtual environment directory, when usable."""
+    relative = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+    candidate = directory / relative
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return str(candidate)
+    return None
 
 
 def package_has_test_script(path: Path) -> bool:
@@ -98,7 +116,7 @@ def run_verification(
                 process = subprocess.CompletedProcess(command, return_code, stdout, stderr)
                 output = format_process_result(command, process)
         except OSError as error:
-            return VerificationResult(False, f"COMMAND: {' '.join(command)}\nERROR: {error}")
+            return VerificationResult(False, format_command_error(command, error))
         outputs.append(output)
         if process.returncode != 0:
             return VerificationResult(False, "\n\n".join(outputs))
@@ -182,6 +200,19 @@ def truncate_diagnostic(text: str, limit: int = MAX_DIAGNOSTIC_CHARS) -> str:
     head = budget // 2
     tail = budget - head
     return text[:head] + marker + text[-tail:]
+
+
+def format_command_error(command: list[str], error: OSError) -> str:
+    """Describe a command that never started, which no code repair can fix."""
+    message = f"COMMAND: {' '.join(command)}\nERROR: {error}"
+    if isinstance(error, FileNotFoundError):
+        message += (
+            f"\n\nThe executable {command[0]!r} was not found on PATH. Verification runs "
+            "without a shell, so shell aliases and functions do not apply. Install the "
+            "executable or set verification_commands in the orchestration parameter file "
+            "to a command that exists."
+        )
+    return message
 
 
 def format_process_result(command: list[str], process: subprocess.CompletedProcess[str]) -> str:

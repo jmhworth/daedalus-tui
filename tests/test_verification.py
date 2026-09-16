@@ -1,3 +1,4 @@
+import os
 import shutil
 import tempfile
 import sys
@@ -23,21 +24,21 @@ class VerificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self._suite_tree(root)
-            with patch("tui.verification.sys.executable", "/venv/bin/python"):
-                self.assertEqual(
-                    discover_commands(root, []),
-                    [
-                        ["npm", "test"],
-                        ["/venv/bin/python", "-m", "pytest"],
-                        ["/venv/bin/python", "-m", "pytest", "child/tests"],
-                    ],
-                )
+            interpreter = python_executable(root)
+            self.assertEqual(
+                discover_commands(root, []),
+                [
+                    ["npm", "test"],
+                    [interpreter, "-m", "pytest"],
+                    [interpreter, "-m", "pytest", "child/tests"],
+                ],
+            )
 
-    def test_falls_back_to_python3_when_the_interpreter_path_is_unknown(self):
+    def test_falls_back_to_path_when_no_virtual_environment_is_available(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self._suite_tree(root)
-            with patch("tui.verification.sys.executable", ""), patch(
+            with patch.dict(os.environ, {}, clear=True), patch(
                 "tui.verification.shutil.which",
                 side_effect=lambda name: "/usr/bin/python3" if name == "python3" else None,
             ):
@@ -45,8 +46,8 @@ class VerificationTests(unittest.TestCase):
                     discover_commands(root, []),
                     [
                         ["npm", "test"],
-                        ["python3", "-m", "pytest"],
-                        ["python3", "-m", "pytest", "child/tests"],
+                        ["/usr/bin/python3", "-m", "pytest"],
+                        ["/usr/bin/python3", "-m", "pytest", "child/tests"],
                     ],
                 )
 
@@ -60,6 +61,33 @@ class VerificationTests(unittest.TestCase):
     def test_python_executable_resolves_to_an_existing_interpreter(self):
         resolved = python_executable()
         self.assertTrue(shutil.which(resolved) or Path(resolved).exists())
+
+    def test_discovered_interpreter_is_an_existing_executable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tests").mkdir()
+            command = discover_commands(root, [])[0]
+
+            self.assertTrue(Path(command[0]).is_file(), command[0])
+            self.assertTrue(os.access(command[0], os.X_OK), command[0])
+
+    def test_prefers_a_virtual_environment_belonging_to_the_code_under_test(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binaries = root / ".venv" / "bin"
+            binaries.mkdir(parents=True)
+            interpreter = binaries / "python"
+            interpreter.write_text("#!/bin/sh\n", encoding="utf-8")
+            interpreter.chmod(0o755)
+
+            self.assertEqual(python_executable(root), str(interpreter))
+
+    def test_missing_executable_is_reported_as_an_environment_problem(self):
+        result = run_verification(Path("/"), [["daedalus-missing-executable"]])
+
+        self.assertFalse(result.succeeded)
+        self.assertIn("was not found on PATH", result.output)
+        self.assertIn("verification_commands", result.output)
 
     @patch("tui.verification.subprocess.run")
     def test_stops_at_first_failed_command(self, run):

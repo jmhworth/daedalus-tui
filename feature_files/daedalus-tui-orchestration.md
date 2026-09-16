@@ -50,7 +50,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
-- 2026-09-16: Hardened interpreter discovery after the `PATH`-lookup fix still emitted a bare `python`, switching `python_executable` to return the already-running `sys.executable` by absolute path so verification cannot depend on the child process's `PATH` or on a shim that passes an executable check but fails to exec.
+- 2026-09-16: Hardened interpreter discovery after the `PATH`-lookup fix still emitted a bare `python`, making `python_executable` accept the roots of the code under test and resolve, in order, a `.venv`/`venv` interpreter belonging to those roots, the active `VIRTUAL_ENV`, a `PATH` lookup, and finally the already-running `sys.executable`, so every discovered command names a real interpreter file rather than a name the child process must resolve itself.
 - 2026-09-16: Fixed convention-based verification failing with `[Errno 2] No such file or directory: 'python'` on hosts that only provide `python3` by resolving the interpreter in `discover_commands` instead of hardcoding `python`.
 - 2026-09-15: Added non-destructive interruption (`interrupted` results, a stop-aware integration gate, and a pre-promotion stop check), execution suffixes for follow-up worktrees, and per-run diagnostics files under `errors/`.
 - 2026-09-15: Added an orchestration-owned Firebase deploy step that applies changed Firestore rules and indexes after verification and repairs failures with the coding profile before blocking integration.
