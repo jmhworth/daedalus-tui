@@ -98,7 +98,7 @@ from .transcript import TranscriptLog
 from .usage_monitor import ProviderUsage, UsageMonitor, format_usage_bar
 from .token_usage import calculate_token_usage, merge_usage_entries, task_usage_entry, usage_entries_from_memory
 from .verification import truncate_diagnostic
-from .vim_text_area import MODE_LABELS, DaedalusVimTextArea, VimMode as VimModeEnum
+from .vim_text_area import MODE_LABELS, SUBMIT_KEYS, DaedalusVimTextArea, VimMode as VimModeEnum
 
 
 def _literal_select_options(options: list[tuple[str, str]]) -> list[tuple[Text, str]]:
@@ -146,8 +146,15 @@ def _unregister_app_for_thread_exit(app: "DaedalusTuiApp") -> None:
         _THREAD_EXIT_APPS.pop(id(app), None)
 
 
+# The prompt editor owns the submit keys because it must let them through
+# instead of inserting a newline; the menu label is derived from them so the
+# two can never drift apart.
+SUBMIT_SHORTCUT = " / ".join(
+    "+".join(part.capitalize() for part in key.split("+")) for key in SUBMIT_KEYS
+)
+
 GLOBAL_SHORTCUTS = (
-    ("Ctrl+Enter", "Send prompt (new task or follow-up)", "submit_prompt"),
+    (SUBMIT_SHORTCUT, "Send prompt (new task or follow-up)", "submit_prompt"),
     ("Tab", "Toggle coding/plan mode", "toggle_plan_mode"),
     ("Ctrl+C", "Stop the run, keep progress, restore prompt", "interrupt_task"),
     ("Ctrl+X", "Same as Ctrl+C (stop the run)", "interrupt_task"),
@@ -160,6 +167,17 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+T", "Show coding statistics", "show_statistics"),
     ("Ctrl+H", "Show pushed commit history", "show_push_history"),
 )
+
+
+def binding_keys(shortcut: str) -> str:
+    """Turn a displayed shortcut into Textual's comma-separated key list.
+
+    A shortcut may offer several keys for one action, written for the
+    shortcuts menu as ``"Shift+Enter / Ctrl+Enter"``. Textual binds the same
+    alternatives as ``"shift+enter,ctrl+enter"``.
+    """
+    return ",".join(part.strip().lower() for part in shortcut.split("/") if part.strip())
+
 
 _ACTIVE_TASK_STATUSES = {
     "queued",
@@ -1062,7 +1080,7 @@ class DaedalusTuiApp(App[None]):
     # consume them, even when output text is selected.
     BINDINGS = [
         Binding(
-            shortcut.lower(),
+            binding_keys(shortcut),
             action,
             description,
             priority=action == "interrupt_task",

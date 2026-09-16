@@ -46,8 +46,8 @@ modes = [
 ]
 
 [defaults]
-provider = "codex"
-model = "gpt-6-astra"
+provider = "claude"
+model = "claude-opus-5"
 reasoning = "high"
 
 [cursor]
@@ -126,16 +126,24 @@ width = "95%"
 # one), so by default the bar reads the same local data their own /usage and
 # /status views show: Codex rate-limit windows from its session logs, and
 # Claude Code's per-day token statistics cache, including any `rate_limits`
-# payload it provides. Set `command` for a provider to run any program instead;
-# it runs with stdin closed and a timeout, and its JSON or first output line is
-# shown. JSON rate-limit fields and Claude `context_window` percentages produce
-# the same progress bars for Claude.
+# payload it provides. The Claude cache is only a derived summary and can be
+# missing or stale, so its session transcripts are counted as well and the
+# larger figure from the two sources is shown. Set `command` for a provider to
+# run any program instead; it runs with stdin closed and a timeout, and its
+# JSON or first output line is shown. JSON rate-limit fields and Claude
+# `context_window` percentages produce the same progress bars for Claude.
 [usage]
 enabled = true
 interval_seconds = 60
 command_timeout_seconds = 20
 codex_sessions_dir = "~/.codex/sessions"
 claude_stats_file = "~/.claude/stats-cache.json"
+# Claude Code appends one JSON line per turn to a session transcript here.
+claude_projects_dir = "~/.claude/projects"
+# How far back transcripts are read. Each transcript in the window is parsed
+# once and afterwards only from where the previous poll stopped, so this bounds
+# the one-time cost of the first reading after launch.
+claude_transcript_days = 30
 # Codex only writes rate limits after a turn completes, so the most recently
 # touched session log is often a just-started session with no usage in it.
 # Scan back through this many logs (newest first) before reporting no data.

@@ -14,7 +14,8 @@ class ConfigTests(unittest.TestCase):
         settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
         orchestration = load_orchestration_settings(root / "parameter_files" / "daedalus-tui-orchestration.toml")
 
-        self.assertEqual(settings.default_model, "gpt-6-astra")
+        self.assertEqual(settings.default_provider, "claude")
+        self.assertEqual(settings.default_model, "claude-opus-5")
         self.assertEqual(settings.default_reasoning, "high")
         self.assertEqual([item.value for item in settings.codex_models], [
             "gpt-6-astra", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
@@ -70,8 +71,8 @@ class ConfigTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
 
+        # The Claude default is not a Codex model, so the first Codex one wins.
         self.assertEqual(settings.default_model_for("codex"), "gpt-6-astra")
-        # The Codex default is not a Claude model, so the first Claude one wins.
         self.assertEqual(settings.default_model_for("claude"), "claude-opus-5")
         self.assertEqual(settings.default_model_for("cursor"), "cursor")
         self.assertEqual(settings.default_reasoning_for("claude"), "high")
@@ -311,3 +312,5 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         self.assertEqual(settings.usage.session_scan_limit, 12)
         self.assertEqual(settings.usage.session_tail_bytes, 262_144)
         self.assertEqual(settings.usage.bar_width, 12)
+        self.assertEqual(settings.usage.claude_projects_dir, "~/.claude/projects")
+        self.assertEqual(settings.usage.claude_transcript_days, 30)

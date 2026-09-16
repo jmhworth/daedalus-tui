@@ -262,8 +262,8 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
     )):
         raise ValueError(f"{path} layout values must be positive.")
 
-    default_provider = str(defaults.get("provider", "codex"))
-    default_model = str(defaults.get("model", "gpt-5.6-luna"))
+    default_provider = str(defaults.get("provider", "claude"))
+    default_model = str(defaults.get("model", "claude-opus-5"))
     default_reasoning = str(defaults.get("reasoning", "high"))
     if not providers or not codex_models or not codex_reasoning:
         raise ValueError(f"{path} must define providers, codex_models, and codex_reasoning.")
@@ -352,9 +352,11 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
     scan_limit = int(values.get("session_scan_limit", defaults.session_scan_limit))
     tail_bytes = int(values.get("session_tail_bytes", defaults.session_tail_bytes))
     bar_width = int(values.get("bar_width", defaults.bar_width))
-    if scan_limit < 1 or tail_bytes < 1 or bar_width < 1:
+    transcript_days = int(values.get("claude_transcript_days", defaults.claude_transcript_days))
+    if scan_limit < 1 or tail_bytes < 1 or bar_width < 1 or transcript_days < 1:
         raise ValueError(
-            f"{path} usage.session_scan_limit, usage.session_tail_bytes, and usage.bar_width must be positive."
+            f"{path} usage.session_scan_limit, usage.session_tail_bytes, usage.bar_width, "
+            "and usage.claude_transcript_days must be positive."
         )
     providers: dict[str, UsageProviderSettings] = {}
     provider_tables = {
@@ -372,6 +374,8 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
         command_timeout_seconds=timeout,
         codex_sessions_dir=str(values.get("codex_sessions_dir", defaults.codex_sessions_dir)),
         claude_stats_file=str(values.get("claude_stats_file", defaults.claude_stats_file)),
+        claude_projects_dir=str(values.get("claude_projects_dir", defaults.claude_projects_dir)),
+        claude_transcript_days=transcript_days,
         session_scan_limit=scan_limit,
         session_tail_bytes=tail_bytes,
         bar_width=bar_width,

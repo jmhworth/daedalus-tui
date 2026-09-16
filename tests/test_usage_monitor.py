@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ import tempfile
 import unittest
 
 from tui.usage_monitor import (
+    ClaudeTranscriptUsage,
     ProviderUsage,
     UsageMonitor,
     UsageProviderSettings,
@@ -29,6 +31,32 @@ class UsageMonitorTests(unittest.TestCase):
 
     def tearDown(self):
         self._directory.cleanup()
+
+    def write_claude_transcript(self, name: str, entries: list[dict], now: float) -> Path:
+        """Write one session transcript and date it so the scan window keeps it."""
+        path = self.home / ".claude" / "projects" / "-workspace-project" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(json.dumps(entry) for entry in entries) + "\n", encoding="utf-8")
+        os.utime(path, (now, now))
+        return path
+
+    @staticmethod
+    def transcript_turn(uuid: str, timestamp: str, *, kind: str = "assistant", tokens: int = 0, content=None) -> dict:
+        message: dict = {"role": kind, "content": content if content is not None else "text"}
+        if kind == "assistant":
+            message["usage"] = {
+                "input_tokens": tokens,
+                "output_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+            }
+        return {
+            "type": kind,
+            "uuid": uuid,
+            "sessionId": "session-1",
+            "timestamp": timestamp,
+            "message": message,
+        }
 
     def write_codex_session(self, name: str, used_primary: float, used_secondary: float, now: float) -> None:
         path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / name
@@ -78,6 +106,84 @@ class UsageMonitorTests(unittest.TestCase):
         self.assertEqual(reading.summary, "Claude today 12.3k tok · 8 msgs")
         self.assertIn("1.0M tokens", reading.detail)
         self.assertIn("2 sessions today", reading.detail)
+
+    def test_claude_reading_counts_transcripts_when_the_stats_cache_is_stale(self):
+        """A cache without today's numbers must not flatten the panel to zero."""
+        now = 1_800_000_000.0
+        stamp = datetime.fromtimestamp(now, timezone.utc).isoformat().replace("+00:00", "Z")
+        (self.home / ".claude" / "stats-cache.json").write_text(
+            json.dumps(
+                {
+                    "dailyActivity": [{"date": "2020-01-01", "messageCount": 99, "sessionCount": 3}],
+                    "lastComputedDate": "2020-01-01",
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.write_claude_transcript(
+            "session-1.jsonl",
+            [
+                self.transcript_turn("u1", stamp, kind="user"),
+                self.transcript_turn("a1", stamp, tokens=1_200),
+                # Tool results are stored as user turns and are not messages.
+                self.transcript_turn("u2", stamp, kind="user", content=[{"type": "tool_result", "content": "ok"}]),
+                self.transcript_turn("a2", stamp, tokens=800),
+                self.transcript_turn("a3", "2020-01-01T00:00:00Z", tokens=5_000),
+            ],
+            now,
+        )
+
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_claude("Claude", now)
+
+        self.assertTrue(reading.ok)
+        self.assertEqual(reading.summary, "Claude today 2.0k tok · 3 msgs")
+        self.assertIn("1 sessions today", reading.detail)
+        self.assertEqual(reading.checked_at, now)
+        self.assertIn(str(self.home / ".claude" / "projects"), reading.source)
+
+    def test_transcripts_are_read_incrementally_and_replayed_turns_counted_once(self):
+        now = 1_800_000_000.0
+        today = datetime.fromtimestamp(now).date().isoformat()
+        stamp = datetime.fromtimestamp(now, timezone.utc).isoformat().replace("+00:00", "Z")
+        path = self.write_claude_transcript(
+            "session-1.jsonl",
+            [self.transcript_turn("a1", stamp, tokens=100)],
+            now,
+        )
+        usage = ClaudeTranscriptUsage(self.home / ".claude" / "projects")
+        usage.refresh(now)
+        self.assertEqual((usage.day(today).tokens, usage.day(today).messages), (100, 1))
+
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(self.transcript_turn("a2", stamp, tokens=50)) + "\n")
+            # A resumed or forked session replays earlier turns; the uuid keeps
+            # them from being billed twice.
+            handle.write(json.dumps(self.transcript_turn("a1", stamp, tokens=100)) + "\n")
+            # A turn still being written has no line break yet.
+            handle.write(json.dumps(self.transcript_turn("a3", stamp, tokens=25)))
+        os.utime(path, (now, now))
+        usage.refresh(now)
+        self.assertEqual((usage.day(today).tokens, usage.day(today).messages), (150, 2))
+
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write("\n")
+        os.utime(path, (now, now))
+        usage.refresh(now)
+        self.assertEqual((usage.day(today).tokens, usage.day(today).messages), (175, 3))
+        self.assertEqual(usage.total_tokens, 175)
+
+    def test_transcripts_outside_the_scan_window_are_skipped(self):
+        now = 1_800_000_000.0
+        stamp = datetime.fromtimestamp(now, timezone.utc).isoformat().replace("+00:00", "Z")
+        self.write_claude_transcript(
+            "old-session.jsonl",
+            [self.transcript_turn("a1", stamp, tokens=100)],
+            now - 86_400 * 45,
+        )
+        usage = ClaudeTranscriptUsage(self.home / ".claude" / "projects", scan_days=30)
+
+        self.assertEqual(usage.refresh(now), 0)
+        self.assertEqual(usage.total_tokens, 0)
 
     def test_claude_reading_draws_rate_limit_windows_when_present(self):
         now = 1_800_000_000.0

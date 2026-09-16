@@ -99,6 +99,9 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-16: Switched the startup defaults from Codex with GPT-6 Astra to
+  Claude Code with Claude Opus 5; the cascade still falls back to each other
+  provider's first model, so selecting Codex preselects GPT-6 Astra.
 - 2026-09-16: Added `[claude] allowed_tools` so the agent runner passes `--allowedTools` to `claude --print`, letting Claude agents run test commands that acceptEdits alone auto-denies.
 - 2026-09-16: Preserved sidebar cursor position after task deletion, added
   Claude rate-limit usage bars, and made successful pushed commit tips visible

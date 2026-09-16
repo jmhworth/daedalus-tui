@@ -27,6 +27,11 @@ _LINE_END_KEYS = {"dollar", "dollar_sign", "$"}
 _REGISTER_PREFIX_KEY = "quotation_mark"
 _SYSTEM_REGISTER_KEY = "plus"
 _INTERRUPT_KEYS = {"ctrl+c", "ctrl+x"}
+# Keys that send the prompt rather than edit it, in the order the shortcuts
+# menu lists them. Enter alone always inserts a newline, so a terminal has to
+# report Enter's modifiers -- which means the Kitty keyboard protocol -- for
+# either of these to arrive at all.
+SUBMIT_KEYS = ("shift+enter", "ctrl+enter")
 
 MODE_LABELS = {
     VimMode.INSERT: "INSERT",
@@ -301,7 +306,7 @@ class DaedalusVimTextArea(VimTextArea):
     # ------------------------------------------------------------------
 
     def _handle_insert_mode(self, event: events.Key) -> None:
-        """Keep Enter as a newline; Ctrl+Enter remains the app submit key."""
+        """Keep Enter as a newline; the modified Enters remain the submit keys."""
         if event.key == "enter":
             return
         super()._handle_insert_mode(event)
@@ -309,6 +314,16 @@ class DaedalusVimTextArea(VimTextArea):
     def on_key(self, event: events.Key) -> None:
         """Route app shortcuts first, then Vim commands, then mirror the register."""
         app = self.app
+        if event.key in SUBMIT_KEYS:
+            # Send from any Vim mode. The app also binds these keys, but the
+            # focused prompt sees them first, and the Vim router has no reason
+            # to hold a key it does not implement.
+            submit = getattr(app, "action_submit_prompt", None)
+            if submit is not None:
+                submit()
+            event.stop()
+            event.prevent_default()
+            return
         if event.key == "ctrl+k":
             # VimTextArea handles several Ctrl keys itself, so route the
             # application's shortcut before its mode-specific processing.
@@ -716,4 +731,4 @@ class DaedalusVimTextArea(VimTextArea):
         event.prevent_default()
 
 
-__all__ = ["DaedalusVimTextArea", "MODE_LABELS", "VimMode"]
+__all__ = ["DaedalusVimTextArea", "MODE_LABELS", "SUBMIT_KEYS", "VimMode"]

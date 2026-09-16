@@ -1312,7 +1312,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 str(widget.render()) for widget in app.screen.query(".shortcut-row")
             )
             self.assertIn("Ctrl+Q", shortcut_text)
-            self.assertIn("Ctrl+Enter", shortcut_text)
+            self.assertIn("Shift+Enter / Ctrl+Enter", shortcut_text)
             self.assertIn("Ctrl+K", shortcut_text)
             self.assertIn("Ctrl+P", shortcut_text)
             self.assertIn("Ctrl+T", shortcut_text)
@@ -1688,6 +1688,25 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("enter")
             prompt.insert("second line")
             self.assertEqual(prompt.text, "first line\nsecond line")
+
+    async def test_shift_enter_and_ctrl_enter_send_the_prompt(self):
+        """Both submit keys must reach the app while the Vim editor has focus."""
+        for key in ("shift+enter", "ctrl+enter"):
+            with self.subTest(key=key):
+                app, coordinator = self.make_app()
+                async with app.run_test() as pilot:
+                    prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+                    prompt.focus()
+                    prompt.insert(f"Send with {key}")
+                    await pilot.press(key)
+                    await pilot.pause()
+
+                    self.assertEqual(
+                        [record.prompt for record in coordinator.records],
+                        [f"Send with {key}"],
+                    )
+                    # The submit key must never also land in the prompt.
+                    self.assertNotIn("\n", prompt.text)
 
     async def test_prompt_accepts_typing_after_resume_and_new_task(self):
         app, coordinator = self.make_app()

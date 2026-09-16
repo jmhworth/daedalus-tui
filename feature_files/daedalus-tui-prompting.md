@@ -45,6 +45,14 @@ provider usage every minute.
   reports the exact path, and launches nothing. Repeated Send events while a
   submission is pending are ignored. View refreshes (streaming output, inbox
   updates) never touch the composer, focus, or cursor.
+- **Submit keys**: `Shift+Enter` and `Ctrl+Enter` both send, from any Vim mode;
+  plain `Enter` always inserts a newline. `SUBMIT_KEYS` in
+  `tui/vim_text_area.py` is the single source of truth: the prompt editor
+  routes those keys to the app before the Vim router or TextArea can consume
+  them, and `app.GLOBAL_SHORTCUTS` derives both its binding and its menu label
+  from them. A terminal that does not implement the Kitty keyboard protocol
+  sends a plain Enter for every variant, so neither key can be delivered there
+  and the Send button remains the way to submit.
 - **Interruption**: `Ctrl+C`, Cancel, and `Ctrl+X` share one action
   (`TaskCoordinator.interrupt`). It saves the current draft, stashes a
   different unsent follow-up as a `stashed` draft reachable from Prompt
@@ -139,6 +147,20 @@ provider usage every minute.
   Claude's `five_hour`, `seven_day`, and `spend_limit` windows when present. A
   `command` per provider runs any program instead (stdin closed, timeout,
   process-group kill) and shows its JSON usage fields or first line.
+- **Claude token and message reading**: Claude Code's statistics cache is a
+  derived summary that can be absent, stale, or written under keys the reader
+  does not know, each of which showed a flat `0 tok · 0 msgs` after a heavy
+  day. Session transcripts under `[usage] claude_projects_dir` are therefore
+  counted as the authoritative record -- every turn appends a JSON line whose
+  `message.usage` holds input, output, and both cache token counts -- and each
+  displayed figure is the larger of the two sources, which cannot double-count
+  because both describe the same local calendar day. Transcripts touched
+  within `[usage] claude_transcript_days` are parsed once and afterwards only
+  from the byte offset where the previous poll stopped, a half-written trailing
+  line is left for the next poll, turns replayed by a resumed or forked session
+  are de-duplicated by their transcript `uuid`, tool results are not counted as
+  messages, and a scan that outlives its poll interval blocks the next one
+  rather than counting the same bytes twice.
 - **Codex rate-limit reading**: Codex writes rate limits only after a turn
   completes, so its most recently touched session log is frequently a
   just-started session holding none. The reader therefore scans back through
@@ -192,6 +214,11 @@ provider usage every minute.
 HACKING
 
 ## State Log
+- 2026-09-16: Fixed the Claude usage reading, which reported zero tokens and
+  zero messages whenever the statistics cache lacked today's entry, by counting
+  Claude Code's session transcripts incrementally and showing the larger figure
+  from the two sources, and added `Shift+Enter` beside `Ctrl+Enter` as a submit
+  key routed by the prompt editor.
 - 2026-09-16: Gave the Markdown viewer automatic line breaks and replaced its muted run-identity line with an action-items header extracted from the response; fixed the Codex usage reader, which reported "no usage data yet" whenever the newest session log was a just-started session and never read Codex's `resets_in_seconds` reset times, and added per-window progress bars to the usage panel.
 - 2026-09-16: Extended usage-window parsing to Claude's documented rate-limit
   payloads and configured JSON sources, including 5-hour, 7-day, and spend

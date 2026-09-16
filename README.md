@@ -249,8 +249,12 @@ twice; if the host clipboard is unavailable the text stays in the Vim
 register and the status line says so. `p` uses the Vim register first and the
 system clipboard when the register is empty; `"+y`, `"+p`, and `"+P` address
 the system clipboard explicitly so newly copied external text is always
-reachable. `Enter` inserts a newline; `Ctrl+Enter` sends. Mouse clicks and
-standard Textual key navigation remain available.
+reachable. `Enter` inserts a newline; `Shift+Enter` and `Ctrl+Enter` both send,
+from any Vim mode. Reporting a modifier on Enter at all requires a terminal
+that implements the Kitty keyboard protocol (Ghostty, Kitty, WezTerm, or
+iTerm2 with CSI u reporting enabled); terminals without it send a plain Enter
+for every variant, and **Send** remains the way to submit there. Mouse clicks
+and standard Textual key navigation remain available.
 
 ## Conversations, follow-ups, and stopping a run
 
@@ -259,7 +263,7 @@ the first meaningful line of its first prompt (Markdown decoration removed,
 cut at a word boundary to `[titles] maximum_length`). The title is shown in
 the inbox and above the composer and never changes on follow-ups. **New Task**
 saves the current draft and starts a separate conversation; with a task
-selected, **Send** (`Ctrl+Enter`) sends the composer text as the next turn of
+selected, **Send** (`Shift+Enter`) sends the composer text as the next turn of
 that task. Sending is available once the task's current run has stopped or
 finished; you can type the next prompt while a run is active. Follow-ups keep
 the task's provider, model, reasoning, mode, and topic unless you change them
@@ -325,8 +329,18 @@ non-interactive `usage` subcommand (Claude Code waits for a terminal; Codex
 refuses without one), so by default the bar reads the same local data their
 own `/usage` and `/status` views show: Codex rate-limit windows (5-hour and
 weekly percentages with reset times) from its session logs under
-`~/.codex/sessions`, and today's token and message totals from Claude Code's
-`~/.claude/stats-cache.json`. Claude rate-limit windows (`five_hour`,
+`~/.codex/sessions`, and today's token and message totals for Claude Code.
+
+Claude's `~/.claude/stats-cache.json` is only a derived summary and is often
+absent or stale, which used to leave the bar reading `0 tok · 0 msgs` after a
+heavy day, so the session transcripts under `[usage] claude_projects_dir`
+(default `~/.claude/projects`) are counted as well: every turn appends a JSON
+line carrying its `message.usage`, which makes them the authoritative record.
+Each figure shown is the larger of the two sources, since neither is complete
+on its own and both describe the same calendar day. Transcripts touched within
+`[usage] claude_transcript_days` (default 30) are parsed once and afterwards
+only from where the previous poll stopped, and turns replayed by a resumed or
+forked session are counted once. Claude rate-limit windows (`five_hour`,
 `seven_day`, and `spend_limit`) are also drawn when that cache or a configured
 JSON command provides them. A configured Claude JSON source may also expose a
 `context_window.used_percentage` bar. Every window that reports a percentage is
