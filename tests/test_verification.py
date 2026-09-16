@@ -1,3 +1,4 @@
+import shutil
 import tempfile
 import sys
 import time
@@ -7,22 +8,51 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tui.agent_runner import AgentControl
-from tui.verification import discover_commands, run_verification
+from tui.verification import discover_commands, python_executable, run_verification
 
 
 class VerificationTests(unittest.TestCase):
+    def _suite_tree(self, root: Path) -> None:
+        (root / "tests").mkdir()
+        (root / "package.json").write_text('{"scripts":{"test":"pytest"}}', encoding="utf-8")
+        child = root / "child"
+        child.mkdir()
+        (child / "tests").mkdir()
+
     def test_discovers_root_and_nested_test_suites(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "tests").mkdir()
-            (root / "package.json").write_text('{"scripts":{"test":"pytest"}}', encoding="utf-8")
-            child = root / "child"
-            child.mkdir()
-            (child / "tests").mkdir()
-            self.assertEqual(
-                discover_commands(root, []),
-                [["npm", "test"], ["python", "-m", "pytest"], ["python", "-m", "pytest", "child/tests"]],
-            )
+            self._suite_tree(root)
+            with patch("tui.verification.shutil.which", return_value="/usr/bin/python"):
+                self.assertEqual(
+                    discover_commands(root, []),
+                    [
+                        ["npm", "test"],
+                        ["python", "-m", "pytest"],
+                        ["python", "-m", "pytest", "child/tests"],
+                    ],
+                )
+
+    def test_falls_back_to_python3_when_python_is_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._suite_tree(root)
+            with patch(
+                "tui.verification.shutil.which",
+                side_effect=lambda name: None if name == "python" else "/usr/bin/python3",
+            ):
+                self.assertEqual(
+                    discover_commands(root, []),
+                    [
+                        ["npm", "test"],
+                        ["python3", "-m", "pytest"],
+                        ["python3", "-m", "pytest", "child/tests"],
+                    ],
+                )
+
+    def test_python_executable_resolves_to_an_existing_interpreter(self):
+        resolved = python_executable()
+        self.assertTrue(shutil.which(resolved) or Path(resolved).exists())
 
     @patch("tui.verification.subprocess.run")
     def test_stops_at_first_failed_command(self, run):

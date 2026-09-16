@@ -6,8 +6,10 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 import subprocess
+import sys
 from threading import Thread
 import time
 from typing import Protocol
@@ -27,15 +29,24 @@ class VerificationResult:
     output: str
 
 
+def python_executable() -> str:
+    """Pick an interpreter that actually exists; many macOS setups only ship python3."""
+    for candidate in ("python", "python3"):
+        if shutil.which(candidate):
+            return candidate
+    return sys.executable
+
+
 def discover_commands(root: Path, configured: list[list[str]]) -> list[list[str]]:
     if configured:
         return configured
 
+    python = python_executable()
     commands: list[list[str]] = []
     if package_has_test_script(root / "package.json"):
         commands.append(["npm", "test"])
     if (root / "tests").is_dir():
-        commands.append(["python", "-m", "pytest"])
+        commands.append([python, "-m", "pytest"])
 
     for child in sorted(root.iterdir()):
         if not child.is_dir() or child.name.startswith("."):
@@ -43,7 +54,7 @@ def discover_commands(root: Path, configured: list[list[str]]) -> list[list[str]
         if package_has_test_script(child / "package.json"):
             commands.append(["npm", "--prefix", child.name, "test"])
         if (child / "tests").is_dir():
-            commands.append(["python", "-m", "pytest", str(Path(child.name) / "tests")])
+            commands.append([python, "-m", "pytest", str(Path(child.name) / "tests")])
     return commands
 
 
