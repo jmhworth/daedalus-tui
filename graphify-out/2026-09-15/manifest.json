@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "tests/test_app.py": {
-    "mtime": 1789522590.3552918,
-    "ast_hash": "2a820e10f6b936c8e70cff043d5d3d84",
+    "mtime": 1789525243.2332585,
+    "ast_hash": "0e6eee00e3a44602ae4428f7a6b18c0d",
     "semantic_hash": ""
   },
   "tests/test_config.py": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "tui/app.py": {
-    "mtime": 1789522590.3585286,
-    "ast_hash": "8d535ded39347231e6b7aa9e2a8302f7",
+    "mtime": 1789525243.2359228,
+    "ast_hash": "6fd3aac1c26f0cae8cd436c4bf187fea",
     "semantic_hash": ""
   },
   "tui/clipboard.py": {
@@ -135,8 +135,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1789522590.3510327,
-    "ast_hash": "478fdf4f21598014e609bc3cda7b83d4",
+    "mtime": 1789525243.2310388,
+    "ast_hash": "5fa14e2adfab02aa4524854444a49fa2",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-orchestration.md": {
@@ -145,8 +145,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
-    "mtime": 1789522590.3530526,
-    "ast_hash": "4ef8c4f91b4c38b0c5afbd18039c7e68",
+    "mtime": 1789525243.2325523,
+    "ast_hash": "7a02d03ea785187f9fbd040ea2215f9f",
     "semantic_hash": ""
   },
   "requirements.txt": {
@@ -255,8 +255,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-project-initialization.md": {
-    "mtime": 1789522590.3520432,
-    "ast_hash": "ff14a569e29398e6999d3ae8e7ed03d4",
+    "mtime": 1789525243.2318077,
+    "ast_hash": "12d7749f5f274eda6f58d5468c5ba349",
     "semantic_hash": ""
   },
   "tui/templates/project-initializer/.agents/profiles/architecture.md": {
@@ -445,13 +445,13 @@
     "semantic_hash": ""
   },
   "tui/personal_supabase.py": {
-    "mtime": 1789522590.3602068,
-    "ast_hash": "c9f8be8760435f568a7f0420ddd35acc",
+    "mtime": 1789525243.2379117,
+    "ast_hash": "b543c6c192a56e7ddd7b2feeea07c27a",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-personal-supabase.md": {
-    "mtime": 1789522590.351545,
-    "ast_hash": "ba76e89cfd340e3a38ca7c364f169856",
+    "mtime": 1789525243.2313817,
+    "ast_hash": "d6a3c4106b9c7bdfa950a1a79965e553",
     "semantic_hash": ""
   },
   "tests/test_environment.py": {

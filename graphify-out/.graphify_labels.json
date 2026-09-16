@@ -78,10 +78,5 @@
   "76": "bootstrap_personal_supabase",
   "77": "update_repository",
   "78": "load_project_worktree_settings",
-  "79": "IntegrationCoordinator",
-  "80": ".edit_paste_after",
-  "81": "app.py",
-  "82": "preflight_personal_supabase",
-  "83": "profile_guidance_section",
-  "84": "RegistrationResult"
+  "80": ".edit_paste_after"
 }
