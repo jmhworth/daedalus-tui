@@ -487,3 +487,54 @@ class TaskMemoryStoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConversationSnapshotTests(unittest.TestCase):
+    def test_round_trips_title_turns_runs_and_version_and_migrates_worktree_keyed_entries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ".daedalus-memory.json"
+            store = TaskMemoryStore(path)
+            store.record_task("task-001-abc-r2", "prompt", "codex", "luna", "high", "coding", "running", submitted_at=0)
+            store.record_task(
+                "task-001-abc",
+                "prompt",
+                "codex",
+                "luna",
+                "high",
+                "coding",
+                "completed",
+                previous_task_id="task-001-abc-r2",
+                submitted_at=0,
+                logical_task_id="001-abc",
+                title="Readable title",
+                turns=[{"turn_id": "t1", "sequence": 1, "text": "prompt", "kind": "user"}],
+                runs=[{"run_id": "r1", "turn_id": "t1", "attempt": 1, "status": "completed"}],
+                active_turn_id="t1",
+                active_run_id="r1",
+                schema_version=2,
+                prompt_count=1,
+                project_key="project-1234abcd",
+            )
+            tasks = store.get_tasks()
+            self.assertEqual(list(tasks), ["task-001-abc"])
+            task = tasks["task-001-abc"]
+            self.assertEqual(task["title"], "Readable title")
+            self.assertEqual(task["schema_version"], 2)
+            self.assertEqual(task["turns"][0]["text"], "prompt")
+            self.assertEqual(task["runs"][0]["status"], "completed")
+            self.assertEqual((task["active_turn_id"], task["active_run_id"]), ("t1", "r1"))
+            self.assertEqual(task["project_key"], "project-1234abcd")
+
+    def test_ui_preferences_persist_without_touching_tasks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ".daedalus-memory.json"
+            store = TaskMemoryStore(path)
+            store.record_task("task-1", "prompt", "codex", "luna", "high", "coding", "completed", submitted_at=0)
+            self.assertFalse(store.get_ui_preference("output_viewer_visible", False))
+            store.set_ui_preference("output_viewer_visible", True)
+            store.set_ui_preference("show_all_tasks", True)
+            self.assertTrue(store.get_ui_preference("output_viewer_visible"))
+            self.assertTrue(store.get_ui_preference("show_all_tasks"))
+            self.assertIn("task-1", store.get_tasks())
+            entries = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(sum(1 for entry in entries if "ui_preferences" in entry), 1)

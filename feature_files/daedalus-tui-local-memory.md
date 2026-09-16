@@ -9,6 +9,20 @@ daemon, a remote service, or a database server.
 ## Key Points
 - **Local persistence**: The launch root stores all task history in one
   `.daedalus-memory.json` file. The file is intentionally ignored by Git.
+- **Conversation snapshots (schema version 2)**: Task entries are keyed by the
+  stable logical id (`task-<id>`); a worktree-keyed legacy entry is migrated
+  once through `previous_task_id`. New fields are `title`, ordered `turns`
+  (id, sequence, exact text, timestamp, kind `user`/`generated`,
+  `revises_turn_id`, configuration snapshot, archive path), `runs` (id, turn,
+  attempt, status, timestamps, message range, error, diagnostics path, tokens,
+  worktree), `active_turn_id`, `active_run_id`, `prompt_count`,
+  `project_key`, `diagnostics_dir`, and `prompts_dir`. Legacy records without
+  these fields load with the prompt as the first user turn and
+  `prompt_history` extras as generated context. Runs active at shutdown are
+  restored as `interrupted`. Exact prompt text lives in the `prompts/` archive
+  (see `daedalus-tui-prompting.md`); memory remains the index.
+- **UI preferences**: A `ui_preferences` entry remembers the output viewer
+  visibility and the All tasks filter.
 - **Task history**: A single `tasks` entry maps each task worktree directory
   name to an ISO-8601 UTC submission `timestamp`, prompt, provider, model,
   reasoning, mode, current state, assistant outputs, non-negative token usage,
@@ -70,6 +84,7 @@ daemon, a remote service, or a database server.
 HACKING
 
 ## State Log
+- 2026-09-15: Added schema-version-2 conversation fields (title, turns, runs, active ids, prompt count, storage paths), stable logical task keys with one-time migration, `interrupted` restoration of runs active at shutdown, and a `ui_preferences` entry.
 - 2026-08-24: Persisted optional task `topic` slugs so tagged topics survive restart and rehydration.
 - 2026-08-23: Added a per-project `project_target_branches` map so Branch Select choices persist in launch-root memory without rewriting the orchestration parameter default.
 - 2026-08-16: Documented the existing local JSON token-usage store, its completion-only recording boundary, and its atomic write and validation behavior.

@@ -148,25 +148,63 @@ Symlinked paths are shared local resources and are not OS-enforced read-only;
 agents and setup commands must treat them as immutable.
 
 The launch root stores task history in `.daedalus-memory.json`. Its `tasks`
-entry maps each task worktree directory name to the submission timestamp,
-prompt, provider/model/reasoning/mode selection, current state, assistant
-outputs, token usage, resolved project path, and any error so failed, paused,
-and cancelled work can be reopened for analysis. Failed tasks and tasks
-interrupted by a TUI restart are rehydrated into the task inbox; failed tasks
-can be retried and interrupted tasks can be resumed when their worktrees still
-exist. The memory file also keeps a single `last_opened_project` entry and an
-`opened_project_directories` list for projects opened by path.
-Plan tasks with submitted answers additionally retain generated review requests
-in an optional `prompt_history` list on the same worktree record.
-Runtime diagnostics are written to `.daedalus-debug.log` next to that memory
-file (rotated at 2 MB). It records UI exceptions, task/agent lifecycle events,
-and shutdown state. During Python exit it cancels active agent process groups
-before the executor can block on their worker threads. If the process is
-stuck, run `kill -USR1 <pid>` to append all Python thread stacks to the same
-log before terminating it; this command writes only to the log by design.
-The first launch initializes it to the default project, every sidebar focus
-change updates it, and the next startup restores it when that project still
-exists. The file is intentionally ignored by Git.
+entry maps each task's stable logical key (`task-<id>`) to the submission
+timestamp, prompt, generated title, provider/model/reasoning/mode selection,
+current state, assistant outputs, token usage, resolved project path, any
+error, and (schema version 2) the ordered conversation turns and runs. Older
+worktree-keyed snapshots are migrated once and loaded with the original prompt
+as the first turn. Failed tasks can be retried; tasks that were running when
+the TUI stopped come back as `interrupted` and can be resumed or continued
+with a new prompt, never auto-launched. The memory file also keeps a single
+`last_opened_project` entry, an `opened_project_directories` list for projects
+opened by path, and small UI preferences (viewer visibility, All tasks).
+The first launch initializes the project marker to the default project, every
+sidebar focus change updates it, and the next startup restores it when that
+project still exists. The file is intentionally ignored by Git.
+
+## Prompts, drafts, and errors on disk
+
+Every prompt you send and every draft you type is saved under the TUI's own
+`prompts/` folder, and every diagnostic under its `errors/` folder. Both live
+under the storage root configured in
+`parameter_files/daedalus-tui-prompting.toml` (`[storage] data_root`, default
+`.` = the TUI project directory that owns `parameter_files`); a relative root
+never depends on the working directory or on which repository a task targets,
+and packaged installs in a read-only location should point it at a writable
+absolute path such as `~/.local/share/daedalus-tui`. Both folders are
+gitignored and never appear as projects in the selector.
+
+```text
+daedalus-tui/
+  prompts/<project-basename>-<digest>/
+    drafts/new-task.json              # unsent new-task draft
+    <task-id>/draft.json              # follow-up or recovered draft
+    <task-id>/turn-0001.md            # exact first submission
+    <task-id>/turn-0002.md            # exact next submission
+  errors/
+    daedalus.log                      # rotating runtime log (2 MB × 3)
+    faults.log                        # fault-handler and SIGUSR1 stack dumps
+    <project-basename>-<digest>/<task-id>/turn-0002-run-0001.log
+```
+
+Archived prompts are written byte-for-byte (indentation, blank lines, and
+trailing newlines included) through atomic file replacement. Drafts save after
+a short typing pause (`[drafts] autosave_delay_ms`) and before Send, Cancel,
+task or project switches, New Task, and quit, so at most the last unflushed
+interval can be lost. If storage cannot be written the editor stays usable and
+the status line names the exact path that failed; a prompt that cannot be
+archived is not sent. On restart the latest draft returns to the composer, a
+missing archive is regenerated from the task index, and an archived prompt the
+index does not know is offered back as a recovered draft.
+
+`errors/daedalus.log` replaces the older launch-root `.daedalus-debug.log`
+(existing files are left in place). It records UI exceptions, task/agent
+lifecycle events with project, task, turn, run, phase, and provider, and
+shutdown state, with known credential patterns redacted. Each run's complete
+error text is also appended to its own `turn-NNNN-run-NNNN.log` before the
+on-screen summary is truncated; the Errors view names both files. If the
+process is stuck, run `kill -USR1 <pid>` to append all Python thread stacks to
+`errors/faults.log`.
 
 The task list keeps each prompt's provider, model, reasoning, status, branch,
 worktree, and filtered assistant-message transcript separate. Raw diffs,
@@ -178,15 +216,82 @@ if you want your terminal emulator's native selection instead, hold Option in
 iTerm or Shift in Terminal.app while dragging.
 
 Vim-style shortcuts are also available without changing normal prompt typing.
-The prompt itself is a modal Vim text area: it starts in Insert mode, `Esc`
-enters Normal mode, and `i`, `a`, `o`, `h/j/k/l`, `w`, `e`, `0`, `$`, `gg`, `G`,
-`d`, `u`, `y`, `p`, Visual mode, and `Shift+V` visual-line mode are available.
-`Enter` inserts a newline;
-`Ctrl+Enter` submits the prompt. Yanks are mirrored to the system clipboard,
-and `p` falls back to the system clipboard when the Vim register is empty.
-The supported command subset is intentionally incremental so additional Vim
-commands can be added as they become useful. Mouse clicks and standard
-Textual key navigation remain available.
+The prompt itself is a modal Vim text area with a compact INSERT/NORMAL/VISUAL
+indicator: it starts in Insert mode and `Esc` enters Normal mode. Supported
+commands: `i a I A o O` (Insert), `h j k l`, `w b e`, `0 $`, `gg G` (moves,
+with counts such as `3j`), `v` / `V` (character / whole-line selection),
+`x dd dw d$` and visual `d`/`x` (cut, `2dd` cuts two lines), visual `c`
+(change), `yy yw y$` and visual `y` (copy, `2yy` copies two lines), `p` / `P`
+(paste after / before; whole lines stay whole lines, including on the last
+line), `u` / `Ctrl+R` (undo / redo while the prompt has focus). Every cut and
+yank also copies to the system clipboard, even when the same text is yanked
+twice; if the host clipboard is unavailable the text stays in the Vim
+register and the status line says so. `p` uses the Vim register first and the
+system clipboard when the register is empty; `"+y`, `"+p`, and `"+P` address
+the system clipboard explicitly so newly copied external text is always
+reachable. `Enter` inserts a newline; `Ctrl+Enter` sends. Mouse clicks and
+standard Textual key navigation remain available.
+
+## Conversations, follow-ups, and stopping a run
+
+Each task is a conversation with an automatically generated title taken from
+the first meaningful line of its first prompt (Markdown decoration removed,
+cut at a word boundary to `[titles] maximum_length`). The title is shown in
+the inbox and above the composer and never changes on follow-ups. **New Task**
+saves the current draft and starts a separate conversation; with a task
+selected, **Send** (`Ctrl+Enter`) sends the composer text as the next turn of
+that task. Sending is available once the task's current run has stopped or
+finished; you can type the next prompt while a run is active. Follow-ups keep
+the task's provider, model, reasoning, mode, and topic unless you change them
+after selecting the task, in which case the change is recorded on the new
+turn. The agent receives the original request, recent history, and the latest
+instruction within a configurable character budget
+(`[conversation] context_budget_chars`), with omitted older turns marked
+explicitly; the complete history stays on disk. A preserved worktree is
+reused; a cleaned-up one is replaced by a fresh worktree from the operating
+branch under the same task. **Prompt history** above the composer reloads any
+earlier prompt (or a saved follow-up) into the editor without changing its
+archived file. The **All tasks** toggle under the inbox lists completed and
+interrupted conversations so they can be reopened after a restart.
+
+**`Ctrl+C`, Cancel, and `Ctrl+X`** all stop the selected task's active run
+without discarding anything: the worktree, branch, and uncommitted files are
+kept, the run is recorded as `interrupted` (not an error), and the interrupted
+prompt's exact text returns to the composer in Insert mode with the cursor at
+the end. If you had typed a different follow-up, it is saved first and listed
+under Prompt history. Edit the restored prompt and Send to continue the same
+task, or press Resume to continue in the existing worktree unchanged. Pressing
+`Ctrl+C` repeatedly is harmless, with nothing running it leaves the draft
+alone, and on the main screen it never copies text or quits (use
+`Ctrl+Alt+S` to copy a selection and `Ctrl+Q` to quit; quitting saves drafts
+first). Modal dialogs keep their own Escape/Cancel behavior.
+
+## Output viewer
+
+**Show viewer** in the output toolbar opens a read-only Markdown viewer that
+takes the right third of the whole usable width on a wide terminal (about 60
+of 180 columns), leaving two thirds for the task inbox and the composer. Its
+source selector offers the latest response, earlier responses, and the current
+plan text; **Raw** shows the exact Markdown source on a selectable surface.
+Live output re-renders with a short debounce, follows streaming only when you
+are already at the bottom, and the viewer never executes code blocks, opens
+links, or fetches images (activating a link shows its target in the status
+line). When the terminal is narrower than `[viewer] minimum_width +
+main_minimum_width` or in compact mode, the same viewer becomes a full-width
+alternate view with a **Back** control. The choice is remembered.
+
+## Usage bar
+
+The bottom-left usage bar refreshes every `[usage] interval_seconds` (default
+60) in `parameter_files/daedalus-tui.toml`. Neither CLI offers a
+non-interactive `usage` subcommand (Claude Code waits for a terminal; Codex
+refuses without one), so by default the bar reads the same local data their
+own `/usage` and `/status` views show: Codex rate-limit windows (5-hour and
+weekly percentages with reset times) from its newest session log under
+`~/.codex/sessions`, and today's token and message totals from Claude Code's
+`~/.claude/stats-cache.json`. Set `[usage.<provider>] command` to run any
+program instead; it runs with stdin closed and a timeout, and its JSON usage
+fields or first output line are shown. Hover the bar for details.
 
 Use the mode selector for Coding, Ask, or Plan, or press `Tab` on the main
 prompting screen to toggle between Coding and Plan. Ask runs are read-only and do
@@ -195,10 +300,10 @@ task list through their `planning`, `questioning`, and answer-review states.
 They return a structured implementation plan and multiple-choice questions;
 submit selected answers for another review round, or use the follow-up
 controls to continue planning. The Implement button remains unavailable until
-the agent confirms that no questions remain, then creates a separate coding
-task from the approved plan. Pause preserves the task worktree and allows
-resume later; Cancel stops the agent and removes that task's worktree and
-branch.
+the agent confirms that no questions remain, then continues the same
+conversation as a coding run from the approved plan. Pause preserves the task
+worktree and allows resume later; Cancel (or `Ctrl+C`) stops the run, keeps
+its worktree and branch, and returns the prompt to the composer.
 
 Optional Topics group closely related tasks under shared markdown in
 `topic_files/` (Topic Goal, Topic Status, State Log). Create or edit those

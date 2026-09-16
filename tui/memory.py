@@ -17,6 +17,7 @@ LAST_OPENED_PROJECT_KEY = "last_opened_project"
 OPENED_PROJECT_DIRECTORIES_KEY = "opened_project_directories"
 PROJECT_TARGET_BRANCHES_KEY = "project_target_branches"
 PROJECT_TOPICS_KEY = "project_topics"
+UI_PREFERENCES_KEY = "ui_preferences"
 TASKS_KEY = "tasks"
 
 
@@ -243,6 +244,37 @@ class TaskMemoryStore:
                 updated_entries.append({PROJECT_TOPICS_KEY: mapping})
             self._write_entries(updated_entries)
 
+    def get_ui_preference(self, key: str, default: object = None) -> object:
+        """Return one remembered UI preference (for example viewer visibility)."""
+        with self._lock:
+            entries = self._read_entries()
+        for entry in reversed(entries):
+            mapping = entry.get(UI_PREFERENCES_KEY)
+            if isinstance(mapping, dict) and key in mapping:
+                return mapping[key]
+        return default
+
+    def set_ui_preference(self, key: str, value: object) -> None:
+        """Remember one UI preference without losing other entries."""
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            mapping: dict[str, object] = {}
+            replaced = False
+            for existing in entries:
+                existing_map = existing.get(UI_PREFERENCES_KEY)
+                if isinstance(existing_map, dict):
+                    if not replaced:
+                        mapping.update(existing_map)
+                        replaced = True
+                    continue
+                if "tokens" in existing:
+                    continue
+                updated_entries.append(existing)
+            mapping[key] = value
+            updated_entries.append({UI_PREFERENCES_KEY: mapping})
+            self._write_entries(updated_entries)
+
     def get_tasks(self) -> dict[str, dict[str, object]]:
         """Return persisted task snapshots keyed by their stable task ID."""
         with self._lock:
@@ -280,8 +312,25 @@ class TaskMemoryStore:
         submission_sequence: int | None = None,
         resume_from: str | None = None,
         topic: str | None = None,
+        title: str | None = None,
+        turns: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+        runs: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+        active_turn_id: str | None = None,
+        active_run_id: str | None = None,
+        schema_version: int | None = None,
+        prompt_count: int | None = None,
+        project_key: str | None = None,
+        diagnostics_dir: Path | None = None,
+        prompts_dir: Path | None = None,
     ) -> None:
-        """Upsert a task snapshot keyed by the task worktree's directory name."""
+        """Upsert a task snapshot keyed by its stable logical task key.
+
+        Older snapshots were keyed by the worktree directory name; passing
+        ``previous_task_id`` migrates such an entry onto the new key once while
+        leaving every other entry untouched. The conversation fields (title,
+        turns, runs, active identifiers) are written only when supplied so a
+        legacy-shaped record stays byte-compatible.
+        """
         task = {
             "timestamp": datetime.fromtimestamp(submitted_at or 0, timezone.utc)
             .isoformat()
@@ -316,6 +365,26 @@ class TaskMemoryStore:
         cleaned_topic = topic.strip() if isinstance(topic, str) and topic.strip() else None
         if cleaned_topic is not None:
             task["topic"] = cleaned_topic
+        if title is not None:
+            task["title"] = title
+        if turns is not None:
+            task["turns"] = [dict(turn) for turn in turns]
+        if runs is not None:
+            task["runs"] = [dict(run) for run in runs]
+        if active_turn_id is not None:
+            task["active_turn_id"] = active_turn_id
+        if active_run_id is not None:
+            task["active_run_id"] = active_run_id
+        if schema_version is not None:
+            task["schema_version"] = int(schema_version)
+        if prompt_count is not None:
+            task["prompt_count"] = max(0, int(prompt_count))
+        if project_key is not None:
+            task["project_key"] = project_key
+        if diagnostics_dir is not None:
+            task["diagnostics_dir"] = str(diagnostics_dir)
+        if prompts_dir is not None:
+            task["prompts_dir"] = str(prompts_dir)
         with self._lock:
             entries = self._read_entries()
             updated_entries: list[dict[str, object]] = []

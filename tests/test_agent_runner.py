@@ -450,3 +450,40 @@ class AgentRunnerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InterruptSignalTests(unittest.TestCase):
+    @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/codex")
+    @patch("tui.agent_runner.subprocess.Popen")
+    def test_interrupt_terminates_the_process_and_reports_the_reason(self, popen, _which):
+        process = InterruptibleProcess()
+        popen.return_value = process
+        control = AgentControl()
+        control.request_interrupt()
+        request = AgentRequest(
+            "Inspect this project",
+            Path("/workspace/project"),
+            "codex",
+            "gpt-5.6-luna",
+            "medium",
+            (Path("/workspace/project"),),
+            control=control,
+        )
+
+        result = AgentRunner().run(request, lambda _event: None)
+
+        self.assertEqual(result.stopped_reason, "interrupted")
+        self.assertTrue(process.terminated)
+        self.assertIsNone(result.error)
+
+    def test_stop_reason_precedence_and_clearing(self):
+        control = AgentControl()
+        self.assertIsNone(control.stop_reason)
+        control.request_pause()
+        control.request_interrupt()
+        self.assertEqual(control.stop_reason, "interrupted")
+        control.request_cancel()
+        self.assertEqual(control.stop_reason, "cancelled")
+        control.clear_interrupt()
+        control.clear_pause()
+        self.assertEqual(control.stop_reason, "cancelled")

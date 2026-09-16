@@ -7,7 +7,9 @@ from pathlib import Path
 import tomllib
 
 from .agent_runner import ProviderAuthPolicy
+from .local_storage import GENERATED_DIRECTORY_NAMES, tui_project_root
 from .orchestrator import OrchestrationSettings
+from .usage_monitor import UsageProviderSettings, UsageSettings
 
 
 AUTH_MODES = frozenset({"account", "api-key"})
@@ -19,6 +21,7 @@ PARAMETER_DIRECTORY = "parameter_files"
 TUI_PARAMETER_FILE = "daedalus-tui.toml"
 ORCHESTRATION_PARAMETER_FILE = "daedalus-tui-orchestration.toml"
 CODING_STATISTICS_PARAMETER_FILE = "daedalus-tui-coding-statistics.toml"
+PROMPTING_PARAMETER_FILE = "daedalus-tui-prompting.toml"
 
 
 @dataclass(frozen=True)
@@ -81,6 +84,7 @@ class ProjectDiscoverySettings:
     include_all_directories: bool = False
     skipped_directory_names: frozenset[str] = frozenset(
         {".git", ".daedalus-worktrees", ".venv", "__pycache__", "node_modules"}
+        | GENERATED_DIRECTORY_NAMES
     )
 
 
@@ -126,6 +130,7 @@ class TuiSettings:
     claude: ClaudeSettings = ClaudeSettings()
     auth: AuthSettings = AuthSettings()
     project_discovery: ProjectDiscoverySettings = ProjectDiscoverySettings()
+    usage: UsageSettings = UsageSettings()
 
     def models_for(self, provider: str) -> tuple[ModelOption, ...]:
         """Return the model choices a provider exposes in the settings bar."""
@@ -156,6 +161,29 @@ class TuiSettings:
         if any(option.value == self.default_reasoning for option in options):
             return self.default_reasoning
         return options[0].value if options else ""
+
+
+@dataclass(frozen=True)
+class PromptingSettings:
+    """Prompt archive, draft, naming, viewer, and error-folder settings.
+
+    ``data_root`` is already resolved: a relative value in the parameter file
+    is anchored to the TUI project directory that owns that file, so the
+    storage location does not depend on the working directory or on which
+    target repository a task runs against.
+    """
+
+    data_root: Path = field(default_factory=tui_project_root)
+    draft_autosave_delay_ms: int = 300
+    task_title_length: int = 60
+    viewer_visible_by_default: bool = False
+    viewer_minimum_width: int = 40
+    main_minimum_width: int = 80
+    viewer_render_debounce_ms: int = 150
+    conversation_context_budget_chars: int = 24_000
+    error_log_max_bytes: int = 2_000_000
+    error_log_backup_count: int = 3
+    run_log_max_bytes: int = 1_000_000
 
 
 @dataclass(frozen=True)
@@ -228,6 +256,7 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
 
     auth = _auth_settings(values.get("auth", {}), path)
     project_discovery = _project_discovery_settings(values.get("projects", {}), path)
+    usage = _usage_settings(values.get("usage", {}), path)
     return TuiSettings(
         default_provider,
         default_model,
@@ -245,6 +274,7 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
         claude,
         auth,
         project_discovery,
+        usage,
     )
 
 
@@ -276,6 +306,35 @@ def _auth_settings(values: object, path: Path) -> AuthSettings:
             sign_in_command=_string_tuple(table.get("sign_in_command", []), path, f"auth.{name}.sign_in_command"),
         )
     return AuthSettings(mode=mode, providers=providers)
+
+
+def _usage_settings(values: object, path: Path) -> UsageSettings:
+    """Build the usage-bar settings: cadence plus a per-provider source."""
+    if not isinstance(values, dict):
+        raise ValueError(f"{path} usage must be a table.")
+    interval = int(values.get("interval_seconds", 60))
+    timeout = float(values.get("command_timeout_seconds", 20))
+    if interval < 1 or timeout <= 0:
+        raise ValueError(f"{path} usage.interval_seconds and usage.command_timeout_seconds must be positive.")
+    defaults = UsageSettings()
+    providers: dict[str, UsageProviderSettings] = {}
+    provider_tables = {
+        name: table for name, table in values.items() if isinstance(table, dict)
+    } or {name: {} for name in defaults.providers}
+    for name, table in provider_tables.items():
+        default = defaults.providers.get(name, UsageProviderSettings(name.capitalize()))
+        providers[name] = UsageProviderSettings(
+            label=str(table.get("label", default.label)),
+            command=_string_tuple(table.get("command", list(default.command)), path, f"usage.{name}.command"),
+        )
+    return UsageSettings(
+        enabled=bool(values.get("enabled", True)),
+        interval_seconds=interval,
+        command_timeout_seconds=timeout,
+        codex_sessions_dir=str(values.get("codex_sessions_dir", defaults.codex_sessions_dir)),
+        claude_stats_file=str(values.get("claude_stats_file", defaults.claude_stats_file)),
+        providers=providers,
+    )
 
 
 def _project_discovery_settings(values: object, path: Path) -> ProjectDiscoverySettings:
@@ -340,6 +399,72 @@ def load_orchestration_settings(parameter_path: Path | None = None) -> Orchestra
         shutdown_grace_seconds=shutdown_grace_seconds,
         debug_log_filename=str(values.get("debug_log_filename", ".daedalus-debug.log")),
     )
+
+
+def load_prompting_settings(parameter_path: Path | None = None) -> PromptingSettings:
+    """Load prompt/error storage settings, anchoring a relative root to the TUI project."""
+    path = parameter_path or (
+        Path(__file__).resolve().parents[1] / PARAMETER_DIRECTORY / PROMPTING_PARAMETER_FILE
+    )
+    try:
+        with path.open("rb") as source:
+            values = tomllib.load(source)
+    except FileNotFoundError:
+        values = {}
+    storage = values.get("storage", {})
+    drafts = values.get("drafts", {})
+    titles = values.get("titles", {})
+    viewer = values.get("viewer", {})
+    conversation = values.get("conversation", {})
+    errors = values.get("errors", {})
+    for name, table in (
+        ("storage", storage),
+        ("drafts", drafts),
+        ("titles", titles),
+        ("viewer", viewer),
+        ("conversation", conversation),
+        ("errors", errors),
+    ):
+        if not isinstance(table, dict):
+            raise ValueError(f"{path} {name} must be a table.")
+
+    # The loader convention resolves relative paths against the project that
+    # owns the parameter file (parameter_files/<file> -> project root).
+    project_root = path.resolve().parents[1] if path.resolve().parent.name == PARAMETER_DIRECTORY else tui_project_root()
+    raw_root = str(storage.get("data_root", "."))
+    data_root = Path(raw_root).expanduser()
+    if not data_root.is_absolute():
+        data_root = project_root / data_root
+    settings = PromptingSettings(
+        data_root=data_root.resolve(),
+        draft_autosave_delay_ms=int(drafts.get("autosave_delay_ms", 300)),
+        task_title_length=int(titles.get("maximum_length", 60)),
+        viewer_visible_by_default=bool(viewer.get("visible_by_default", False)),
+        viewer_minimum_width=int(viewer.get("minimum_width", 40)),
+        main_minimum_width=int(viewer.get("main_minimum_width", 80)),
+        viewer_render_debounce_ms=int(viewer.get("render_debounce_ms", 150)),
+        conversation_context_budget_chars=int(conversation.get("context_budget_chars", 24_000)),
+        error_log_max_bytes=int(errors.get("log_max_bytes", 2_000_000)),
+        error_log_backup_count=int(errors.get("log_backup_count", 3)),
+        run_log_max_bytes=int(errors.get("run_log_max_bytes", 1_000_000)),
+    )
+    if settings.draft_autosave_delay_ms < 0 or settings.viewer_render_debounce_ms < 0:
+        raise ValueError(f"{path} autosave and render delays must not be negative.")
+    if any(
+        value < 1
+        for value in (
+            settings.task_title_length,
+            settings.viewer_minimum_width,
+            settings.main_minimum_width,
+            settings.conversation_context_budget_chars,
+            settings.error_log_max_bytes,
+            settings.run_log_max_bytes,
+        )
+    ):
+        raise ValueError(f"{path} sizes and widths must be positive.")
+    if settings.error_log_backup_count < 0:
+        raise ValueError(f"{path} errors.log_backup_count must not be negative.")
+    return settings
 
 
 def load_coding_statistics_settings(parameter_path: Path | None = None) -> CodingStatisticsSettings:

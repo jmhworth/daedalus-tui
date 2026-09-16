@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .local_storage import GENERATED_DIRECTORY_NAMES
+
 if TYPE_CHECKING:  # pragma: no cover - typing only, avoids an import cycle
     from .config import ProjectDiscoverySettings
 
@@ -88,7 +90,9 @@ def discover_projects(
     if not launch_root.is_dir():
         return ()
 
-    skipped = settings.skipped_directory_names if settings else _SKIPPED_DIRECTORY_NAMES
+    # The TUI's own prompt and error archives are generated folders, never
+    # projects, even when discovery lists every immediate child directory.
+    skipped = (settings.skipped_directory_names if settings else _SKIPPED_DIRECTORY_NAMES) | GENERATED_DIRECTORY_NAMES
     include_git = settings.include_git_repositories if settings else False
     include_all = settings.include_all_directories if settings else False
 

@@ -103,10 +103,36 @@ skipped_directory_names = [
   ".venv",
   "__pycache__",
   "node_modules",
+  # The TUI's own generated prompt and error archives are never projects.
+  "prompts",
+  "errors",
 ]
 
 [output]
 width = "95%"
+
+# Usage bar (bottom left). Every `interval_seconds` the TUI reads each
+# provider's usage and refreshes the bar. Neither CLI offers a non-interactive
+# `usage` subcommand (Claude Code waits for a terminal; Codex refuses without
+# one), so by default the bar reads the same local data their own /usage and
+# /status views show: Codex rate-limit windows from its session logs, and
+# Claude Code's per-day token statistics cache. Set `command` for a provider
+# to run any program instead; it runs with stdin closed and a timeout, and its
+# JSON or first output line is shown.
+[usage]
+enabled = true
+interval_seconds = 60
+command_timeout_seconds = 20
+codex_sessions_dir = "~/.codex/sessions"
+claude_stats_file = "~/.claude/stats-cache.json"
+
+[usage.claude]
+label = "Claude"
+command = []
+
+[usage.codex]
+label = "Codex"
+command = []
 
 # Responsive safety guard and compact dimensions. Above the guard, the TUI
 # measures the wide controls' laid-out regions and enters compact mode if any

@@ -145,3 +145,44 @@ class PromptTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConversationPromptTests(unittest.TestCase):
+    def test_orders_history_and_marks_the_latest_instruction(self):
+        from tui.prompts import ConversationEntry, build_conversation_prompt
+
+        prompt = build_conversation_prompt(
+            [
+                ConversationEntry("user", "Build the login page"),
+                ConversationEntry("assistant", "Built it."),
+                ConversationEntry("context", "Re-evaluate the plan using the user's answers below."),
+                ConversationEntry("assistant", "Plan revised."),
+            ],
+            "Now add validation",
+        )
+        self.assertTrue(prompt.startswith("Original request for this task:\nBuild the login page"))
+        self.assertLess(prompt.index("Built it."), prompt.index("Plan revised."))
+        self.assertIn("not typed by the user", prompt)
+        self.assertTrue(prompt.endswith("Latest instruction (respond to this one):\nNow add validation"))
+
+    def test_bounded_history_identifies_omitted_turns_and_keeps_the_original_goal(self):
+        from tui.prompts import ConversationEntry, build_conversation_prompt
+
+        entries = [ConversationEntry("user", "Goal text")]
+        for index in range(30):
+            entries.append(ConversationEntry("user", f"user turn {index} " + "x" * 400))
+            entries.append(ConversationEntry("assistant", f"assistant reply {index} " + "y" * 400))
+        prompt = build_conversation_prompt(entries, "final instruction", budget_chars=3000)
+        self.assertLessEqual(len(prompt), 3400)
+        self.assertIn("Goal text", prompt)
+        self.assertIn("earlier turns omitted to fit the context budget", prompt)
+        self.assertIn("assistant reply 29", prompt)
+        self.assertNotIn("assistant reply 0 ", prompt)
+        self.assertTrue(prompt.endswith("final instruction"))
+
+    def test_single_turn_has_no_history_section(self):
+        from tui.prompts import ConversationEntry, build_conversation_prompt
+
+        prompt = build_conversation_prompt([ConversationEntry("user", "only goal")], "only goal")
+        self.assertNotIn("Conversation so far", prompt)
+        self.assertIn("only goal", prompt)

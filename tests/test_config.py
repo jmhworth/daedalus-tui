@@ -1,3 +1,4 @@
+from dataclasses import replace
 import tempfile
 import unittest
 from pathlib import Path
@@ -205,3 +206,53 @@ class ConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PromptingAndUsageSettingsTests(unittest.TestCase):
+    def test_loads_prompting_settings_anchored_to_the_tui_project(self):
+        from tui.config import load_prompting_settings
+
+        root = Path(__file__).resolve().parents[1]
+        settings = load_prompting_settings(root / "parameter_files" / "daedalus-tui-prompting.toml")
+        self.assertEqual(settings.data_root, root)
+        self.assertEqual(settings.draft_autosave_delay_ms, 300)
+        self.assertEqual(settings.task_title_length, 60)
+        self.assertFalse(settings.viewer_visible_by_default)
+        self.assertEqual((settings.viewer_minimum_width, settings.main_minimum_width), (40, 80))
+        self.assertEqual(settings.error_log_max_bytes, 2_000_000)
+        self.assertEqual(settings.error_log_backup_count, 3)
+
+    def test_relative_data_root_resolves_against_the_parameter_files_owner_not_cwd(self):
+        from tui.config import load_prompting_settings
+
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "installed-tui"
+            (project / "parameter_files").mkdir(parents=True)
+            parameter_path = project / "parameter_files" / "daedalus-tui-prompting.toml"
+            parameter_path.write_text('[storage]\ndata_root = "state"\n', encoding="utf-8")
+            settings = load_prompting_settings(parameter_path)
+            self.assertEqual(settings.data_root, (project / "state").resolve())
+            parameter_path.write_text(f'[storage]\ndata_root = "{Path(directory) / "abs"}"\n', encoding="utf-8")
+            self.assertEqual(load_prompting_settings(parameter_path).data_root, (Path(directory) / "abs").resolve())
+
+    def test_generated_storage_folders_are_never_discovered_as_projects(self):
+        from tui.projects import discover_projects
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "prompts" / "feature_files").mkdir(parents=True)
+            (root / "errors").mkdir()
+            (root / "real" / "feature_files").mkdir(parents=True)
+            settings = load_tui_settings(Path(__file__).resolve().parents[1] / "parameter_files" / "daedalus-tui.toml")
+            discovered = discover_projects(root, replace(settings.project_discovery, include_all_directories=True))
+            self.assertEqual([project.name for project in discovered], ["real"])
+            self.assertIn("prompts", settings.project_discovery.skipped_directory_names)
+
+    def test_loads_usage_bar_settings(self):
+        root = Path(__file__).resolve().parents[1]
+        settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
+        self.assertTrue(settings.usage.enabled)
+        self.assertEqual(settings.usage.interval_seconds, 60)
+        self.assertEqual(set(settings.usage.providers), {"claude", "codex"})
+        self.assertEqual(settings.usage.providers["codex"].command, ())
+        self.assertEqual(settings.usage.providers["claude"].label, "Claude")

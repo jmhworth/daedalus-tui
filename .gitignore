@@ -6,3 +6,5 @@ __pycache__/
 call-graph-out/
 .daedalus-debug.log
 .daedalus-debug.log.*
+/prompts/
+/errors/

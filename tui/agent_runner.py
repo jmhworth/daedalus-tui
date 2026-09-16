@@ -104,6 +104,9 @@ class AgentControl:
 
     pause_requested: Event = field(default_factory=Event)
     cancel_requested: Event = field(default_factory=Event)
+    # A non-destructive stop: the run ends, its worktree, branch, and files
+    # stay exactly as they are, and the task remains continuable.
+    interrupt_requested: Event = field(default_factory=Event)
 
     def request_pause(self) -> None:
         self.pause_requested.set()
@@ -111,13 +114,21 @@ class AgentControl:
     def request_cancel(self) -> None:
         self.cancel_requested.set()
 
+    def request_interrupt(self) -> None:
+        self.interrupt_requested.set()
+
     def clear_pause(self) -> None:
         self.pause_requested.clear()
+
+    def clear_interrupt(self) -> None:
+        self.interrupt_requested.clear()
 
     @property
     def stop_reason(self) -> str | None:
         if self.cancel_requested.is_set():
             return "cancelled"
+        if self.interrupt_requested.is_set():
+            return "interrupted"
         if self.pause_requested.is_set():
             return "paused"
         return None

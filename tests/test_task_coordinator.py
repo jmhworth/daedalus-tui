@@ -201,8 +201,10 @@ class TaskCoordinatorTests(unittest.TestCase):
                 for item in json.loads(coordinator.memory.path.read_text(encoding="utf-8"))
                 if "tasks" in item
             )
-            self.assertEqual(tasks[failed.worktree_path.name]["state"], "failed")
-            self.assertEqual(tasks[failed.worktree_path.name]["error"], failed.error)
+            # Snapshots are keyed by the stable logical task id, not the
+            # worktree name, so later worktrees never duplicate the record.
+            self.assertEqual(tasks[f"task-{failed.task_id}"]["state"], "failed")
+            self.assertEqual(tasks[f"task-{failed.task_id}"]["error"], failed.error)
             coordinator.shutdown()
 
     def test_persists_task_details_for_failed_and_completed_tasks(self):
@@ -316,9 +318,15 @@ class TaskCoordinatorTests(unittest.TestCase):
             self.assertEqual(failed.context.branch_name, "agent/task-003-rehydrated")
             self.assertEqual(failed.messages, ["The implementation was written."])
             self.assertIsNotNone(interrupted)
-            self.assertEqual(interrupted.status, "paused")
-            self.assertIn("resume", interrupted.error.lower())
+            # A run that was active when the previous process ended is
+            # recoverable, never auto-launched, and not reported as an error.
+            self.assertEqual(interrupted.status, "interrupted")
+            self.assertIsNone(interrupted.error)
+            self.assertIn("closed", interrupted.phase.lower())
             self.assertIsNotNone(interrupted.context)
+            self.assertEqual(interrupted.title, "Keep the task")
+            self.assertEqual([turn.text for turn in interrupted.turns], ["Keep the task"])
+            self.assertEqual(interrupted.runs[-1].status, "interrupted")
             legacy = coordinator.get("005-legacy")
             self.assertIsNotNone(legacy)
             self.assertIsNotNone(legacy.context)
@@ -462,8 +470,13 @@ class TaskCoordinatorTests(unittest.TestCase):
 
             entries = json.loads(memory_path.read_text(encoding="utf-8"))
             tasks = next(entry["tasks"] for entry in entries if "tasks" in entry)
+            snapshot = tasks[f"task-{record.task_id}"]
+            legacy_keys = (
+                "timestamp", "prompt", "provider", "model", "reasoning", "mode",
+                "state", "outputs", "error", "tokens", "project",
+            )
             self.assertEqual(
-                tasks[f"task-{record.task_id}"],
+                {key: snapshot[key] for key in legacy_keys},
                 {
                     "timestamp": datetime.fromtimestamp(record.submitted_at, timezone.utc)
                         .isoformat()
@@ -480,6 +493,12 @@ class TaskCoordinatorTests(unittest.TestCase):
                     "project": str(Path(directory).resolve()),
                 },
             )
+            # The conversation representation carries a version marker.
+            self.assertEqual(snapshot["schema_version"], 2)
+            self.assertEqual(snapshot["title"], "cursor task")
+            self.assertEqual(snapshot["prompt_count"], 1)
+            self.assertEqual([turn["text"] for turn in snapshot["turns"]], ["cursor task"])
+            self.assertEqual(snapshot["runs"][0]["status"], "completed")
 
     def test_pause_preserves_context_and_resume_reuses_same_worktree(self):
         class PausableOrchestrator:
@@ -584,19 +603,23 @@ class TaskCoordinatorTests(unittest.TestCase):
             self.assertIsNone(record.resume_from)
             coordinator.shutdown()
 
-    def test_cancel_paused_task_removes_preserved_worktree(self):
+    def test_explicit_discard_removes_a_paused_tasks_preserved_worktree(self):
+        # ``cancel`` is the explicit destructive route; the UI's Cancel control
+        # uses ``interrupt`` and never deletes a worktree.
         with tempfile.TemporaryDirectory() as directory:
             coordinator = TaskCoordinator(Path(directory), object(), OrchestrationSettings(max_concurrent_tasks=1))
             record = TaskRecord("paused-task", 1, "pause me", "codex", "luna", "medium", status="paused")
-            record.context = WorktreeContext(
+            context = WorktreeContext(
                 Path(directory), record.task_id, "base", "agent/task-paused", Path(directory) / "worktree"
             )
+            record.context = context
             with coordinator._lock:
                 coordinator._tasks[record.task_id] = record
             with patch("tui.task_coordinator.GitWorktreeManager") as manager_class:
                 self.assertTrue(coordinator.cancel(record.task_id))
-                manager_class.return_value.remove_cancelled.assert_called_once_with(record.context)
+                manager_class.return_value.remove_cancelled.assert_called_once_with(context)
             self.assertEqual(record.status, "cancelled")
+            self.assertIsNone(record.context)
             coordinator.shutdown()
 
     def test_plan_answers_require_agent_confirmation_before_implementation(self):
@@ -644,10 +667,18 @@ class TaskCoordinatorTests(unittest.TestCase):
                 self.assertTrue(plan_record.plan_implemented)
                 self.assertIsNone(coordinator.implement_plan(plan_record.task_id))
 
+            # Implementation continues inside the same conversation: same
+            # logical task and title, a recorded mode change, and a generated
+            # (not user-typed) implementation turn.
+            self.assertIs(coding_record, plan_record)
             self.assertEqual(coding_record.mode, "coding")
-            self.assertIn("Add the JSON store", coding_record.prompt)
-            self.assertIn("Original user request", coding_record.prompt)
-            self.assertIn("q1: b (Which store?: JSON)", coding_record.prompt)
+            self.assertEqual(coding_record.title, "Choose a store")
+            implementation_prompt = PlanOrchestrator.prompts[-1]
+            self.assertIn("Add the JSON store", implementation_prompt)
+            self.assertIn("Original user request", implementation_prompt)
+            self.assertIn("q1: b (Which store?: JSON)", implementation_prompt)
+            self.assertEqual([turn.kind for turn in coding_record.turns], ["user", "generated", "generated"])
+            self.assertEqual([turn.text for turn in coding_record.user_turns], ["Choose a store"])
             coordinator.shutdown()
 
     def test_plan_answers_accept_ui_owned_custom_text(self):
@@ -931,3 +962,293 @@ class TaskCoordinatorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InterruptionAndFollowUpTests(unittest.TestCase):
+    """Non-destructive interruption, late callbacks, and multi-turn conversations."""
+
+    def _coordinator(self, directory, **kwargs):
+        from tui.local_storage import LocalStorage
+        from tui.prompt_store import PromptStore
+
+        storage = LocalStorage(Path(directory) / "data")
+        return TaskCoordinator(
+            Path(directory) / "project",
+            object(),
+            OrchestrationSettings(max_concurrent_tasks=2),
+            memory_path=Path(directory) / ".daedalus-memory.json",
+            prompt_store=PromptStore(storage),
+            storage=storage,
+            **kwargs,
+        )
+
+    def test_interrupting_a_running_agent_preserves_the_worktree_and_restores_nothing_destructively(self):
+        class InterruptibleOrchestrator:
+            started = threading.Event()
+
+            def __init__(self, repository, _runner, _settings, on_event, integration_gate=None):
+                self.repository = repository
+                self.on_event = on_event
+
+            def run(self, prompt, provider, model, reasoning, task_id=None, control=None, existing_context=None, **_kwargs):
+                context = existing_context or WorktreeContext(
+                    self.repository, task_id, "base", f"agent/task-{task_id}", self.repository / "worktree"
+                )
+                self.on_event("worktree", f"Created {context.branch_name} at {context.path}.", "status")
+                self.on_event("agent", "partial work", "message")
+                type(self).started.set()
+                control.interrupt_requested.wait(timeout=2)
+                self.on_event("interrupted", "Run stopped; progress preserved.", "status")
+                return OrchestrationResult(False, task_id, context.branch_name, context.path, context=context, interrupted=True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "project").mkdir()
+            coordinator = self._coordinator(directory)
+            with patch("tui.task_coordinator.LocalOrchestrator", InterruptibleOrchestrator), patch(
+                "tui.task_coordinator.GitWorktreeManager"
+            ) as manager_class:
+                record = coordinator.submit("Build it\n", "codex", "luna", "medium")
+                self.assertTrue(InterruptibleOrchestrator.started.wait(timeout=2))
+                self.assertTrue(coordinator.interrupt(record.task_id))
+                self.assertEqual(record.phase, "Stopping")
+                # Repeated presses are idempotent while stopping.
+                self.assertTrue(coordinator.interrupt(record.task_id))
+                record.future.result(timeout=5)
+            self.assertEqual(record.status, "interrupted")
+            self.assertIsNone(record.error)
+            self.assertIsNotNone(record.context)
+            manager_class.return_value.remove_cancelled.assert_not_called()
+            self.assertEqual(record.runs[-1].status, "interrupted")
+            self.assertEqual(record.messages, ["partial work"])
+            # Nothing is running now, so another interrupt reports False.
+            self.assertFalse(coordinator.interrupt(record.task_id))
+            # The exact prompt was archived verbatim, trailing newline included.
+            archive = Path(record.turns[0].archive_path)
+            self.assertEqual(archive.read_text(encoding="utf-8"), "Build it\n")
+            coordinator.shutdown()
+
+    def test_queued_run_is_interrupted_without_creating_a_worktree(self):
+        class BlockingOrchestrator(FakeOrchestrator):
+            pass
+
+        FakeOrchestrator.release = threading.Event()
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "project").mkdir()
+            coordinator = TaskCoordinator(Path(directory) / "project", object(), OrchestrationSettings(max_concurrent_tasks=1))
+            with patch("tui.task_coordinator.LocalOrchestrator", BlockingOrchestrator):
+                first = coordinator.submit("first", "codex", "luna", "medium")
+                second = coordinator.submit("second", "codex", "luna", "medium")
+                deadline = time.time() + 2
+                while first.status != "running" and time.time() < deadline:
+                    time.sleep(0.01)
+                self.assertEqual(second.status, "queued")
+                self.assertTrue(coordinator.interrupt(second.task_id))
+                self.assertEqual(second.status, "interrupted")
+                self.assertIsNone(second.context)
+                self.assertEqual(second.runs[-1].status, "interrupted")
+                FakeOrchestrator.release.set()
+                first.future.result(timeout=5)
+            self.assertEqual(first.status, "completed")
+            coordinator.shutdown()
+
+    def test_late_callbacks_from_a_superseded_run_are_ignored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "project").mkdir()
+            coordinator = self._coordinator(directory)
+            record = TaskRecord("late-task", 1, "prompt", "codex", "luna", "medium", status="interrupted")
+            from tui.conversation import TaskRun, TaskTurn
+
+            record.turns = [TaskTurn("turn-1", 1, "prompt", 0.0)]
+            record.runs = [TaskRun("run-old", "turn-1", 1, "interrupted", message_end=0), TaskRun("run-new", "turn-1", 2, "running")]
+            record.active_turn_id = "turn-1"
+            record.active_run_id = "run-new"
+            record.status = "running"
+            with coordinator._lock:
+                coordinator._tasks[record.task_id] = record
+            coordinator._handle_event(record, "run-old", "agent", "stale delta", "message")
+            coordinator._handle_event(record, "run-old", "failed", "stale failure", "error")
+            self.assertEqual(record.messages, [])
+            self.assertEqual(record.status, "running")
+            self.assertIsNone(record.error)
+            coordinator._handle_event(record, "run-new", "agent", "fresh delta", "message")
+            self.assertEqual(record.messages, ["fresh delta"])
+            self.assertEqual(record.runs[-1].message_end, 1)
+            coordinator.shutdown()
+
+    def test_follow_up_after_cleanup_creates_a_fresh_worktree_under_the_same_task(self):
+        class RecordingOrchestrator:
+            calls = []
+
+            def __init__(self, repository, _runner, _settings, on_event, integration_gate=None):
+                self.repository = repository
+                self.on_event = on_event
+
+            def run(self, prompt, provider, model, reasoning, task_id=None, existing_context=None, resume_from=None, resume_notes=(), **_kwargs):
+                type(self).calls.append((task_id, prompt, existing_context, resume_from, tuple(resume_notes)))
+                self.on_event("agent", f"response to {task_id}", "message")
+                # Completed coding runs clean up their worktree.
+                return OrchestrationResult(True, task_id, f"agent/task-{task_id}", None, context=None, tokens_consumed=5)
+
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "project").mkdir()
+            coordinator = self._coordinator(directory, context_budget_chars=4000)
+            with patch("tui.task_coordinator.LocalOrchestrator", RecordingOrchestrator):
+                record = coordinator.submit("# Fix login validation\nDetails here.", "codex", "luna", "medium")
+                record.future.result(timeout=5)
+                self.assertEqual(record.status, "completed")
+                self.assertEqual(record.title, "Fix login validation")
+                record.resume_from = "integration"
+                record.retry_prompt = "stale retry prompt"
+                same = coordinator.submit_followup(record.task_id, "Also handle empty passwords", reasoning="high")
+                self.assertIs(same, record)
+                record.future.result(timeout=5)
+                third = coordinator.submit_followup(record.task_id, "And add tests")
+                third.future.result(timeout=5)
+            self.assertEqual(record.status, "completed")
+            self.assertEqual(record.title, "Fix login validation")
+            self.assertEqual([turn.text for turn in record.user_turns], ["# Fix login validation\nDetails here.", "Also handle empty passwords", "And add tests"])
+            self.assertEqual(record.turns[1].reasoning, "high")
+            self.assertEqual(record.reasoning, "high")
+            self.assertEqual(len(record.runs), 3)
+            self.assertEqual(record.tokens_consumed, 15)
+            calls = RecordingOrchestrator.calls
+            self.assertEqual([call[0] for call in calls], [record.task_id, f"{record.task_id}-r2", f"{record.task_id}-r3"])
+            self.assertTrue(all(call[2] is None for call in calls))
+            self.assertIsNone(calls[1][3])
+            self.assertEqual(calls[1][4], ())
+            second_prompt = calls[1][1]
+            self.assertIn("Original request for this task:\n# Fix login validation", second_prompt)
+            self.assertIn(f"response to {record.task_id}", second_prompt)
+            self.assertIn("Latest instruction (respond to this one):\nAlso handle empty passwords", second_prompt)
+            self.assertNotIn("stale retry prompt", second_prompt)
+            # One logical memory record with three prompts, not three tasks.
+            tasks = coordinator.memory.get_tasks()
+            self.assertEqual(list(tasks), [f"task-{record.task_id}"])
+            self.assertEqual(tasks[f"task-{record.task_id}"]["prompt_count"], 3)
+            self.assertEqual(len(tasks[f"task-{record.task_id}"]["runs"]), 3)
+            archives = sorted(entry.name for entry in Path(record.turns[0].archive_path).parent.iterdir() if entry.name.startswith("turn-"))
+            self.assertEqual(archives, ["turn-0001.md", "turn-0002.md", "turn-0003.md"])
+            coordinator.shutdown()
+
+    def test_follow_up_is_refused_while_a_run_is_active_and_without_an_archive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "project").mkdir()
+            coordinator = self._coordinator(directory)
+            record = TaskRecord("busy", 1, "prompt", "codex", "luna", "medium", status="running")
+            with coordinator._lock:
+                coordinator._tasks[record.task_id] = record
+            with self.assertRaises(RuntimeError):
+                coordinator.submit_followup(record.task_id, "another")
+            record.status = "completed"
+            with patch.object(coordinator.prompt_store, "archive_turn", side_effect=__import__("tui.prompt_store", fromlist=["PromptStoreError"]).PromptStoreError("Could not save prompt to /x/turn-0001.md: disk full")):
+                with self.assertRaises(OSError) as raised:
+                    coordinator.submit_followup(record.task_id, "another")
+            self.assertIn("/x/turn-0001.md", str(raised.exception))
+            self.assertEqual(record.turns, [])
+            self.assertIsNone(record.future)
+            coordinator.shutdown()
+
+    def test_restart_restores_conversation_and_offers_orphaned_archive_as_a_draft(self):
+        from tui.local_storage import LocalStorage
+        from tui.prompt_store import PromptStore
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            project.mkdir()
+            storage = LocalStorage(root / "data")
+            store = PromptStore(storage)
+            memory = TaskMemoryStore(root / ".daedalus-memory.json")
+            memory.record_task(
+                "task-001-conv",
+                "First prompt",
+                "codex",
+                "luna",
+                "medium",
+                "coding",
+                "running",
+                ["answer one"],
+                project=project,
+                logical_task_id="001-conv",
+                title="First prompt",
+                turns=[
+                    {"turn_id": "t1", "sequence": 1, "text": "First prompt", "kind": "user"},
+                    {"turn_id": "t2", "sequence": 2, "text": "Second prompt", "kind": "user"},
+                ],
+                runs=[
+                    {"run_id": "r1", "turn_id": "t1", "attempt": 1, "status": "completed", "message_start": 0, "message_end": 1},
+                    {"run_id": "r2", "turn_id": "t2", "attempt": 1, "status": "running", "message_start": 1},
+                ],
+                active_turn_id="t2",
+                active_run_id="r2",
+                schema_version=2,
+            )
+            store.archive_turn(project, "001-conv", 3, "orphaned partial submission")
+
+            coordinator = TaskCoordinator(
+                project, object(), OrchestrationSettings(), memory_path=root / ".daedalus-memory.json", prompt_store=store, storage=storage
+            )
+            record = coordinator.get("001-conv")
+            self.assertEqual(record.status, "interrupted")
+            self.assertEqual(record.title, "First prompt")
+            self.assertEqual([turn.turn_id for turn in record.turns], ["t1", "t2"])
+            self.assertEqual(record.runs[1].status, "interrupted")
+            self.assertEqual(record.runs[1].message_end, 1)
+            self.assertEqual(record.response_text(record.runs[0]), "answer one")
+            self.assertIsNone(record.future)
+            # Missing archives were regenerated; the orphan became a draft.
+            self.assertEqual(store.turn_path(project, "001-conv", 1).read_text(encoding="utf-8"), "First prompt")
+            draft = store.load_draft(project, "001-conv")
+            self.assertEqual((draft.text, draft.kind), ("orphaned partial submission", "recovered"))
+            coordinator.shutdown()
+
+    def test_legacy_snapshot_keeps_generated_plan_prompts_as_context(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            project.mkdir()
+            memory = TaskMemoryStore(root / ".daedalus-memory.json")
+            memory.record_task(
+                "task-002-legacy",
+                "Plan the API",
+                "codex",
+                "luna",
+                "medium",
+                "plan",
+                "awaiting_answers",
+                ["plan output"],
+                project=project,
+                prompt_history=("Plan the API", "Re-evaluate the plan using the user's answers below."),
+            )
+            coordinator = TaskCoordinator(project, object(), OrchestrationSettings(), memory_path=root / ".daedalus-memory.json")
+            record = coordinator.get("002-legacy")
+            self.assertEqual(record.title, "Plan the API")
+            self.assertEqual([turn.kind for turn in record.turns], ["user", "generated"])
+            self.assertIsNone(record.turns[1].submitted_at)
+            self.assertEqual(len(record.user_turns), 1)
+            self.assertEqual(record.runs[0].message_end, 1)
+            coordinator.shutdown()
+
+    def test_integration_gate_releases_an_interrupted_waiter(self):
+        from tui.orchestrator import AgentStopped
+
+        gate = IntegrationCoordinator()
+        holder_started = threading.Event()
+        release = threading.Event()
+
+        def hold():
+            holder_started.set()
+            release.wait(timeout=5)
+
+        holder = threading.Thread(target=gate.run_when_ready, args=(1, hold))
+        holder.start()
+        self.assertTrue(holder_started.wait(timeout=2))
+        stop_after = time.monotonic() + 0.2
+        with self.assertRaises(AgentStopped):
+            gate.run_when_ready(2, lambda: None, lambda: "interrupted" if time.monotonic() > stop_after else None)
+        release.set()
+        holder.join(timeout=2)
+        # The gate is usable afterwards.
+        ran = []
+        gate.run_when_ready(3, lambda: ran.append(True))
+        self.assertEqual(ran, [True])

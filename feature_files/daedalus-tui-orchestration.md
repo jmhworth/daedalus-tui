@@ -6,7 +6,9 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 ## Key Points
 - **Worktree isolation**: Each task receives an `agent/task-<id>` branch and a sibling `.daedalus-worktrees` directory.
 - **Project worktree provisioning**: An optional target-project `.daedalus` file can run one install command inside each task worktree and symlink declared repository-relative shared paths from the primary checkout.
-- **Restart recovery**: Persisted failed tasks are restored with Retry available, while tasks active during shutdown are restored as paused tasks with their existing worktree context.
+- **Restart recovery**: Persisted failed tasks are restored with Retry available; tasks paused by a clean shutdown are restored as paused, and runs that were still active when the process ended are restored as `interrupted`, both with their existing worktree context and never auto-launched.
+- **Non-destructive interruption**: `AgentControl.request_interrupt` stops the agent or verification subprocess group, releases a task waiting at the integration gate, and is checked immediately before promotion; the orchestrator returns `interrupted` with the worktree, branch, and uncommitted files preserved. Only the explicit discard path removes a worktree.
+- **Follow-up execution**: A later turn reuses a preserved worktree (the agent is told to inspect existing work) or, after cleanup, runs under a new execution id (`<task>-r2`, …) in a fresh worktree from the operating branch while the logical task stays the same.
 - **Verification repair**: Failed task checks launch repair attempts in the same worktree up to the configured limit.
 - **Verification diagnostics**: When every verification attempt fails, each attempt's failure output is written to the task error panel and included in the final failure message.
 - **Supabase migration push**: After verification succeeds, orchestration runs `supabase db push --yes` only when the task changed `supabase/migrations/` relative to the worktree base commit; failures emit diagnostics and launch coding-profile repairs up to the verification attempt limit before blocking integration. Personal schema registration (separate feature) only scaffolds those migration files; this feature remains the sole remote push owner.
@@ -47,6 +49,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-09-15: Added non-destructive interruption (`interrupted` results, a stop-aware integration gate, and a pre-promotion stop check), execution suffixes for follow-up worktrees, and per-run diagnostics files under `errors/`.
 - 2026-09-15: Added an orchestration-owned Firebase deploy step that applies changed Firestore rules and indexes after verification and repairs failures with the coding profile before blocking integration.
 - 2026-09-13: Noted that personal shared-Supabase schema registration scaffolds migrations only; orchestration remains the sole `supabase db push` owner.
 - 2026-08-25: Added post-verification Supabase migration push with a verify→repair loop when `supabase/migrations/` changed, gated by `supabase_db_push_enabled`.

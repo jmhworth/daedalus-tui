@@ -21,6 +21,10 @@ class TokenUsageEntry:
     tokens: int
     prompt: str = ""
     state: str = "completed"
+    # One conversation is one task; each submitted user turn is a prompt and
+    # each execution attempt is a run. Legacy records count as one of each.
+    prompts: int = 1
+    runs: int = 1
 
     def __post_init__(self) -> None:
         timestamp = self.timestamp
@@ -31,6 +35,8 @@ class TokenUsageEntry:
         object.__setattr__(self, "timestamp", timestamp)
         object.__setattr__(self, "tokens", max(0, int(self.tokens)))
         object.__setattr__(self, "provider", self.provider or "unknown")
+        object.__setattr__(self, "prompts", max(1, int(self.prompts)))
+        object.__setattr__(self, "runs", max(1, int(self.runs)))
 
 
 @dataclass(frozen=True)
@@ -52,6 +58,8 @@ class TokenUsageStats:
     thirty_day_expected_tasks: int
     provider_tokens: tuple[tuple[str, int], ...]
     provider_tasks: tuple[tuple[str, int], ...]
+    cumulative_prompts: int = 0
+    cumulative_runs: int = 0
 
     def provider_split(self, unit: str = "tokens") -> tuple[tuple[str, int], ...]:
         """Return provider and absolute usage pairs for the selected unit."""
@@ -149,19 +157,25 @@ def calculate_token_usage(
 
     provider_totals: dict[str, int] = {}
     provider_task_totals: dict[str, int] = {}
+    provider_prompt_totals: dict[str, int] = {}
     for entry in normalized:
         provider_totals[entry.provider] = provider_totals.get(entry.provider, 0) + entry.tokens
         provider_task_totals[entry.provider] = provider_task_totals.get(entry.provider, 0) + 1
+        provider_prompt_totals[entry.provider] = provider_prompt_totals.get(entry.provider, 0) + entry.prompts
     provider_items = tuple(sorted(provider_totals.items(), key=lambda item: (-item[1], item[0])))
     provider_task_items = tuple(
         sorted(provider_task_totals.items(), key=lambda item: (-item[1], item[0]))
     )
+    # Averages are per submitted prompt (user turn), so a conversation with
+    # three prompts does not look like one expensive prompt, and retries
+    # (runs) never count as additional prompts.
     average_tokens_by_provider = tuple(
-        (provider, provider_totals[provider] / provider_task_totals[provider])
+        (provider, provider_totals[provider] / provider_prompt_totals[provider])
         for provider, _ in provider_items
     )
     average_tasks_by_provider = tuple(
-        (provider, 1.0) for provider, _ in provider_task_items
+        (provider, provider_task_totals[provider] / provider_prompt_totals[provider])
+        for provider, _ in provider_task_items
     )
     return TokenUsageStats(
         entries=normalized,
@@ -179,6 +193,8 @@ def calculate_token_usage(
         thirty_day_expected_tasks=round(month_tasks * month_days / current_local.day),
         provider_tokens=provider_items,
         provider_tasks=provider_task_items,
+        cumulative_prompts=sum(entry.prompts for entry in normalized),
+        cumulative_runs=sum(entry.runs for entry in normalized),
     )
 
 
@@ -205,9 +221,33 @@ def usage_entries_from_memory(store) -> tuple[TokenUsageEntry, ...]:
                 tokens,
                 str(task.get("prompt", "")),
                 str(task.get("state", "")),
+                prompts=_prompt_count(task),
+                runs=_run_count(task),
             )
         )
     return tuple(entries)
+
+
+def _prompt_count(task: dict[str, object]) -> int:
+    """Count submitted user prompts, treating legacy snapshots as one prompt."""
+    value = task.get("prompt_count")
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    turns = task.get("turns")
+    if isinstance(turns, list):
+        user_turns = sum(
+            1 for turn in turns if isinstance(turn, dict) and turn.get("kind", "user") == "user"
+        )
+        if user_turns:
+            return user_turns
+    return 1
+
+
+def _run_count(task: dict[str, object]) -> int:
+    runs = task.get("runs")
+    if isinstance(runs, list) and runs:
+        return len(runs)
+    return 1
 
 
 def merge_usage_entries(*entry_groups: Iterable[TokenUsageEntry]) -> tuple[TokenUsageEntry, ...]:
@@ -235,6 +275,9 @@ def task_usage_entry(record) -> TokenUsageEntry | None:
     """Convert a live task record without coupling this module to its class."""
     if record.status != "completed":
         return None
+    turns = getattr(record, "turns", None) or ()
+    prompts = sum(1 for turn in turns if getattr(turn, "kind", "user") == "user") or 1
+    runs = len(getattr(record, "runs", None) or ()) or 1
     return TokenUsageEntry(
         record.memory_task_id or f"task-{record.task_id}",
         datetime.fromtimestamp(record.submitted_at, UTC),
@@ -242,4 +285,6 @@ def task_usage_entry(record) -> TokenUsageEntry | None:
         record.tokens_consumed,
         record.prompt,
         record.status,
+        prompts=prompts,
+        runs=runs,
     )

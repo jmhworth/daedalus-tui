@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 from pathlib import Path
 import uuid
 from typing import Callable
@@ -37,7 +38,8 @@ from .verification import discover_commands, run_verification, truncate_diagnost
 
 
 EventCallback = Callable[[str, str, str], None]
-IntegrationGate = Callable[[int, Callable[[], None]], None]
+IntegrationGate = Callable[..., None]
+StopCheck = Callable[[], "str | None"]
 PROFILE_FILENAMES = {
     "coding": "coding.md",
     "plan": "planning.md",
@@ -76,6 +78,9 @@ class OrchestrationResult:
     cancelled: bool = False
     tokens_consumed: int = 0
     awaiting_plan: bool = False
+    # The user stopped the run without discarding anything; the task can
+    # continue from the same worktree and branch.
+    interrupted: bool = False
 
 
 class AgentStopped(RuntimeError):
@@ -97,8 +102,9 @@ class LocalOrchestrator:
         self.runner = runner
         self.settings = settings
         self.on_event = on_event
-        self.integration_gate = integration_gate or (lambda _sequence, operation: operation())
+        self.integration_gate = integration_gate or (lambda _sequence, operation, *_extra: operation())
         self._tokens_consumed = 0
+        self._gate_accepts_stop_check = _accepts_stop_check(self.integration_gate)
 
     def run(
         self,
@@ -227,11 +233,15 @@ class LocalOrchestrator:
                 self.integrate(
                     manager, context, selection, prompt, control, topic_slug=topic_slug
                 )
+                # Promotion is the last atomic Git step. Check for a stop
+                # right before it; once it starts it runs to a known state
+                # and the actual result is reported, never undone.
+                self._raise_if_stopped(control)
                 manager.promote(context, integration_base)
                 self.refresh_graphify(manager, task_id)
 
             self.emit("ready", "Task is ready for serialized integration.")
-            self.integration_gate(submission_sequence, integrate_and_promote)
+            self._run_integration_gate(submission_sequence, integrate_and_promote, control)
             manager.remove_successful(context)
             self.emit("completed", f"Promoted {context.branch_name} into {self.settings.primary_branch}.")
             return OrchestrationResult(
@@ -254,6 +264,20 @@ class LocalOrchestrator:
                     context.path,
                     "Task cancelled.",
                     cancelled=True,
+                    tokens_consumed=self._completed_tokens(False),
+                )
+            if stopped.reason == "interrupted":
+                self.emit(
+                    "interrupted",
+                    "Run stopped; its worktree, branch, and current progress were preserved.",
+                )
+                return OrchestrationResult(
+                    False,
+                    task_id,
+                    context.branch_name if context else "",
+                    context.path if context else None,
+                    context=context,
+                    interrupted=True,
                     tokens_consumed=self._completed_tokens(False),
                 )
             self.emit("paused", "Task paused; its worktree and current progress were preserved.")
@@ -677,6 +701,22 @@ class LocalOrchestrator:
                     "error",
                 )
 
+    def _run_integration_gate(
+        self,
+        sequence: int,
+        operation: Callable[[], None],
+        control: AgentControl | None,
+    ) -> None:
+        """Wait at the serialized gate while still observing stop requests."""
+        if self._gate_accepts_stop_check:
+            self.integration_gate(
+                sequence,
+                operation,
+                (lambda: control.stop_reason) if control is not None else (lambda: None),
+            )
+        else:
+            self.integration_gate(sequence, operation)
+
     def emit(self, phase: str, message: str, kind: str = "status") -> None:
         LOGGER.debug("Orchestration event phase=%s kind=%s message_length=%d", phase, kind, len(message))
         self.on_event(phase, message, kind)
@@ -689,3 +729,19 @@ class LocalOrchestrator:
     def _raise_if_stopped(control: AgentControl | None) -> None:
         if control is not None and control.stop_reason:
             raise AgentStopped(control.stop_reason)
+
+
+def _accepts_stop_check(gate: Callable[..., None]) -> bool:
+    """Return whether an integration gate takes the optional stop-check argument."""
+    try:
+        parameters = inspect.signature(gate).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    positional = [
+        parameter
+        for parameter in parameters
+        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+    ]
+    if any(parameter.kind == parameter.VAR_POSITIONAL for parameter in parameters):
+        return True
+    return len(positional) >= 3

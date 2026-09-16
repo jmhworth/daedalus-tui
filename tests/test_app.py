@@ -12,6 +12,7 @@ from textual.selection import Selection as ScreenSelection
 from textual.widgets import Button, DataTable, Log, Select, Static, TextArea
 from vimkeys_input import VimMode
 
+from tui.transcript import TranscriptLog
 from tui.app import (
     OPEN_DIRECTORY_VALUE,
     CodingStatisticsScreen,
@@ -22,9 +23,11 @@ from tui.app import (
     TopicViewerScreen,
 )
 from tui.memory import TaskMemoryStore
-from tui.config import LayoutSettings, ModelOption, TuiSettings
+from tui.config import LayoutSettings, ModelOption, PromptingSettings, TuiSettings
+from tui.usage_monitor import UsageSettings
 from tui.projects import DaedalusProject
 from tui.plan import CUSTOM_ANSWER_OPTION_ID, PlanOption, PlanQuestion, encode_custom_answer
+from tui.conversation import TaskRun, TaskTurn
 from tui.task_coordinator import TaskRecord
 from tui.topics import TOPIC_NONE_VALUE
 from tui.vim_text_area import DaedalusVimTextArea
@@ -42,6 +45,8 @@ class FakeCoordinator:
         self.resume_notes = []
         self.plan_actions = []
         self.retry_actions = []
+        self.followups = []
+        self.interrupts = []
 
     def set_event_callback(self, callback):
         self.callback = callback
@@ -61,9 +66,68 @@ class FakeCoordinator:
             branch_name=f"agent/task-{len(self.records) + 1}",
             worktree_path=Path(f"/tmp/task-{len(self.records) + 1}"),
         )
+        record.title = prompt.strip().splitlines()[0][:60] if prompt.strip() else record.task_id
+        self._add_turn(record, prompt)
         self.records.append(record)
         self.emit(record, "agent", "", "status")
         return record
+
+    def _add_turn(self, record, text, revises_turn_id=None):
+        turn = TaskTurn(
+            turn_id=f"{record.task_id}-turn-{len(record.turns) + 1}",
+            sequence=len(record.turns) + 1,
+            text=text,
+            submitted_at=0.0,
+            revises_turn_id=revises_turn_id,
+        )
+        record.turns.append(turn)
+        record.active_turn_id = turn.turn_id
+        run = TaskRun(
+            run_id=f"{record.task_id}-run-{len(record.runs) + 1}",
+            turn_id=turn.turn_id,
+            attempt=1,
+            status="running",
+            message_start=len(record.messages),
+        )
+        record.runs.append(run)
+        record.active_run_id = run.run_id
+        return turn
+
+    def submit_followup(self, task_id, text, revises_turn_id=None, **changes):
+        record = self.get(task_id)
+        if record is None:
+            return None
+        if record.status in {"queued", "running", "planning", "verifying", "ready", "integrating", "resolving"}:
+            raise RuntimeError("Wait for the current run to stop before sending another prompt.")
+        self.followups.append((task_id, text, revises_turn_id, changes))
+        for name, value in changes.items():
+            if name in {"provider", "model", "reasoning", "mode"}:
+                setattr(record, name, value)
+        self._add_turn(record, text, revises_turn_id)
+        record.status = "running"
+        record.phase = "Agent"
+        self.emit(record, "agent", "", "status")
+        return record
+
+    def interrupt(self, task_id):
+        record = self.get(task_id)
+        if record is None or record.status not in {"queued", "running", "planning", "verifying", "ready", "integrating", "resolving"}:
+            return False
+        self.interrupts.append(task_id)
+        record.phase = "Stopping"
+        self.emit(record, "stopping", "Stopping the active run; progress is preserved.", "status")
+        return True
+
+    def finish_interrupt(self, record):
+        record.status = "interrupted"
+        record.phase = "Interrupted"
+        if record.runs:
+            record.runs[-1].status = "interrupted"
+            record.runs[-1].message_end = len(record.messages)
+        self.emit(record, "interrupted", "Run stopped; progress preserved.", "status")
+
+    def conversation_entries(self, record):
+        return []
 
     def tasks(self):
         return tuple(self.records)
@@ -79,6 +143,9 @@ class FakeCoordinator:
         record.messages.append(message)
         record.status = "completed"
         record.phase = "Completed"
+        if record.runs:
+            record.runs[-1].status = "completed"
+            record.runs[-1].message_end = len(record.messages)
         self.emit(record, "completed", "", "status")
 
     def shutdown(self):
@@ -177,6 +244,17 @@ def settings():
             ModelOption("Extra high", "extra-high"),
             ModelOption("Max", "max"),
         ),
+        usage=UsageSettings(enabled=False),
+    )
+
+
+def prompting_settings():
+    """Prompt archives, drafts, and diagnostics for one test go to a fresh
+    throwaway root instead of the checkout's own prompts/ and errors/ folders,
+    so drafts saved by one test are never restored by the next."""
+    return PromptingSettings(
+        data_root=Path(tempfile.mkdtemp(prefix="daedalus-tui-tests-")),
+        draft_autosave_delay_ms=0,
     )
 
 
@@ -188,6 +266,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             directory=Path("/workspace/project"),
             settings=settings(),
             coordinator=coordinator,
+            prompting_settings=prompting_settings(),
         )
         return app, coordinator
 
@@ -211,8 +290,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(all(not column.auto_width for column in task_list.columns.values()))
             self.assertIsInstance(app.query_one("#prompt-input", TextArea), DaedalusVimTextArea)
             self.assertEqual(app.query_one("#prompt-input", DaedalusVimTextArea).vim_mode, VimMode.INSERT)
-            self.assertEqual(app.query("#vim-mode").nodes, [])
+            # A compact mode indicator is visible; no verbose Vim help chrome.
+            self.assertEqual(str(app.query_one("#vim-mode", Static).render()), "INSERT")
             self.assertEqual(app.query("#vim-help").nodes, [])
+            self.assertEqual(str(app.query_one("#usage-bar", Static).render()), "Usage: disabled")
             self.assertEqual(app.query("#copy-button, #copy-selection-button, #copy-error-button").nodes, [])
             self.assertIsInstance(app.query_one("#project-select", Select), Select)
             self.assertIsInstance(app.query_one("#pause-button", Button), Button)
@@ -251,6 +332,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=project,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
             async with app.run_test() as pilot:
                 button = app.query_one("#register-backend-button", Button)
@@ -280,6 +362,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=project,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
             async with app.run_test() as pilot:
                 app.action_register_backend()
@@ -353,6 +436,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             directory=Path("/workspace/project"),
             settings=replace(settings(), layout=LayoutSettings(100, 30, 6, 3)),
             coordinator=FakeCoordinator(),
+            prompting_settings=prompting_settings(),
         )
         async with app.run_test() as pilot:
             self.assertTrue(app._compact_mode)
@@ -610,6 +694,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 runner=FakeRunner(),
                 directory=root,
                 settings=settings(),
+                prompting_settings=prompting_settings(),
             )
             app._coordinator_for(second)
 
@@ -641,6 +726,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
             app._coordinators[nested.resolve()] = FakeCoordinator()
             app.projects = (*app.projects, DaedalusProject(nested, root))
@@ -680,7 +766,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             list_branches.return_value = ["main"]
             coordinator_class.return_value = FakeCoordinator()
 
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings())
+            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
             async with app.run_test() as pilot:
                 await pilot.pause()
                 project_select = app.query_one("#project-select", Select)
@@ -705,7 +791,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             list_branches.return_value = ["main"]
             coordinator_class.return_value = FakeCoordinator()
 
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings())
+            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
             async with app.run_test() as pilot:
                 await pilot.pause()
                 app.query_one("#project-select", Select).value = OPEN_DIRECTORY_VALUE
@@ -734,7 +820,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             list_branches.return_value = ["main"]
             coordinator_class.return_value = FakeCoordinator()
 
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings())
+            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
             async with app.run_test() as pilot:
                 await pilot.pause()
                 app._open_project_directory(outside)
@@ -781,7 +867,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             store.add_opened_project_directory(removed)
             store.set_last_opened_project(outside)
 
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings())
+            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
             async with app.run_test() as pilot:
                 await pilot.pause()
 
@@ -808,7 +894,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             list_branches.return_value = ["main"]
             coordinator_class.return_value = FakeCoordinator()
 
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings())
+            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
             async with app.run_test() as pilot:
                 await pilot.pause()
                 app._open_project_directory(root / "missing")
@@ -849,6 +935,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 runner=FakeRunner(),
                 directory=root,
                 settings=settings(),
+                prompting_settings=prompting_settings(),
             )
             async with app.run_test() as pilot:
                 await pilot.pause()
@@ -894,6 +981,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
 
             async with app.run_test() as pilot:
@@ -940,6 +1028,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
 
             async with app.run_test() as pilot:
@@ -977,6 +1066,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
 
             async with app.run_test() as pilot:
@@ -1053,6 +1143,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
 
             async with app.run_test() as pilot:
@@ -1095,6 +1186,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 runner=FakeRunner(),
                 directory=root,
                 settings=settings(),
+                prompting_settings=prompting_settings(),
             )
 
             self.assertEqual(coordinator_class.call_args.args[2].primary_branch, "james")
@@ -1122,6 +1214,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
 
             self.assertEqual(app.directory, second.resolve())
@@ -1155,6 +1248,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
 
             self.assertEqual(app.directory, first.resolve())
@@ -1176,6 +1270,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
+                prompting_settings=prompting_settings(),
             )
 
             self.assertEqual(
@@ -1346,7 +1441,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             prompt.insert("Submitted task prompt")
             app.action_submit_prompt()
             await pilot.pause()
-            self.assertTrue(prompt.read_only)
+            # After submission the composer is a blank follow-up draft whose
+            # Send waits for the run; the submitted text itself is immutable.
+            self.assertEqual(prompt.text, "")
+            self.assertTrue(app.query_one("#send-button", Button).disabled)
 
             app.query_one("#project-select", Select).value = str(second)
             await pilot.pause()
@@ -1354,6 +1452,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.directory, second)
             self.assertEqual(prompt.text, "")
             self.assertFalse(prompt.read_only)
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
 
     async def test_cursor_disables_model_and_reasoning_controls(self):
         app, _ = self.make_app()
@@ -1403,10 +1502,18 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_submit_prompt()
             await pilot.pause()
 
-            self.assertEqual(prompt.text, "Keep this prompt available")
-            self.assertTrue(prompt.read_only)
+            record = coordinator.records[0]
+            # The exact submission is an immutable turn shown in the transcript
+            # and listed in Prompt history; the composer becomes a blank
+            # follow-up draft whose Send waits for the run to stop.
+            self.assertEqual(record.prompt, "Keep this prompt available")
+            self.assertIn("Keep this prompt available", "\n".join(app.query_one("#output", TranscriptLog).messages))
+            history = app.query_one("#prompt-history-select", Select)
+            self.assertEqual([value for _label, value in history._options if isinstance(value, str)], [record.turns[0].turn_id and f"turn:{record.turns[0].turn_id}"])
+            self.assertEqual(prompt.text, "")
+            self.assertFalse(prompt.read_only)
             self.assertTrue(app.query_one("#send-button", Button).disabled)
-            self.assertEqual(coordinator.records[0].prompt, prompt.text)
+            self.assertEqual(str(app.query_one("#task-title", Static).render()), "Task: Keep this prompt available")
 
     async def test_submitted_task_becomes_selected_for_every_mode(self):
         app, coordinator = self.make_app()
@@ -1465,9 +1572,13 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             task_list.action_select_cursor()
             await pilot.pause()
 
-            self.assertEqual(prompt.text, "A task that will fail")
-            self.assertTrue(prompt.read_only)
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
+            # The submitted prompt stays visible in the conversation while the
+            # composer is an editable follow-up draft for the failed task.
+            self.assertIn("A task that will fail", "\n".join(app.query_one("#output", TranscriptLog).messages))
+            self.assertEqual(str(app.query_one("#task-title", Static).render()), "Task: A task that will fail")
+            self.assertEqual(prompt.text, "")
+            self.assertFalse(prompt.read_only)
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
 
     async def test_failed_task_exposes_retry_action(self):
         app, coordinator = self.make_app()
@@ -1710,7 +1821,11 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(app.query_one("#continue-plan-button", Button).disabled)
             self.assertFalse(app.query_one("#start-coding-button", Button).disabled)
             self.assertTrue(app.query_one("#pause-button", Button).disabled)
-            self.assertFalse(app.query_one("#cancel-button", Button).disabled)
+            # Nothing is running while the plan waits for review, so there is
+            # nothing to stop; the worktree is never deleted from here.
+            self.assertTrue(app.query_one("#cancel-button", Button).disabled)
+            # A follow-up prompt can be typed and sent from the composer.
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
 
             app.query_one("#resume-notes", TextArea).insert("Please clarify the data flow.")
             app.action_continue_plan()
@@ -2351,8 +2466,11 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             output = app.query_one("#output", Log)
             self.assertTrue(output.allow_select)
+            # The user's turn is rendered above the assistant's response.
+            self.assertEqual(output._lines[0], "You · turn 1:")
+            line = output._lines.index("Selectable assistant transcript line.")
             selected = output.get_selection(
-                ScreenSelection.from_offsets(Offset(0, 0), Offset(10, 0))
+                ScreenSelection.from_offsets(Offset(0, line), Offset(10, line))
             )
             self.assertIsNotNone(selected)
             self.assertEqual(selected[0], "Selectable")
@@ -2392,7 +2510,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             output = app.query_one("#output", Log)
-            self.assertEqual(output._lines[:3], [
+            start = output._lines.index("Deciphering things")
+            self.assertEqual(output._lines[start:start + 3], [
                 "Deciphering things",
                 "",
                 "Deciphering more things",
@@ -2450,16 +2569,24 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             output = app.query_one("#output", Log)
             output._render_line_strip(2, output.rich_style)
 
-    async def test_submitted_prompt_uses_faded_read_only_text_style(self):
-        app, _ = self.make_app()
+    async def test_earlier_prompt_can_be_reloaded_without_changing_its_archive(self):
+        app, coordinator = self.make_app()
         async with app.run_test() as pilot:
             prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
             prompt.insert("Keep this task immutable")
             app.action_submit_prompt()
+            record = coordinator.records[0]
+            coordinator.finish(record, "Done.")
+            await pilot.pause()
+            prompt.insert("half-typed follow-up")
+            history = app.query_one("#prompt-history-select", Select)
+            history.value = f"turn:{record.turns[0].turn_id}"
             await pilot.pause()
 
-            self.assertTrue(prompt.read_only)
-            self.assertTrue(prompt.has_class("-read-only"))
+            self.assertEqual(prompt.text, "Keep this task immutable")
+            self.assertFalse(prompt.read_only)
+            self.assertEqual(record.turns[0].text, "Keep this task immutable")
+            self.assertEqual(app._composer_revises_turn_id, record.turns[0].turn_id)
 
     async def test_output_selection_uses_prompt_selection_colors(self):
         app, _ = self.make_app()
@@ -2593,6 +2720,260 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             self.assertIn(row_key, app._updated_task_rows)
+
+    async def test_ctrl_c_interrupts_and_restores_the_submitted_prompt_for_editing(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("first line\n  second line\n")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            await pilot.pause()
+            output = app.query_one("#output", TranscriptLog)
+            output.focus()
+            app.screen.get_selected_text = Mock(return_value="selected output")
+            await pilot.pause()
+
+            with patch("tui.app.copy_to_system_clipboard") as clipboard:
+                await pilot.press("ctrl+c")
+                await pilot.pause()
+                clipboard.assert_not_called()
+
+            self.assertEqual(coordinator.interrupts, [record.task_id])
+            self.assertEqual(prompt.text, "first line\n  second line\n")
+            self.assertFalse(prompt.read_only)
+            self.assertEqual(prompt.vim_mode, VimMode.INSERT)
+            self.assertEqual(prompt.cursor_location, (2, 0))
+            self.assertIs(app.focused, prompt)
+            self.assertEqual(app._composer_revises_turn_id, record.turns[0].turn_id)
+            # Send stays disabled until the run has actually stopped.
+            self.assertTrue(app.query_one("#send-button", Button).disabled)
+            self.assertIn("Stopping", str(app.query_one("#status", Static).render()))
+            coordinator.finish_interrupt(record)
+            await pilot.pause()
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
+            self.assertEqual(prompt.text, "first line\n  second line\n")
+            self.assertFalse(app.query_one("#resume-button", Button).disabled)
+
+    async def test_ctrl_c_with_nothing_running_keeps_the_draft(self):
+        app, _ = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("untouched draft")
+            await pilot.press("ctrl+c")
+            await pilot.pause()
+            self.assertEqual(prompt.text, "untouched draft")
+            self.assertEqual(str(app.query_one("#status", Static).render()), "Nothing is running")
+            self.assertIsNone(app._exception)
+
+    async def test_interrupt_saves_a_different_follow_up_before_restoring_the_prompt(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("original request")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            await pilot.pause()
+            prompt.insert("a different follow-up I was typing")
+            await pilot.pause()
+
+            app.action_interrupt_task()
+            await pilot.pause()
+
+            self.assertEqual(prompt.text, "original request")
+            stashed = [
+                draft for draft in app.prompt_store.list_drafts(app._active_project_path, record.task_id)
+                if draft.kind == "stashed"
+            ]
+            self.assertEqual([draft.text for draft in stashed], ["a different follow-up I was typing"])
+            history = app.query_one("#prompt-history-select", Select)
+            values = [value for _label, value in history._options if isinstance(value, str)]
+            self.assertTrue(any(value.startswith("draft:stash-") for value in values))
+            history.value = next(value for value in values if value.startswith("draft:stash-"))
+            await pilot.pause()
+            self.assertEqual(prompt.text, "a different follow-up I was typing")
+
+    async def test_streaming_output_does_not_overwrite_the_draft_or_steal_focus(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("run this")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            await pilot.pause()
+            prompt.insert("typing the next prompt")
+            prompt.cursor_location = (0, 6)
+            for index in range(5):
+                record.messages.append(f"progress {index}")
+                coordinator.emit(record, "agent", f"progress {index}", "message")
+                await pilot.pause()
+            self.assertEqual(prompt.text, "typing the next prompt")
+            self.assertEqual(prompt.cursor_location, (0, 6))
+            self.assertIs(app.focused, prompt)
+            self.assertIn("progress 4", "\n".join(app.query_one("#output", TranscriptLog).messages))
+
+    async def test_follow_up_sends_to_the_selected_named_task_and_records_setting_changes(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("Build the login page")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            await pilot.pause()
+            self.assertTrue(app.query_one("#send-button", Button).disabled)
+            coordinator.finish(record, "Login page built.")
+            await pilot.pause()
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
+
+            app.query_one("#reasoning-select", Select).value = "high"
+            prompt.insert("Now add validation\n")
+            app.action_submit_prompt()
+            await pilot.pause()
+
+            self.assertEqual(len(coordinator.records), 1)
+            task_id, text, revises, changes = coordinator.followups[0]
+            self.assertEqual((task_id, text, revises), (record.task_id, "Now add validation\n", None))
+            self.assertEqual(changes, {"reasoning": "high"})
+            self.assertEqual(app._selected_task_id, record.task_id)
+            self.assertEqual(prompt.text, "")
+            self.assertTrue(app.query_one("#send-button", Button).disabled)
+            self.assertEqual(str(app.query_one("#task-title", Static).render()), "Task: Build the login page")
+            transcript = "\n".join(app.query_one("#output", TranscriptLog).messages)
+            self.assertIn("Build the login page", transcript)
+            self.assertIn("Now add validation", transcript)
+            self.assertIn("Login page built.", transcript)
+
+    async def test_drafts_autosave_and_restore_for_new_task_and_selected_task(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("draft for a new task")
+            await pilot.pause()
+            saved = app.prompt_store.load_draft(app._active_project_path, None)
+            self.assertEqual(saved.text, "draft for a new task")
+
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            await pilot.pause()
+            self.assertIsNone(app.prompt_store.load_draft(app._active_project_path, None))
+            prompt.insert("follow-up in progress")
+            await pilot.pause()
+            self.assertEqual(app.prompt_store.load_draft(app._active_project_path, record.task_id).text, "follow-up in progress")
+
+            app.action_new_task()
+            await pilot.pause()
+            self.assertEqual(prompt.text, "")
+            task_list = app.query_one("#task-list", DataTable)
+            task_list.move_cursor(row=0, column=0)
+            task_list.action_select_cursor()
+            await pilot.pause()
+            self.assertEqual(prompt.text, "follow-up in progress")
+
+    async def test_all_tasks_toggle_reveals_completed_history(self):
+        app, coordinator = self.make_app()
+        old = TaskRecord("001-old", 1, "An old completed task", "codex", "model", "medium", status="completed")
+        old.title = "An old completed task"
+        coordinator.records.append(old)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            key = app._task_row_key(app._active_project_path, old.task_id)
+            self.assertNotIn(key, app._task_rows)
+            app.action_toggle_task_history()
+            await pilot.pause()
+            self.assertIn(key, app._task_rows)
+            self.assertEqual(str(app.query_one("#history-toggle-button", Button).label), "Recent tasks")
+            task_list = app.query_one("#task-list", DataTable)
+            task_list.move_cursor(row=list(app._task_rows).index(key), column=0)
+            task_list.action_select_cursor()
+            await pilot.pause()
+            self.assertEqual(app._selected_task_id, old.task_id)
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
+
+    async def test_output_viewer_toggles_takes_the_right_third_and_survives_resizing(self):
+        app, coordinator = self.make_app()
+        async with app.run_test(size=(180, 50)) as pilot:
+            await pilot.pause()
+            workspace = app.query_one("#workspace")
+            viewer = app.query_one("#output-viewer")
+            self.assertEqual(viewer.styles.display, "none")
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("Render **markdown**")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            coordinator.finish(record, "# Result\n\n- one\n- two")
+            await pilot.pause()
+            prompt.insert("keep this draft")
+
+            app.query_one("#viewer-toggle-button", Button).press()
+            await pilot.pause()
+            await pilot.pause()
+            self.assertTrue(workspace.has_class("viewer-visible"))
+            self.assertFalse(workspace.has_class("viewer-full"))
+            main = app.query_one("#main-workspace")
+            self.assertAlmostEqual(viewer.region.width / (viewer.region.width + main.region.width), 1 / 3, delta=0.04)
+            self.assertEqual(app.query_one("#output-viewer").current_text(), "# Result\n\n- one\n- two")
+            self.assertEqual(prompt.text, "keep this draft")
+            self.assertTrue(app._viewer_visible)
+
+            await pilot.resize_terminal(90, 40)
+            await pilot.pause()
+            self.assertTrue(workspace.has_class("viewer-full"))
+            self.assertEqual(main.styles.display, "none")
+            self.assertEqual(prompt.text, "keep this draft")
+            app.query_one("#viewer-back-button", Button).press()
+            await pilot.pause()
+            self.assertFalse(workspace.has_class("viewer-full"))
+            self.assertEqual(viewer.styles.display, "none")
+            await pilot.resize_terminal(180, 50)
+            await pilot.pause()
+            app.action_toggle_output_viewer()
+            await pilot.pause()
+            self.assertTrue(workspace.has_class("viewer-visible"))
+            self.assertEqual(prompt.text, "keep this draft")
+
+    async def test_errors_view_names_the_local_diagnostics_files(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            app.query_one("#prompt-input", TextArea).insert("Fail please")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            record.diagnostics_dir = Path("/tmp/errors/project/task-1")
+            record.runs[-1].diagnostics_path = "/tmp/errors/project/task-1/turn-0001-run-0001.log"
+            record.status = "failed"
+            record.error = "Verification failed."
+            coordinator.emit(record, "failed", "Verification failed.", "error")
+            await pilot.pause()
+            lines = "\n".join(app.query_one("#task-error", Log)._lines)
+            self.assertIn("turn-0001-run-0001.log", lines)
+            self.assertIn(str(app.debug_log_path), lines)
+            self.assertIn("Verification failed.", lines)
+
+    async def test_usage_bar_shows_monitor_readings(self):
+        from tui.usage_monitor import ProviderUsage
+
+        class FakeMonitor:
+            def poll(self):
+                return (
+                    ProviderUsage("claude", "Claude", "Claude today 1.0k tok · 2 msgs", checked_at=1.0),
+                    ProviderUsage("codex", "Codex", "Codex 5h 30% · week 46%", checked_at=1.0),
+                )
+
+        coordinator = FakeCoordinator()
+        app = DaedalusTuiApp(
+            runner=FakeRunner(),
+            directory=Path("/workspace/project"),
+            settings=replace(settings(), usage=UsageSettings(enabled=True, interval_seconds=60)),
+            coordinator=coordinator,
+            prompting_settings=prompting_settings(),
+            usage_monitor=FakeMonitor(),
+        )
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.pause()
+            text = str(app.query_one("#usage-bar", Static).render())
+            self.assertIn("Claude today 1.0k tok · 2 msgs", text)
+            self.assertIn("Codex 5h 30% · week 46%", text)
+            self.assertIsNotNone(app._usage_timer)
 
 
 if __name__ == "__main__":

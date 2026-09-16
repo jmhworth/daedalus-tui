@@ -1,0 +1,44 @@
+# Prompt archives, drafts, task naming, the optional output viewer, and the
+# local error folder. Paired with feature_files/daedalus-tui-prompting.md.
+
+[storage]
+# Root that owns `prompts/` and `errors/`. A relative path resolves against the
+# TUI project directory (the parent of parameter_files), not the current
+# working directory and not the target project, so launching Daedalus against
+# another repository never moves the saved prompts. Packaged installations in
+# a read-only location should set an absolute writable path such as
+# "~/.local/share/daedalus-tui".
+data_root = "."
+
+[drafts]
+# Milliseconds of typing silence before the composer draft is written to disk.
+autosave_delay_ms = 300
+
+[titles]
+# Maximum characters of the readable task title generated from the first
+# meaningful line of the original prompt. Titles are cut at a word boundary.
+maximum_length = 60
+
+[viewer]
+# Whether the Markdown output viewer starts visible. The user's toggle choice
+# is remembered in launch-root memory and overrides this default.
+visible_by_default = false
+# Minimum usable columns for the viewer and for the main workspace. When the
+# terminal cannot provide both, the viewer becomes a full-width alternate view
+# with a Back control instead of a one-third side panel.
+minimum_width = 40
+main_minimum_width = 80
+# Milliseconds between Markdown re-renders while a response is streaming.
+render_debounce_ms = 150
+
+[conversation]
+# Character budget for the conversation history transmitted with a follow-up
+# turn. Complete history stays on disk; only the transmitted excerpt is bounded.
+context_budget_chars = 24000
+
+[errors]
+# Rotation limits for errors/daedalus.log (the former .daedalus-debug.log).
+log_max_bytes = 2000000
+log_backup_count = 3
+# Size cap for each per-run diagnostics file under errors/<project>/<task>/.
+run_log_max_bytes = 1000000

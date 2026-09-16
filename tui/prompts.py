@@ -1,8 +1,93 @@
 """Prompt wrappers used by task and resolver agents."""
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from .topics import embed_topic
+
+
+CONVERSATION_HEADER = "Conversation so far (earlier turns of this same task, oldest first):"
+LATEST_INSTRUCTION_HEADER = "Latest instruction (respond to this one):"
+ORIGINAL_GOAL_HEADER = "Original request for this task:"
+
+
+@dataclass(frozen=True)
+class ConversationEntry:
+    """One historical exchange piece: ``user``, ``assistant``, or generated ``context``."""
+
+    role: str
+    text: str
+    label: str = ""
+
+
+def build_conversation_prompt(
+    entries: Sequence[ConversationEntry],
+    latest_instruction: str,
+    budget_chars: int = 24_000,
+) -> str:
+    """Compose provider-neutral conversation context for a follow-up turn.
+
+    The original request and the latest instruction are always transmitted.
+    Recent history is added newest-first until the character budget is
+    spent; anything older is summarized by an explicit omission marker so the
+    agent knows history exists that it was not shown. Complete history remains
+    on disk regardless of what is transmitted.
+    """
+    budget = max(1, int(budget_chars))
+    original = next((entry for entry in entries if entry.role == "user"), None)
+    history = [entry for entry in entries if entry is not original]
+    original_block = ""
+    if original is not None:
+        original_text = _bounded(original.text, max(200, budget // 3))
+        original_block = f"{ORIGINAL_GOAL_HEADER}\n{original_text}\n\n"
+    latest_block = f"{LATEST_INSTRUCTION_HEADER}\n{latest_instruction}"
+    remaining = budget - len(original_block) - len(latest_block) - len(CONVERSATION_HEADER) - 4
+
+    included: list[str] = []
+    for index, entry in enumerate(reversed(history)):
+        block = _entry_block(entry, len(history) - index)
+        if len(block) + 2 > remaining and included:
+            break
+        if len(block) + 2 > remaining:
+            block = _bounded(block, max(80, remaining))
+        included.append(block)
+        remaining -= len(block) + 2
+        if remaining <= 0:
+            break
+    included.reverse()
+    omitted = len(history) - len(included)
+    parts = [original_block]
+    if history:
+        parts.append(f"{CONVERSATION_HEADER}\n\n")
+        if omitted:
+            parts.append(
+                f"[… {omitted} earlier turn{'s' if omitted != 1 else ''} omitted to fit the context budget; "
+                "the complete history is stored locally and can be requested …]\n\n"
+            )
+        parts.append("\n\n".join(included))
+        parts.append("\n\n")
+    parts.append(latest_block)
+    return "".join(parts)
+
+
+def _entry_block(entry: ConversationEntry, position: int) -> str:
+    if entry.role == "assistant":
+        label = entry.label or f"Assistant response {position}"
+    elif entry.role == "context":
+        label = entry.label or f"Generated follow-up {position} (not typed by the user)"
+    else:
+        label = entry.label or f"User turn {position}"
+    return f"[{label}]\n{entry.text.rstrip()}"
+
+
+def _bounded(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    marker = "\n[… truncated to fit the context budget …]\n"
+    keep = max(0, limit - len(marker))
+    head = keep * 2 // 3
+    tail = keep - head
+    return text[:head] + marker + (text[-tail:] if tail else "")
 
 
 def build_topic_population_prompt(

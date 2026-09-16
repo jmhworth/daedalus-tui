@@ -61,6 +61,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
+- **Conversations and prompting**: Tasks are conversations with generated titles, verbatim prompt archives, autosaved drafts, non-destructive `Ctrl+C`/Cancel, follow-up turns, an optional right-third Markdown viewer, local `errors/` diagnostics, and a bottom-left usage bar; see `feature_files/daedalus-tui-prompting.md`.
 
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
@@ -70,7 +71,8 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - `tui/prompts.py`: Task, repair, and resolver prompt wrappers, including plan-mode recommended-option instructions.
 - `tui/topics.py`: Optional topic discovery, load, and prompt embedding.
 - `tui/plan.py`: Agent plan parsing plus UI-owned custom-answer encoding, clarification prompts, and prompt formatting.
-- `tui/vim_text_area.py`: Incremental modal Vim prompt adapter and system clipboard integration.
+- `tui/vim_text_area.py`: Completed modal Vim prompt adapter (line-aware register, visual modes, system-register commands, interrupt routing).
+- `tui/output_viewer.py`, `tui/prompt_store.py`, `tui/local_storage.py`, `tui/usage_monitor.py`: Viewer, prompt archives, storage root, and usage bar (owned by `daedalus-tui-prompting.md`).
 - `tui/agent_runner.py`: Independent Codex, Claude Code, and Cursor subprocess
   adapter, including the account-login API-key stripping policy.
 - `tui/provider_auth.py`: Provider sign-in status checks and operator guidance.
@@ -91,6 +93,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-15: Reworked prompting around conversations: composer drafts, verbatim archives, `Ctrl+C`/Cancel interruption that restores the prompt, follow-up turns, generated titles with an All tasks filter, the right-third Markdown viewer, `errors/` diagnostics, completed Vim clipboard commands, and a usage bar (details in `daedalus-tui-prompting.md`).
 - 2026-09-15: Added an `Open directory…` entry to the project selector that opens any directory by path, labels it `(external)`, remembers it in `.daedalus-memory.json` for later launches, and forgets it once the directory is gone.
 - 2026-09-15: Added launch-root discovery of plain Git checkouts and, optionally, every immediate child directory, labelling non-Daedalus folders `(unformatted)` so the TUI is not limited to already-converted projects.
 - 2026-09-15: Replaced the Supabase-only New Project checkbox and task-bar button with a backend selector and Register Backend dialog covering Firebase and personal Supabase.

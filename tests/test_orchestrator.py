@@ -869,3 +869,97 @@ class OrchestratorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InterruptionTests(unittest.TestCase):
+    def test_interrupted_agent_preserves_worktree_and_reports_interrupted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", -15, "", stopped_reason="interrupted")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda phase, message, channel: events.append((phase, message, channel)),
+            )
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager):
+                from tui.agent_runner import AgentControl
+
+                control = AgentControl()
+                control.request_interrupt()
+                result = orchestrator.run("Build it", "codex", "gpt-5.6-luna", "medium", control=control)
+
+        self.assertFalse(result.succeeded)
+        self.assertTrue(result.interrupted)
+        self.assertFalse(result.cancelled)
+        self.assertIs(result.context, context)
+        manager.remove_cancelled.assert_not_called()
+        manager.remove_successful.assert_not_called()
+        self.assertTrue(any(phase == "interrupted" for phase, _, _ in events))
+        self.assertFalse(any(channel == "error" for _, _, channel in events))
+
+    def test_interruption_is_checked_before_promotion_and_gate_receives_a_stop_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "new-commit"
+            manager.capture_primary.return_value = "base"
+            gate_calls = []
+
+            def gate(sequence, operation, stop_check=None):
+                gate_calls.append(stop_check)
+                operation()
+
+            from tui.agent_runner import AgentControl
+
+            control = AgentControl()
+
+            def integrate(*_args, **_kwargs):
+                # The user presses Ctrl+C after integration but before promotion.
+                control.request_interrupt()
+
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda _phase, _message, _channel: None,
+                integration_gate=gate,
+            )
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager), patch.object(
+                orchestrator, "run_agent", return_value=AgentResult("codex", 0, "done")
+            ), patch.object(orchestrator, "verify_with_repairs"), patch.object(
+                orchestrator, "push_migrations_with_repairs"
+            ), patch.object(orchestrator, "deploy_firebase_with_repairs"), patch.object(
+                orchestrator, "integrate", side_effect=integrate
+            ):
+                result = orchestrator.run("Build it", "codex", "luna", "medium", control=control)
+
+        self.assertTrue(result.interrupted)
+        manager.promote.assert_not_called()
+        manager.remove_successful.assert_not_called()
+        self.assertEqual(len(gate_calls), 1)
+        self.assertIsNotNone(gate_calls[0])
+        self.assertEqual(gate_calls[0](), "interrupted")
+
+    def test_two_argument_gates_remain_supported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            calls = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                Mock(),
+                OrchestrationSettings(),
+                lambda *_: None,
+                integration_gate=lambda sequence, operation: calls.append(sequence) or operation(),
+            )
+            ran = []
+            orchestrator._run_integration_gate(7, lambda: ran.append(True), None)
+        self.assertEqual((calls, ran), ([7], [True]))

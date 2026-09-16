@@ -17,6 +17,39 @@ Screen {
     height: 1fr;
 }
 
+/* The main workspace (task inbox + composer/output) and the optional viewer
+   are siblings so the viewer can take one third of the whole usable width. */
+#main-workspace {
+    width: 1fr;
+    height: 1fr;
+}
+
+#output-viewer {
+    display: none;
+    width: 1fr;
+    height: 1fr;
+    margin-left: 1;
+}
+
+#workspace.viewer-visible #main-workspace {
+    width: 2fr;
+}
+
+#workspace.viewer-visible #output-viewer {
+    display: block;
+}
+
+/* Narrow terminals show the same viewer as a full-width alternate view. */
+#workspace.viewer-full #main-workspace {
+    display: none;
+}
+
+#workspace.viewer-full #output-viewer {
+    display: block;
+    width: 1fr;
+    margin-left: 0;
+}
+
 #task-sidebar {
     width: 44;
     min-width: 22;
@@ -30,6 +63,22 @@ Screen {
     /* The inbox columns have fixed cell widths; never introduce a second
        layout by horizontally scrolling when an update marker appears. */
     overflow-x: hidden;
+}
+
+#history-toggle-button {
+    width: 1fr;
+    height: 3;
+    margin-top: 1;
+}
+
+#usage-bar {
+    height: auto;
+    margin-top: 1;
+    color: $text-muted;
+}
+
+#screen.compact-width #usage-bar {
+    display: none;
 }
 
 #project-main {
@@ -140,6 +189,11 @@ Screen {
 
 #output-toggle-button {
     width: 21;
+    margin-right: 1;
+}
+
+#viewer-toggle-button {
+    width: 15;
 }
 
 #task-error, #output {
@@ -270,6 +324,28 @@ Screen {
     min-height: 7;
 }
 
+#task-title {
+    height: 1;
+    color: $text-accent;
+    text-style: bold;
+}
+
+#composer-tools {
+    height: 3;
+    align: left middle;
+}
+
+#prompt-history-select {
+    width: 1fr;
+    max-width: 60;
+}
+
+#vim-mode {
+    width: 10;
+    color: $text-muted;
+    text-style: bold;
+}
+
 #prompt-input {
     height: 7;
     border: round $secondary;
@@ -324,8 +400,12 @@ Screen {
     padding: 1;
 }
 
-#screen.compact-width #workspace {
+#screen.compact-width #main-workspace {
     layout: vertical;
+}
+
+#screen.compact-width #history-toggle-button {
+    display: none;
 }
 
 #screen.compact-width #task-sidebar {
@@ -333,6 +413,10 @@ Screen {
     min-width: 0;
     height: 8;
     padding: 1;
+}
+
+#screen.compact-width #composer-tools {
+    display: none;
 }
 
 #screen.compact-width #project-main {
