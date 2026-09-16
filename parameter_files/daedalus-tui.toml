@@ -144,6 +144,11 @@ claude_projects_dir = "~/.claude/projects"
 # once and afterwards only from where the previous poll stopped, so this bounds
 # the one-time cost of the first reading after launch.
 claude_transcript_days = 30
+# How far back the Ctrl+T coding statistics screen reads transcripts for its
+# account-wide Claude token total. That screen answers "how much Claude have I
+# used in total", so it looks back over the whole retained history instead of
+# the usage bar's recent window; the scan runs off the UI thread.
+claude_account_scan_days = 3650
 # Codex only writes rate limits after a turn completes, so the most recently
 # touched session log is often a just-started session with no usage in it.
 # Scan back through this many logs (newest first) before reporting no data.

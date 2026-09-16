@@ -36,6 +36,10 @@ DEFAULT_BAR_WIDTH = 12
 # window is parsed once in full and then only from where the previous scan
 # stopped, so the window bounds the one-time cost of the first reading.
 DEFAULT_CLAUDE_TRANSCRIPT_DAYS = 30
+# The coding statistics screen reports every Claude Code token the operator has
+# spent, not just the recent window the usage bar draws, so its own reader looks
+# back far enough to cover the whole retained transcript history.
+DEFAULT_CLAUDE_ACCOUNT_SCAN_DAYS = 3650
 
 # Codex window keys in display order, with the label used when a payload omits
 # ``window_minutes`` (newer Codex builds send the windows without it).
@@ -68,6 +72,11 @@ class UsageSettings:
     # authoritative record of tokens and messages.
     claude_projects_dir: str = "~/.claude/projects"
     claude_transcript_days: int = DEFAULT_CLAUDE_TRANSCRIPT_DAYS
+    # How far back the coding statistics screen reads transcripts for its
+    # account-wide Claude total. This is deliberately much larger than
+    # ``claude_transcript_days``: the bar wants a cheap recent reading, the
+    # statistics screen wants everything the operator has spent.
+    claude_account_scan_days: int = DEFAULT_CLAUDE_ACCOUNT_SCAN_DAYS
     # A freshly started Codex session has no rate-limit payload until its first
     # turn finishes, so reading only the newest file reports "no usage data"
     # while a slightly older session holds the current numbers. Scan back
@@ -408,6 +417,28 @@ class _ClaudeTotals:
     sessions: int = 0
 
 
+@dataclass(frozen=True)
+class ClaudeAccountUsage:
+    """Every Claude Code token recorded locally, across all projects.
+
+    This is the operator's whole Claude spend, not the subset that Daedalus
+    itself launched: it counts transcripts under every project directory Claude
+    Code has written, plus the statistics cache's all-time model totals.
+    """
+
+    total_tokens: int = 0
+    today_tokens: int = 0
+    transcript_tokens: int = 0
+    cache_tokens: int = 0
+    messages: int = 0
+    scanned_files: int = 0
+    first_day: str = ""
+    days_recorded: int = 0
+    ok: bool = False
+    detail: str = ""
+    source: str = ""
+
+
 class UsageMonitor:
     """Read each provider's usage on demand; the app schedules the cadence."""
 
@@ -415,6 +446,10 @@ class UsageMonitor:
         self.settings = settings or UsageSettings()
         self.home = home
         self._claude_transcripts: ClaudeTranscriptUsage | None = None
+        # The account-wide reader keeps its own offsets and window so a wide
+        # statistics scan never redefines what the usage bar's recent window
+        # means, and so each reader only re-parses bytes it has not seen.
+        self._claude_account_transcripts: ClaudeTranscriptUsage | None = None
 
     # --- public -------------------------------------------------------------------
 
@@ -640,6 +675,72 @@ class UsageMonitor:
             self._claude_windows(data or {}, now),
         )
 
+    def read_claude_account_usage(self, now: float | None = None) -> ClaudeAccountUsage:
+        """Total every Claude Code token on this machine, not just Daedalus tasks.
+
+        The coding statistics screen answers "how much Claude have I used?",
+        which is a different question from the usage bar's "how much today?".
+        Both local sources are read and each figure is taken from whichever
+        reports more: the statistics cache keeps all-time per-model totals but
+        can be missing or stale, while transcripts are the raw per-turn record
+        but only for the sessions still on disk. Neither source is complete on
+        its own, and a maximum cannot double-count because both describe the
+        same spend.
+
+        This scan can touch every transcript ever written, so callers should run
+        it off the UI thread. It never raises: any problem is reported in
+        ``detail`` with ``ok`` false.
+        """
+        now = time.time() if now is None else now
+        stats_path = self._expand(self.settings.claude_stats_file)
+        transcripts = self._account_transcript_usage()
+        transcripts.refresh(now)
+        today = datetime.fromtimestamp(now).date().isoformat()
+
+        data, cache_error = self._read_claude_stats(stats_path)
+        cache_today, cache_total = self._claude_cache_totals(data, today)
+        day = transcripts.day(today)
+        total_tokens = max(cache_total, transcripts.total_tokens)
+        messages = sum(totals.messages for totals in transcripts.days.values())
+        recorded_days = sorted(transcripts.days)
+
+        details = [
+            f"transcripts: {_format_tokens(transcripts.total_tokens)} tokens from "
+            f"{transcripts.scanned_files} files under {transcripts.root}",
+            f"stats cache: {_format_tokens(cache_total)} tokens from {stats_path}",
+        ]
+        for reason in (cache_error, transcripts.error):
+            if reason:
+                details.append(reason)
+        if not total_tokens and not transcripts.scanned_files:
+            details.append(f"no transcripts found under {transcripts.root}")
+        return ClaudeAccountUsage(
+            total_tokens=total_tokens,
+            today_tokens=max(cache_today.tokens, day.tokens),
+            transcript_tokens=transcripts.total_tokens,
+            cache_tokens=cache_total,
+            messages=messages,
+            scanned_files=transcripts.scanned_files,
+            first_day=recorded_days[0] if recorded_days else "",
+            days_recorded=len(recorded_days),
+            ok=total_tokens > 0,
+            detail="\n".join(details),
+            source=f"{stats_path}; {transcripts.root}",
+        )
+
+    def _account_transcript_usage(self) -> ClaudeTranscriptUsage:
+        """Return the account-wide transcript reader, keeping its offsets between reads."""
+        root = self._expand(self.settings.claude_projects_dir)
+        if (
+            self._claude_account_transcripts is None
+            or self._claude_account_transcripts.root != root
+        ):
+            self._claude_account_transcripts = ClaudeTranscriptUsage(
+                root,
+                scan_days=self.settings.claude_account_scan_days,
+            )
+        return self._claude_account_transcripts
+
     def _transcript_usage(self) -> ClaudeTranscriptUsage:
         """Return the transcript reader, keeping its per-file offsets between polls."""
         root = self._expand(self.settings.claude_projects_dir)
@@ -851,11 +952,13 @@ def format_usage_bar(
 
 __all__ = [
     "DEFAULT_BAR_WIDTH",
+    "DEFAULT_CLAUDE_ACCOUNT_SCAN_DAYS",
     "DEFAULT_CLAUDE_TRANSCRIPT_DAYS",
     "DEFAULT_COMMAND_TIMEOUT_SECONDS",
     "DEFAULT_INTERVAL_SECONDS",
     "DEFAULT_SESSION_SCAN_LIMIT",
     "DEFAULT_SESSION_TAIL_BYTES",
+    "ClaudeAccountUsage",
     "ClaudeDayUsage",
     "ClaudeTranscriptUsage",
     "ProviderUsage",

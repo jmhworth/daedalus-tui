@@ -161,6 +161,18 @@ provider usage every minute.
   are de-duplicated by their transcript `uuid`, tool results are not counted as
   messages, and a scan that outlives its poll interval blocks the next one
   rather than counting the same bytes twice.
+- **Account-wide Claude total**: `UsageMonitor.read_claude_account_usage`
+  answers "how much Claude have I used in total", which is a different question
+  from the bar's "how much today". It merges the statistics cache's all-time
+  `modelUsage` totals with a transcript scan that looks back `[usage]
+  claude_account_scan_days` instead of `claude_transcript_days`, and takes the
+  larger figure for the same reason the daily numbers do. It uses its own
+  `ClaudeTranscriptUsage` instance so a wide scan can never redefine the recent
+  window the bar reports, and so each reader re-parses only bytes it has not
+  seen. The reading is returned as a `ClaudeAccountUsage` value with its source
+  breakdown rather than being formatted here; the `Ctrl+T` statistics screen
+  (`daedalus-tui-coding-statistics.md`) displays it from a background worker
+  because the scan can touch every transcript on disk.
 - **Codex rate-limit reading**: Codex writes rate limits only after a turn
   completes, so its most recently touched session log is frequently a
   just-started session holding none. The reader therefore scans back through
@@ -207,13 +219,14 @@ provider usage every minute.
 - `tui/memory.py`, `tui/token_usage.py`: Conversation snapshot fields, UI
   preferences, prompt/attempt accounting, and shared push-history storage.
 - `parameter_files/daedalus-tui-prompting.toml`: Storage root, autosave delay, title length, viewer widths, line breaks, action-item header, context budget, error rotation.
-- `parameter_files/daedalus-tui.toml`: `[usage]` cadence, per-provider sources, session scan depth and tail size, bar width.
+- `parameter_files/daedalus-tui.toml`: `[usage]` cadence, per-provider sources, session scan depth and tail size, transcript and account scan windows, bar width.
 - `tests/test_vim_text_area.py`, `tests/test_prompt_store.py`, `tests/test_debug_log.py`, `tests/test_output_viewer.py`, `tests/test_usage_monitor.py`, plus extended `tests/test_app.py`, `tests/test_task_coordinator.py`, `tests/test_orchestrator.py`, `tests/test_agent_runner.py`, `tests/test_prompts.py`, `tests/test_token_usage.py`, `tests/test_memory.py`, `tests/test_config.py`.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-16: Added `UsageMonitor.read_claude_account_usage`, an account-wide Claude token total that scans `[usage] claude_account_scan_days` of transcripts through its own reader so the coding statistics screen can report total Claude usage without changing what the usage bar's recent window means.
 - 2026-09-16: Fixed the Claude usage reading, which reported zero tokens and
   zero messages whenever the statistics cache lacked today's entry, by counting
   Claude Code's session transcripts incrementally and showing the larger figure

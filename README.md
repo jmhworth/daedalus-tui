@@ -357,6 +357,24 @@ until it finds real percentages, reads only the last `session_tail_bytes` of
 each, and accepts both the `resets_in_seconds` and `resets_at` spellings of a
 window's reset time.
 
+## Coding statistics
+
+`Ctrl+T` opens the coding statistics screen: cumulative, today's, and projected
+usage from the tasks Daedalus itself launched, a per-task history table, and a
+per-provider breakdown, all switchable between tokens and tasks.
+
+Its fourth summary tile, **All Claude tokens**, is not limited to Daedalus: it
+totals every Claude Code token recorded on this machine, including sessions run
+from a plain terminal. It reads the same two local sources as the usage bar --
+all-time model totals from `~/.claude/stats-cache.json` and the per-turn
+transcripts under `[usage] claude_projects_dir` -- and shows the larger of the
+two, since neither is complete on its own. That scan looks back `[usage]
+claude_account_scan_days` (default 3650) rather than the bar's 30-day window,
+so it runs off the UI thread: the tile reads `reading…` until it finishes, and
+hovering it shows today's total, the span covered, and what each source
+reported. Setting `[usage] enabled = false` turns the reading off with the rest
+of the usage readings, and the tile then shows `—`.
+
 Use the mode selector for Coding, Ask, or Plan, or press `Tab` on the main
 prompting screen to toggle between Coding and Plan. Ask runs are read-only and do
 not promote file changes. Plan runs are read-only and remain selectable in the

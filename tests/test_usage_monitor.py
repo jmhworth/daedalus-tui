@@ -185,6 +185,62 @@ class UsageMonitorTests(unittest.TestCase):
         self.assertEqual(usage.refresh(now), 0)
         self.assertEqual(usage.total_tokens, 0)
 
+    def test_claude_account_usage_counts_every_project_beyond_the_bar_window(self):
+        """Ctrl+T reports the whole Claude spend, not just the bar's recent window."""
+        now = 1_800_000_000.0
+        stamp = datetime.fromtimestamp(now, timezone.utc).isoformat().replace("+00:00", "Z")
+        old_stamp = datetime.fromtimestamp(now - 86_400 * 200, timezone.utc).isoformat().replace("+00:00", "Z")
+        self.write_claude_transcript(
+            "session-now.jsonl",
+            [self.transcript_turn("a1", stamp, tokens=1_000)],
+            now,
+        )
+        # A different project, last touched long before the usage bar's window.
+        old = self.home / ".claude" / "projects" / "-workspace-other" / "session-old.jsonl"
+        old.parent.mkdir(parents=True, exist_ok=True)
+        old.write_text(json.dumps(self.transcript_turn("a2", old_stamp, tokens=9_000)) + "\n", encoding="utf-8")
+        os.utime(old, (now - 86_400 * 200, now - 86_400 * 200))
+        monitor = UsageMonitor(UsageSettings(), home=self.home)
+
+        account = monitor.read_claude_account_usage(now)
+
+        self.assertTrue(account.ok)
+        self.assertEqual(account.total_tokens, 10_000)
+        self.assertEqual(account.today_tokens, 1_000)
+        self.assertEqual(account.scanned_files, 2)
+        self.assertEqual(account.days_recorded, 2)
+        # The bar's 30-day reading still sees only the recent transcript, so the
+        # wide scan cannot have redefined the window the bar reports.
+        self.assertIn("last 30d 1.0k tokens", monitor.read_claude("Claude", now).detail)
+
+    def test_claude_account_usage_prefers_the_larger_of_cache_and_transcripts(self):
+        """The cache keeps totals for transcripts that are no longer on disk."""
+        now = 1_800_000_000.0
+        stamp = datetime.fromtimestamp(now, timezone.utc).isoformat().replace("+00:00", "Z")
+        self.write_claude_transcript(
+            "session-1.jsonl",
+            [self.transcript_turn("a1", stamp, tokens=2_000)],
+            now,
+        )
+        (self.home / ".claude" / "stats-cache.json").write_text(
+            json.dumps({"modelUsage": {"claude-opus-5": {"inputTokens": 5_000_000, "outputTokens": 1_000}}}),
+            encoding="utf-8",
+        )
+
+        account = UsageMonitor(UsageSettings(), home=self.home).read_claude_account_usage(now)
+
+        self.assertEqual(account.total_tokens, 5_001_000)
+        self.assertEqual(account.transcript_tokens, 2_000)
+        self.assertEqual(account.cache_tokens, 5_001_000)
+        self.assertIn("stats cache", account.detail)
+
+    def test_claude_account_usage_reports_missing_data_without_raising(self):
+        account = UsageMonitor(UsageSettings(), home=self.home).read_claude_account_usage(1_800_000_000.0)
+
+        self.assertFalse(account.ok)
+        self.assertEqual(account.total_tokens, 0)
+        self.assertIn("no transcripts found", account.detail)
+
     def test_claude_reading_draws_rate_limit_windows_when_present(self):
         now = 1_800_000_000.0
         from datetime import datetime

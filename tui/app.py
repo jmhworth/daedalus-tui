@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 from pathlib import Path
+from typing import Callable
 import sys
 import threading
 import time
@@ -95,7 +96,7 @@ from .topics import (
     validate_topic_name,
 )
 from .transcript import TranscriptLog
-from .usage_monitor import ProviderUsage, UsageMonitor, format_usage_bar
+from .usage_monitor import ClaudeAccountUsage, ProviderUsage, UsageMonitor, format_usage_bar
 from .token_usage import calculate_token_usage, merge_usage_entries, task_usage_entry, usage_entries_from_memory
 from .verification import truncate_diagnostic
 from .vim_text_area import MODE_LABELS, SUBMIT_KEYS, DaedalusVimTextArea, VimMode as VimModeEnum
@@ -164,7 +165,7 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+N", "New project", "show_new_project"),
     ("Ctrl+Q", "Quit (drafts are saved first)", "quit"),
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
-    ("Ctrl+T", "Show coding statistics", "show_statistics"),
+    ("Ctrl+T", "Show coding statistics and total Claude usage", "show_statistics"),
     ("Ctrl+H", "Show pushed commit history", "show_push_history"),
 )
 
@@ -878,6 +879,7 @@ class CodingStatisticsScreen(ModalScreen[None]):
         self,
         entries,
         settings: CodingStatisticsSettings | None = None,
+        account_usage_reader: Callable[[], ClaudeAccountUsage] | None = None,
     ) -> None:
         super().__init__()
         self.settings = settings or CodingStatisticsSettings()
@@ -888,6 +890,11 @@ class CodingStatisticsScreen(ModalScreen[None]):
             thirty_day_forecast_days=self.settings.thirty_day_forecast_days,
         )
         self.unit = "tokens"
+        # Reading every Claude Code transcript can take a moment, so the screen
+        # opens with the Daedalus figures and fills the account total in later.
+        self._account_usage_reader = account_usage_reader
+        self.account_usage: ClaudeAccountUsage | None = None
+        self._account_error = ""
 
     def compose(self) -> ComposeResult:
         with Vertical(id="coding-statistics-dialog"):
@@ -905,6 +912,7 @@ class CodingStatisticsScreen(ModalScreen[None]):
                 yield Static(id="cumulative-metric", classes="usage-metric")
                 yield Static(id="daily-metric", classes="usage-metric")
                 yield Static(id="thirty-day-metric", classes="usage-metric")
+                yield Static(id="claude-account-metric", classes="usage-metric")
             with Horizontal(id="coding-statistics-body"):
                 with Vertical(id="usage-history-panel"):
                     yield Static("Task usage", classes="statistics-heading")
@@ -920,6 +928,7 @@ class CodingStatisticsScreen(ModalScreen[None]):
 
     def on_mount(self) -> None:
         self._refresh_statistics_view()
+        self._start_account_usage_read()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id != "statistics-unit-select" or event.value in (Select.BLANK, ""):
@@ -959,6 +968,7 @@ class CodingStatisticsScreen(ModalScreen[None]):
             f"Monthly projected {suffix}\n{_format_count(thirty_day)}"
         )
         self.query_one("#provider-split", Static).update(self._provider_split_text())
+        self._render_account_metric()
 
         table = self.query_one("#usage-table", DataTable)
         table.clear(columns=True)
@@ -989,6 +999,85 @@ class CodingStatisticsScreen(ModalScreen[None]):
 
     def action_close_statistics(self) -> None:
         self.dismiss(None)
+
+    # --- account-wide Claude usage ---------------------------------------------
+
+    def _start_account_usage_read(self) -> None:
+        """Read every Claude Code token off the UI thread, then show the total.
+
+        The Daedalus figures above count only tasks this app launched; this
+        reads Claude Code's own local records so the operator sees their whole
+        Claude spend, including sessions run outside Daedalus.
+        """
+        reader = self._account_usage_reader
+        if reader is None:
+            return
+        app = self.app
+
+        def work() -> None:
+            try:
+                usage = reader()
+            except Exception as error:  # pragma: no cover - defensive UI boundary
+                log_exception("Claude account usage reading failed", error)
+                usage, failure = None, str(error)
+            else:
+                failure = ""
+            try:
+                app.call_from_thread(self._show_account_usage, usage, failure)
+            except RuntimeError:
+                # The operator closed the screen, or the app stopped, while the
+                # transcripts were still being read.
+                return
+
+        self.app.run_worker(
+            work,
+            thread=True,
+            exclusive=True,
+            group="claude-account-usage",
+            exit_on_error=False,
+        )
+
+    def _show_account_usage(self, usage: ClaudeAccountUsage | None, error: str) -> None:
+        self.account_usage = usage
+        self._account_error = error
+        if not self.is_running:
+            return
+        self._render_account_metric()
+
+    def _render_account_metric(self) -> None:
+        """Draw the account-wide Claude total, which is always a token count."""
+        try:
+            tile = self.query_one("#claude-account-metric", Static)
+        except NoMatches:  # pragma: no cover - the tile is part of compose
+            return
+        usage = self.account_usage
+        if usage is None:
+            if self._account_error:
+                tile.update("All Claude tokens\nunavailable")
+                tile.tooltip = self._account_error
+            elif self._account_usage_reader is None:
+                tile.update("All Claude tokens\n—")
+                tile.tooltip = "Usage readings are disabled in the parameter file."
+            else:
+                tile.update("All Claude tokens\nreading…")
+                tile.tooltip = None
+            return
+        if not usage.ok:
+            tile.update("All Claude tokens\nno usage data")
+            tile.tooltip = usage.detail or None
+            return
+        # The tile keeps the same two-line shape as its neighbours; the record's
+        # span and sources belong in the tooltip, where they cannot clip.
+        tile.update(f"All Claude tokens\n{_format_count(usage.total_tokens)}")
+        since = f"recorded since {usage.first_day}\n" if usage.first_day else ""
+        tile.tooltip = (
+            "Every Claude Code token recorded on this machine, including "
+            "sessions run outside Daedalus.\n"
+            f"{since}"
+            f"today: {_format_count(usage.today_tokens)} tokens\n"
+            f"{usage.days_recorded} days recorded · {usage.scanned_files} transcripts\n"
+            f"{usage.detail}"
+        )
 
     def _average_per_prompt_text(self) -> str:
         suffix = "tasks" if self.unit == "tasks" else "tokens"
@@ -1739,7 +1828,22 @@ class DaedalusTuiApp(App[None]):
         self.push_screen(KeyboardShortcutsScreen())
 
     def action_show_statistics(self) -> None:
-        self.push_screen(CodingStatisticsScreen(self._usage_entries(), self.statistics_settings))
+        # The screen reads the operator's whole Claude Code spend through the
+        # usage monitor, so Ctrl+T shows more than the tasks Daedalus launched.
+        # Turning usage readings off also turns that reading off, because it is
+        # the same local Claude data the usage bar would have polled.
+        reader = (
+            self.usage_monitor.read_claude_account_usage
+            if self.settings.usage.enabled
+            else None
+        )
+        self.push_screen(
+            CodingStatisticsScreen(
+                self._usage_entries(),
+                self.statistics_settings,
+                account_usage_reader=reader,
+            )
+        )
 
     def action_show_push_history(self) -> None:
         """Show the launch-root record of successful branch pushes."""

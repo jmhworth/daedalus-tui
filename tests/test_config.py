@@ -314,3 +314,6 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         self.assertEqual(settings.usage.bar_width, 12)
         self.assertEqual(settings.usage.claude_projects_dir, "~/.claude/projects")
         self.assertEqual(settings.usage.claude_transcript_days, 30)
+        # The statistics screen's account-wide total looks back much further
+        # than the bar's recent window.
+        self.assertEqual(settings.usage.claude_account_scan_days, 3650)

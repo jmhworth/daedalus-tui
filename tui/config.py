@@ -353,10 +353,13 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
     tail_bytes = int(values.get("session_tail_bytes", defaults.session_tail_bytes))
     bar_width = int(values.get("bar_width", defaults.bar_width))
     transcript_days = int(values.get("claude_transcript_days", defaults.claude_transcript_days))
-    if scan_limit < 1 or tail_bytes < 1 or bar_width < 1 or transcript_days < 1:
+    account_scan_days = int(
+        values.get("claude_account_scan_days", defaults.claude_account_scan_days)
+    )
+    if scan_limit < 1 or tail_bytes < 1 or bar_width < 1 or transcript_days < 1 or account_scan_days < 1:
         raise ValueError(
             f"{path} usage.session_scan_limit, usage.session_tail_bytes, usage.bar_width, "
-            "and usage.claude_transcript_days must be positive."
+            "usage.claude_transcript_days, and usage.claude_account_scan_days must be positive."
         )
     providers: dict[str, UsageProviderSettings] = {}
     provider_tables = {
@@ -376,6 +379,7 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
         claude_stats_file=str(values.get("claude_stats_file", defaults.claude_stats_file)),
         claude_projects_dir=str(values.get("claude_projects_dir", defaults.claude_projects_dir)),
         claude_transcript_days=transcript_days,
+        claude_account_scan_days=account_scan_days,
         session_scan_limit=scan_limit,
         session_tail_bytes=tail_bytes,
         bar_width=bar_width,

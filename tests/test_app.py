@@ -25,7 +25,7 @@ from tui.app import (
 )
 from tui.memory import TaskMemoryStore
 from tui.config import LayoutSettings, ModelOption, PromptingSettings, TuiSettings
-from tui.usage_monitor import UsageSettings
+from tui.usage_monitor import ClaudeAccountUsage, UsageSettings
 from tui.projects import DaedalusProject
 from tui.plan import CUSTOM_ANSWER_OPTION_ID, PlanOption, PlanQuestion, encode_custom_answer
 from tui.conversation import TaskRun, TaskTurn
@@ -1467,6 +1467,86 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
             self.assertNotIsInstance(app.screen, CodingStatisticsScreen)
+
+    async def test_statistics_shows_total_claude_tokens_from_outside_daedalus(self):
+        """The screen reports the operator's whole Claude spend, read in the background."""
+        app, _ = self.make_app()
+        account = ClaudeAccountUsage(
+            total_tokens=4_321_000,
+            today_tokens=12_500,
+            transcript_tokens=4_000_000,
+            cache_tokens=4_321_000,
+            scanned_files=9,
+            first_day="2026-01-02",
+            days_recorded=3,
+            ok=True,
+            detail="stats cache: 4.3M tokens",
+        )
+        async with app.run_test() as pilot:
+            def run_inline(work, **kwargs):
+                work()
+
+            with patch.object(app, "run_worker", side_effect=run_inline), patch.object(
+                app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)
+            ):
+                app.push_screen(
+                    CodingStatisticsScreen(
+                        (),
+                        app.statistics_settings,
+                        account_usage_reader=lambda: account,
+                    )
+                )
+                await pilot.pause()
+
+            summary = "\n".join(str(widget.render()) for widget in app.screen.query(".usage-metric"))
+            self.assertIn("All Claude tokens", summary)
+            self.assertIn("4,321,000", summary)
+            self.assertIn("12,500", app.screen.query_one("#claude-account-metric", Static).tooltip)
+
+            # The account total is tokens even while the screen shows tasks.
+            app.screen.query_one("#statistics-unit-select", Select).value = "tasks"
+            await pilot.pause()
+            self.assertIn(
+                "4,321,000",
+                str(app.screen.query_one("#claude-account-metric", Static).render()),
+            )
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_statistics_reports_when_the_claude_total_cannot_be_read(self):
+        app, _ = self.make_app()
+
+        def fail():
+            raise OSError("transcripts unreadable")
+
+        async with app.run_test() as pilot:
+            def run_inline(work, **kwargs):
+                work()
+
+            with patch.object(app, "run_worker", side_effect=run_inline), patch.object(
+                app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)
+            ):
+                app.push_screen(CodingStatisticsScreen((), app.statistics_settings, account_usage_reader=fail))
+                await pilot.pause()
+
+            tile = app.screen.query_one("#claude-account-metric", Static)
+            self.assertIn("unavailable", str(tile.render()))
+            self.assertIn("transcripts unreadable", tile.tooltip)
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_statistics_marks_the_claude_total_absent_when_usage_is_disabled(self):
+        """Usage readings are off in these settings, so no transcripts are read."""
+        app, _ = self.make_app()
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+t")
+            await pilot.pause()
+
+            self.assertIsInstance(app.screen, CodingStatisticsScreen)
+            self.assertIsNone(app.screen._account_usage_reader)
+            self.assertIn("—", str(app.screen.query_one("#claude-account-metric", Static).render()))
+            await pilot.press("escape")
+            await pilot.pause()
 
     @patch("tui.app.discover_projects")
     async def test_sidebar_switches_active_project_and_keeps_task_coordinators_separate(self, discover):
