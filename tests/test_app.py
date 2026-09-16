@@ -397,6 +397,36 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await app.screen.dismiss(None)
             await pilot.pause()
 
+    async def test_app_starts_when_the_default_provider_is_claude(self):
+        """A Claude default model is not a Codex option, so the settings bar
+        must be built from the default provider's own lists at compose time
+        rather than crashing on mount with an illegal select value."""
+        claude_settings = replace(
+            settings(),
+            default_provider="claude",
+            default_model="claude-opus-5",
+            default_reasoning="high",
+        )
+        coordinator = FakeCoordinator()
+        app = DaedalusTuiApp(
+            runner=FakeRunner(),
+            directory=Path("/workspace/project"),
+            settings=claude_settings,
+            coordinator=coordinator,
+            prompting_settings=prompting_settings(),
+        )
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            self.assertEqual(app.query_one("#provider-select", Select).value, "claude")
+            model_select = app.query_one("#model-select", Select)
+            self.assertEqual(model_select.value, "claude-opus-5")
+            self.assertEqual(
+                select_values(model_select),
+                ["claude-opus-5", "claude-sonnet-5"],
+            )
+            self.assertEqual(app.query_one("#reasoning-select", Select).value, "high")
+            self.assertEqual(app._current_submission_settings()[:3], ("claude", "claude-opus-5", "high"))
+
     async def test_claude_provider_offers_its_own_models_and_effort_scale(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:

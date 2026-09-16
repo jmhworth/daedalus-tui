@@ -1254,20 +1254,25 @@ class DaedalusTuiApp(App[None]):
                 yield Button("Register Backend", id="register-backend-button")
                 yield Button("Sign In", id="sign-in-button")
                 yield Button("New Task", id="new-task-button", variant="primary")
+            # The model and effort lists depend on the default provider: the
+            # Claude default model is not a Codex option, so building these
+            # controls from the Codex lists would make the initial value
+            # illegal and crash on mount before the provider cascade runs.
+            default_provider = self.settings.default_provider
             with Horizontal(id="settings"):
                 yield Select(
                     [(option.label, option.value) for option in self.settings.providers],
-                    value=self.settings.default_provider,
+                    value=default_provider,
                     id="provider-select",
                 )
                 yield Select(
-                    [(option.label, option.value) for option in self.settings.codex_models],
-                    value=self.settings.default_model,
+                    self._provider_model_options(default_provider),
+                    value=self.settings.default_model_for(default_provider),
                     id="model-select",
                 )
                 yield Select(
-                    [(option.label, option.value) for option in self.settings.codex_reasoning],
-                    value=self.settings.default_reasoning,
+                    self._provider_reasoning_options(default_provider),
+                    value=self.settings.default_reasoning_for(default_provider),
                     id="reasoning-select",
                 )
                 yield Select(
