@@ -314,3 +314,6 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         self.assertEqual(settings.usage.bar_width, 12)
         self.assertEqual(settings.usage.claude_projects_dir, "~/.claude/projects")
         self.assertEqual(settings.usage.claude_transcript_days, 30)
+        # 0 means the Claude bars calibrate against the busiest recorded window.
+        self.assertEqual(settings.usage.claude_five_hour_token_limit, 0)
+        self.assertEqual(settings.usage.claude_weekly_token_limit, 0)

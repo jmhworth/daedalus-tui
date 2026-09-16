@@ -358,6 +358,15 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
             f"{path} usage.session_scan_limit, usage.session_tail_bytes, usage.bar_width, "
             "and usage.claude_transcript_days must be positive."
         )
+    # 0 keeps the Claude progress bars calibrated against the operator's own
+    # busiest window; a negative budget would silently invert them.
+    five_hour_limit = int(values.get("claude_five_hour_token_limit", defaults.claude_five_hour_token_limit))
+    weekly_limit = int(values.get("claude_weekly_token_limit", defaults.claude_weekly_token_limit))
+    if five_hour_limit < 0 or weekly_limit < 0:
+        raise ValueError(
+            f"{path} usage.claude_five_hour_token_limit and usage.claude_weekly_token_limit "
+            "must not be negative (0 calibrates against the busiest recorded window)."
+        )
     providers: dict[str, UsageProviderSettings] = {}
     provider_tables = {
         name: table for name, table in values.items() if isinstance(table, dict)
@@ -376,6 +385,8 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
         claude_stats_file=str(values.get("claude_stats_file", defaults.claude_stats_file)),
         claude_projects_dir=str(values.get("claude_projects_dir", defaults.claude_projects_dir)),
         claude_transcript_days=transcript_days,
+        claude_five_hour_token_limit=five_hour_limit,
+        claude_weekly_token_limit=weekly_limit,
         session_scan_limit=scan_limit,
         session_tail_bytes=tail_bytes,
         bar_width=bar_width,

@@ -7,7 +7,9 @@ own ``/usage`` and ``/status`` views: Codex writes rate-limit windows into its
 session logs after every turn, and Claude Code maintains a per-day token
 statistics cache that may also include its status-line rate-limit windows.
 Claude Code's cache is only a derived summary, so its session transcripts are
-read as the raw record of what was actually spent. A command can be configured
+read as the raw record of what was actually spent, and when Claude Code
+publishes no rate-limit payload those transcripts also supply the rolling 5h
+and 7d windows its progress bars are drawn from. A command can be configured
 per provider instead; it runs with stdin closed, a bounded timeout, and
 process-group termination.
 """
@@ -36,6 +38,13 @@ DEFAULT_BAR_WIDTH = 12
 # window is parsed once in full and then only from where the previous scan
 # stopped, so the window bounds the one-time cost of the first reading.
 DEFAULT_CLAUDE_TRANSCRIPT_DAYS = 30
+# Transcript tokens are bucketed by time so a rolling window can be summed
+# without keeping one entry per turn. Five minutes is finer than any window the
+# panel draws and still leaves fewer than ten thousand buckets for a month.
+ROLLING_BUCKET_SECONDS = 300
+# The rolling windows Claude's own /usage view reports, drawn as progress bars
+# from transcript tokens when Claude Code publishes no rate-limit payload.
+_CLAUDE_ROLLING_WINDOWS = (("5h", 5 * 3600), ("7d", 7 * 86_400))
 
 # Codex window keys in display order, with the label used when a payload omits
 # ``window_minutes`` (newer Codex builds send the windows without it).
@@ -68,6 +77,12 @@ class UsageSettings:
     # authoritative record of tokens and messages.
     claude_projects_dir: str = "~/.claude/projects"
     claude_transcript_days: int = DEFAULT_CLAUDE_TRANSCRIPT_DAYS
+    # Token budgets the Claude progress bars are drawn against. Claude Code
+    # publishes no limit locally, so 0 means "calibrate against the busiest
+    # equivalent window in the scanned transcripts" -- a bar that is always
+    # meaningful, where a full bar means the operator's own busiest stretch.
+    claude_five_hour_token_limit: int = 0
+    claude_weekly_token_limit: int = 0
     # A freshly started Codex session has no rate-limit payload until its first
     # turn finishes, so reading only the newest file reports "no usage data"
     # while a slightly older session holds the current numbers. Scan back
@@ -168,6 +183,27 @@ def _format_reset(window: dict, now: float) -> str:
     return _format_duration(_window_reset_seconds(window, now))
 
 
+def _format_rolloff(remaining: float | None) -> str:
+    """Describe when a rolling window's oldest tokens leave it.
+
+    A rolling window never resets the way a provider's quota window does, so
+    saying "resets in" would misdescribe it; what actually happens is that the
+    oldest tokens age out and the bar falls.
+    """
+    if remaining is None:
+        return ""
+    total = int(remaining)
+    if total <= 0:
+        return "frees up now"
+    hours, minutes = divmod(total // 60, 60)
+    if hours >= 24:
+        days, hours = divmod(hours, 24)
+        return f"frees up in {days}d {hours}h"
+    if hours:
+        return f"frees up in {hours}h {minutes:02d}m"
+    return f"frees up in {minutes}m"
+
+
 def format_bar(percent: float, width: int = DEFAULT_BAR_WIDTH) -> str:
     """Draw a fixed-width progress bar for a 0-100 percentage.
 
@@ -251,12 +287,26 @@ class ClaudeTranscriptUsage:
     when a session log has grown to megabytes. Entries are de-duplicated by
     their transcript ``uuid`` because resumed and forked sessions replay
     earlier turns into a new file.
+
+    Alongside the per-day totals, tokens are bucketed by time so the rolling
+    windows behind Claude's progress bars are a sum over a few buckets rather
+    than a walk over every turn ever recorded.
     """
 
-    def __init__(self, root: Path, *, scan_days: int = DEFAULT_CLAUDE_TRANSCRIPT_DAYS) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        scan_days: int = DEFAULT_CLAUDE_TRANSCRIPT_DAYS,
+        bucket_seconds: int = ROLLING_BUCKET_SECONDS,
+    ) -> None:
         self.root = root
         self.scan_days = max(1, int(scan_days))
+        self.bucket_seconds = max(1, int(bucket_seconds))
         self.days: dict[str, ClaudeDayUsage] = {}
+        # Tokens keyed by ``timestamp // bucket_seconds`` so a rolling window
+        # is a sum over buckets rather than over every turn ever recorded.
+        self.buckets: dict[int, int] = {}
         self.total_tokens = 0
         self.scanned_files = 0
         self.error: str | None = None
@@ -271,6 +321,52 @@ class ClaudeTranscriptUsage:
 
     def day(self, date: str) -> ClaudeDayUsage:
         return self.days.get(date, ClaudeDayUsage())
+
+    # --- rolling windows ----------------------------------------------------------
+
+    def _span(self, seconds: float) -> int:
+        """Buckets spanned by a window, excluding the bucket it ends in."""
+        return max(0, int(seconds // self.bucket_seconds))
+
+    def window_tokens(self, now: float, seconds: float) -> int:
+        """Total tokens recorded in the ``seconds`` ending at ``now``."""
+        cutoff = int((now - seconds) // self.bucket_seconds)
+        return sum(tokens for bucket, tokens in self.buckets.items() if bucket >= cutoff)
+
+    def peak_window_tokens(self, seconds: float) -> int:
+        """Return the busiest window of this length anywhere in the history.
+
+        Every window that could be the busiest one ends in a bucket that holds
+        tokens, so sliding a running sum over the occupied buckets finds the
+        peak in one pass. The current window is one of the candidates, so a
+        percentage taken against this peak can never exceed 100%.
+        """
+        span = self._span(seconds)
+        buckets = sorted(self.buckets)
+        peak = 0
+        total = 0
+        start = 0
+        for bucket in buckets:
+            total += self.buckets[bucket]
+            while buckets[start] < bucket - span:
+                total -= self.buckets[buckets[start]]
+                start += 1
+            peak = max(peak, total)
+        return peak
+
+    def window_rolloff_seconds(self, now: float, seconds: float) -> float | None:
+        """Seconds until the oldest tokens in the window fall out of it."""
+        cutoff = int((now - seconds) // self.bucket_seconds)
+        oldest = min((bucket for bucket in self.buckets if bucket >= cutoff), default=None)
+        if oldest is None:
+            return None
+        return (oldest + 1) * self.bucket_seconds + seconds - now
+
+    def _prune(self, now: float) -> None:
+        """Drop buckets older than the scan window; the totals above stay whole."""
+        cutoff = int((now - self.scan_days * 86_400) // self.bucket_seconds)
+        for bucket in [bucket for bucket in self.buckets if bucket < cutoff]:
+            del self.buckets[bucket]
 
     def refresh(self, now: float) -> int:
         """Parse transcript bytes appended since the last refresh.
@@ -301,6 +397,7 @@ class ClaudeTranscriptUsage:
                     continue
                 scanned += 1
                 self._scan(path, info)
+            self._prune(now)
             self.scanned_files = scanned
             return scanned
         finally:
@@ -346,9 +443,10 @@ class ClaudeTranscriptUsage:
             if identifier in self._seen:
                 return
             self._seen.add(identifier)
-        date = _local_date(entry.get("timestamp"))
-        if date is None:
+        moment = _local_moment(entry.get("timestamp"))
+        if moment is None:
             return
+        date, recorded_at = moment
         message = entry.get("message")
         message = message if isinstance(message, dict) else {}
         # Usage normally rides on the message; a few Claude Code builds put it
@@ -358,6 +456,9 @@ class ClaudeTranscriptUsage:
         totals = self.days.setdefault(date, ClaudeDayUsage())
         totals.tokens += tokens
         self.total_tokens += tokens
+        if tokens:
+            bucket = int(recorded_at // self.bucket_seconds)
+            self.buckets[bucket] = self.buckets.get(bucket, 0) + tokens
         totals.sessions.add(str(entry.get("sessionId") or session))
         if kind == "assistant" or not _is_tool_result(message):
             # Tool results are recorded as user turns; counting them would
@@ -365,8 +466,13 @@ class ClaudeTranscriptUsage:
             totals.messages += 1
 
 
-def _local_date(value: object) -> str | None:
-    """Return the local calendar date of a transcript ISO timestamp."""
+def _local_moment(value: object) -> tuple[str, float] | None:
+    """Return the local calendar date and epoch time of a transcript timestamp.
+
+    Both are read from one parse: the date groups a turn into its day, and the
+    epoch time places it in the rolling windows the progress bars are drawn
+    from.
+    """
     if not isinstance(value, str) or not value:
         return None
     try:
@@ -375,7 +481,7 @@ def _local_date(value: object) -> str | None:
         return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone().date().isoformat()
+    return parsed.astimezone().date().isoformat(), parsed.timestamp()
 
 
 def _claude_usage_tokens(usage: object) -> int:
@@ -618,9 +724,18 @@ class UsageMonitor:
         computed = (data or {}).get("lastComputedDate")
         computed_text = f" as of {computed}" if isinstance(computed, str) and computed else ""
         summary = f"{label} today {_format_tokens(tokens_today)} tok · {messages_today} msgs"
+        # Claude Code publishes rate-limit percentages only on some builds; when
+        # it does they are the truth and are drawn as-is. Otherwise the panel
+        # would show Claude as bare numbers beside Codex's bars, so the same
+        # rolling windows are measured from the transcripts instead.
+        windows = self._claude_windows(data or {}, now)
+        window_details: list[str] = []
+        if not windows:
+            windows, window_details = self._claude_rolling_windows(transcripts, now)
         details = [
             f"last {transcripts.scan_days}d {_format_tokens(total_tokens)} tokens; "
             f"{sessions_today} sessions today{computed_text}",
+            *window_details,
             f"transcripts: {_format_tokens(transcript_today.tokens)} tok · "
             f"{transcript_today.messages} msgs today from {transcripts.scanned_files} files",
             f"stats cache: {_format_tokens(cache_today.tokens)} tok · {cache_today.messages} msgs today",
@@ -637,8 +752,46 @@ class UsageMonitor:
             True,
             now,
             source,
-            self._claude_windows(data or {}, now),
+            windows,
         )
+
+    def _claude_rolling_windows(
+        self,
+        transcripts: ClaudeTranscriptUsage,
+        now: float,
+    ) -> tuple[tuple[UsageWindow, ...], list[str]]:
+        """Draw Claude's 5h and 7d token usage against its configured budgets.
+
+        A budget of 0 means none was configured -- Claude Code stores no plan
+        limit locally, so inventing one would draw a bar that is either pinned
+        at 100% or permanently near empty. The busiest equivalent window in the
+        scanned transcripts is used instead, which makes a full bar mean "as
+        busy as you have ever been" and keeps the bar honest for any plan.
+        """
+        limits = (
+            self.settings.claude_five_hour_token_limit,
+            self.settings.claude_weekly_token_limit,
+        )
+        windows: list[UsageWindow] = []
+        details: list[str] = []
+        for (label, seconds), limit in zip(_CLAUDE_ROLLING_WINDOWS, limits):
+            used = transcripts.window_tokens(now, seconds)
+            budget = int(limit) if limit and limit > 0 else transcripts.peak_window_tokens(seconds)
+            if budget <= 0:
+                continue
+            percent = min(100.0, used / budget * 100.0)
+            rolloff = _format_rolloff(transcripts.window_rolloff_seconds(now, seconds))
+            windows.append(UsageWindow(label, percent, rolloff))
+            basis = (
+                f"of a {_format_tokens(budget)} budget"
+                if limit and limit > 0
+                else f"of your busiest {label} in {transcripts.scan_days}d ({_format_tokens(budget)})"
+            )
+            details.append(
+                f"{label}: {_format_tokens(used)} tokens, {percent:.0f}% {basis}"
+                + (f", {rolloff}" if rolloff else "")
+            )
+        return tuple(windows), details
 
     def _transcript_usage(self) -> ClaudeTranscriptUsage:
         """Return the transcript reader, keeping its per-file offsets between polls."""
@@ -850,6 +1003,7 @@ def format_usage_bar(
 
 
 __all__ = [
+    "ROLLING_BUCKET_SECONDS",
     "DEFAULT_BAR_WIDTH",
     "DEFAULT_CLAUDE_TRANSCRIPT_DAYS",
     "DEFAULT_COMMAND_TIMEOUT_SECONDS",

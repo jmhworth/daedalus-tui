@@ -131,7 +131,9 @@ width = "95%"
 # larger figure from the two sources is shown. Set `command` for a provider to
 # run any program instead; it runs with stdin closed and a timeout, and its
 # JSON or first output line is shown. JSON rate-limit fields and Claude
-# `context_window` percentages produce the same progress bars for Claude.
+# `context_window` percentages produce the same progress bars for Claude, and
+# when Claude Code publishes none, its bars are measured from transcript
+# tokens over the rolling windows configured below.
 [usage]
 enabled = true
 interval_seconds = 60
@@ -144,6 +146,14 @@ claude_projects_dir = "~/.claude/projects"
 # once and afterwards only from where the previous poll stopped, so this bounds
 # the one-time cost of the first reading after launch.
 claude_transcript_days = 30
+# Token budgets the Claude progress bars are drawn against, for the rolling 5h
+# and 7d windows Claude Code's own /usage view reports. Claude Code stores no
+# plan limit locally, so 0 means "calibrate against the busiest equivalent
+# window in the scanned transcripts": a full bar then means as busy as this
+# machine has ever been, instead of a bar drawn against an invented limit. Set
+# a token count to measure against a fixed budget instead.
+claude_five_hour_token_limit = 0
+claude_weekly_token_limit = 0
 # Codex only writes rate limits after a turn completes, so the most recently
 # touched session log is often a just-started session with no usage in it.
 # Scan back through this many logs (newest first) before reporting no data.
