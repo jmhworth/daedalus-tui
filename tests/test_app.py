@@ -240,7 +240,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 coordinator=FakeCoordinator(),
             )
             async with app.run_test() as pilot:
-                await pilot.press("f4")
+                await pilot.press("ctrl+shift+s")
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
                 self.assertFalse((project / "supabase" / "config.toml").exists())
@@ -340,7 +340,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             )
             app._supabase_bootstrap_started = True
             async with app.run_test() as pilot:
-                await pilot.press("f4")
+                await pilot.press("ctrl+shift+s")
                 await pilot.pause()
 
                 self.assertIsInstance(app.screen, PersonalSupabaseActivationProgressScreen)
@@ -1139,27 +1139,27 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Ctrl+P", shortcut_text)
             self.assertIn("Ctrl+T", shortcut_text)
             self.assertIn("Ctrl+U", shortcut_text)
-            self.assertIn("F2", shortcut_text)
-            self.assertIn("F3", shortcut_text)
-            self.assertIn("F4", shortcut_text)
+            self.assertIn("Ctrl+Shift+N", shortcut_text)
+            self.assertIn("Ctrl+Shift+T", shortcut_text)
+            self.assertIn("Ctrl+Shift+S", shortcut_text)
             self.assertIn("gg / G", shortcut_text)
 
             await pilot.press("escape")
             await pilot.pause()
             self.assertNotIsInstance(app.screen, KeyboardShortcutsScreen)
 
-    async def test_f2_opens_new_project_modal(self):
+    async def test_ctrl_shift_n_opens_new_project_modal(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            await pilot.press("f2")
+            await pilot.press("ctrl+shift+n")
             await pilot.pause()
 
             self.assertIsInstance(app.screen, ProjectInitializerScreen)
 
-    async def test_f3_opens_create_topic_modal(self):
+    async def test_ctrl_shift_t_opens_create_topic_modal(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            await pilot.press("f3")
+            await pilot.press("ctrl+shift+t")
             await pilot.pause()
 
             self.assertIsInstance(app.screen, CreateTopicScreen)

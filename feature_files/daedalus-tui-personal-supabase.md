@@ -17,7 +17,7 @@ ecosystem-ready.
   `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
   claim ecosystem readiness.
-- **Phase 2 — Activate**: Operator `F4` after name confirmation runs
+- **Phase 2 — Activate**: Operator `Ctrl+Shift+S` after name confirmation runs
   scaffold (when unregistered) then Activate when gates pass: require HEAD already
   on the selected operating/target branch (no checkout/switch), refuse unrelated
   dirty files, software-owned local commit of known scaffold paths + marker, launch-root
@@ -25,7 +25,7 @@ ecosystem-ready.
   remains the optional operator Push button.
 - **Existing projects only**: Personal Supabase is post-init for projects already
   in the Daedalus format. New Project has no personal-Supabase opt-in.
-- **Retry**: Scaffolded or Activate-blocked projects reuse `F4` with the
+- **Retry**: Scaffolded or Activate-blocked projects reuse `Ctrl+Shift+S` with the
   same name confirmation; skip re-scaffold when registered, validate completeness,
   and re-run Phase 2. Incomplete scaffolds fail closed.
 - **Status model**: Distinguish unregistered, scaffolded (`registered`, not
@@ -51,7 +51,7 @@ ecosystem-ready.
   preflight, Activate orchestration, canonical environment bootstrap, and temporary
   CLI configuration.
 - `tui/environment.py`: Comment-preserving atomic `.env` synchronization and runtime loading.
-- `tui/app.py`: Confirmation modal, activation progress modal, and `F4` scaffold+Activate / retry worker.
+- `tui/app.py`: Confirmation modal, activation progress modal, and `Ctrl+Shift+S` scaffold+Activate / retry worker.
 - `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation copy,
   activate commit message, and preflight timeout.
@@ -71,3 +71,4 @@ HACKING
 - 2026-09-14: Deferred activation until the confirmation modal is popped and buffered fast worker updates until the progress modal is mounted.
 - 2026-09-15: Rebound personal-Supabase activation and retry from CapsLock+4 to Option+4 for terminal compatibility.
 - 2026-09-15: Replaced the non-portable CapsLock/Option activation chord with the Textual-native `F4` binding.
+- 2026-09-16: Rebound personal-Supabase activation and retry from F4 to the Control-based Ctrl+Shift+S shortcut.

@@ -142,11 +142,11 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+P", "Pause task", "pause_task"),
     ("Ctrl+R", "Resume task", "resume_task"),
     ("Ctrl+X", "Cancel task", "cancel_task"),
-    # Use Textual-native function-key names for low-frequency actions. Modifier
-    # names such as CapsLock and Option are not portable terminal key events.
-    ("F2", "New project", "show_new_project"),
-    ("F3", "Create topic", "show_create_topic"),
-    ("F4", "Activate personal Supabase", "register_personal_supabase"),
+    # Use Control-based chords for low-frequency actions so they work without
+    # relying on a terminal's function-key layer.
+    ("Ctrl+Shift+N", "New project", "show_new_project"),
+    ("Ctrl+Shift+T", "Create topic", "show_create_topic"),
+    ("Ctrl+Shift+S", "Activate personal Supabase", "register_personal_supabase"),
     ("Ctrl+T", "New task", "new_task"),
     ("Ctrl+Q", "Quit", "quit"),
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
@@ -1717,7 +1717,7 @@ class DaedalusTuiApp(App[None]):
             reason = result.blocked_reason or "blocked"
             self._set_error(detail)
             self._set_status(
-                f"Activate blocked ({reason}) for schema {result.schema!r}; retry with F4"
+                f"Activate blocked ({reason}) for schema {result.schema!r}; retry with Ctrl+Shift+S"
             )
             self.call_after_refresh(
                 self._finish_personal_supabase_progress,
