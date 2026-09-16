@@ -622,6 +622,55 @@ class TaskCoordinatorTests(unittest.TestCase):
             self.assertIsNone(record.context)
             coordinator.shutdown()
 
+    def test_delete_task_removes_inactive_record_and_snapshot_but_not_active_tasks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            memory_path = Path(directory) / ".daedalus-memory.json"
+            coordinator = TaskCoordinator(
+                Path(directory),
+                object(),
+                OrchestrationSettings(max_concurrent_tasks=1),
+                memory_path=memory_path,
+            )
+            completed = TaskRecord(
+                "completed-task",
+                1,
+                "remove me",
+                "codex",
+                "luna",
+                "medium",
+                status="completed",
+            )
+            active = TaskRecord(
+                "active-task",
+                2,
+                "keep me running",
+                "codex",
+                "luna",
+                "medium",
+                status="running",
+            )
+            coordinator.memory.record_task(
+                "task-completed-task",
+                completed.prompt,
+                completed.provider,
+                completed.model,
+                completed.reasoning,
+                completed.mode,
+                completed.status,
+                project=Path(directory),
+            )
+            completed.memory_task_id = "task-completed-task"
+            with coordinator._lock:
+                coordinator._tasks[completed.task_id] = completed
+                coordinator._tasks[active.task_id] = active
+
+            self.assertFalse(coordinator.delete_task(active.task_id))
+            self.assertTrue(coordinator.delete_task(completed.task_id))
+            self.assertIsNone(coordinator.get(completed.task_id))
+            self.assertIsNotNone(coordinator.get(active.task_id))
+            self.assertNotIn("task-completed-task", coordinator.memory.get_tasks())
+            coordinator.shutdown()
+
     def test_plan_answers_require_agent_confirmation_before_implementation(self):
         class PlanOrchestrator:
             responses = [

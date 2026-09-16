@@ -718,6 +718,59 @@ class TaskCoordinator:
         with self._lock:
             return self._tasks.get(task_id)
 
+    def delete_task(self, task_id: str) -> bool:
+        """Delete an inactive task and its persisted task snapshot.
+
+        Active runs are deliberately left in place until they are stopped so a
+        background worker cannot continue writing to a task that the UI has
+        already forgotten. Any preserved task worktree is discarded as part of
+        the deletion, matching the explicit destructive cleanup path.
+        """
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is None or record.status in ACTIVE_RUN_STATUSES:
+                return False
+            if any(
+                clarification.status in {"queued", "running"}
+                for items in record.plan_clarifications.values()
+                for clarification in items
+            ):
+                return False
+
+            if record.context is not None:
+                try:
+                    GitWorktreeManager(
+                        self.repository,
+                        self.settings.primary_branch,
+                        self.settings.worktree_root,
+                    ).remove_cancelled(record.context)
+                except GitWorktreeError as error:
+                    LOGGER.warning(
+                        "Could not delete task worktree task=%s error=%s",
+                        record.task_id,
+                        error,
+                    )
+                    return False
+
+            memory_task_id = record.memory_task_id or f"task-{record.task_id}"
+            try:
+                self.memory.delete_task(memory_task_id)
+            except (OSError, ValueError) as error:
+                LOGGER.warning(
+                    "Could not delete persisted task task=%s error=%s",
+                    record.task_id,
+                    error,
+                )
+                return False
+
+            self._tasks.pop(task_id, None)
+            self._last_persist_at.pop(task_id, None)
+            for clarification in record.plan_clarifications.values():
+                for item in clarification:
+                    self._clarification_controls.pop(item.clarification_id, None)
+            LOGGER.info("Deleted task=%s project=%s", record.task_id, self.project_key)
+            return True
+
     def conversation_entries(self, record: TaskRecord) -> list[ConversationEntry]:
         """Return ordered user turns, generated context, and assistant responses."""
         entries: list[ConversationEntry] = []

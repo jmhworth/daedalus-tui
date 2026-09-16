@@ -57,6 +57,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Project selection**: Launching from a root directory discovers only immediate child directories with `feature_files` folders; nested descendants are excluded, and the launch root is used only as a fallback when no eligible child exists. A trailing `Open directory…` entry in the selector takes one path and adds that directory as a project labelled `(external)`, so projects outside the launch root are reachable without relaunching the TUI and without listing unopened directories. The task toolbar selects the project for new submissions, editable prompt drafts survive project switches, and focusing an inbox row synchronizes the active project without mixing transcripts or worktrees. Each project's remembered operating branch is restored independently when focus returns.
 - **Project initialization**: New Project materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
+- **Task deletion**: Focus a sidebar row and press `dd` to remove an inactive task and its durable snapshot; active runs remain protected until they stop. See `feature_files/daedalus-tui-task-deletion.md`.
 - **Stable task inbox layout**: The task inbox uses fixed, parameterized marker/project/task/status widths and visible ellipses so background update markers cannot resize or horizontally scroll the sidebar.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
@@ -87,12 +88,14 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - `feature_files/daedalus-tui-orchestration.md`: Local orchestration ownership boundary.
 - `feature_files/daedalus-tui-topics.md`: Optional topic umbrellas and shared State Log memory.
 - `feature_files/daedalus-tui-project-initialization.md`: Launch-root project scaffolding.
+- `feature_files/daedalus-tui-task-deletion.md`: Sidebar task deletion behavior and safety boundary.
 - `tests/test_plan.py`, `tests/test_app.py`, `tests/test_task_coordinator.py`: Coverage for custom-answer rendering, validation, and follow-up handoff.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-16: Added Vim-style `dd` deletion for inactive tasks selected in the cross-project sidebar, including coordinator cleanup and durable snapshot removal.
 - 2026-09-15: Reworked prompting around conversations: composer drafts, verbatim archives, `Ctrl+C`/Cancel interruption that restores the prompt, follow-up turns, generated titles with an All tasks filter, the right-third Markdown viewer, `errors/` diagnostics, completed Vim clipboard commands, and a usage bar (details in `daedalus-tui-prompting.md`).
 - 2026-09-15: Added an `Open directory…` entry to the project selector that opens any directory by path, labels it `(external)`, remembers it in `.daedalus-memory.json` for later launches, and forgets it once the directory is gone.
 - 2026-09-15: Added launch-root discovery of plain Git checkouts and, optionally, every immediate child directory, labelling non-Daedalus folders `(unformatted)` so the TUI is not limited to already-converted projects.

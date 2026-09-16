@@ -289,6 +289,30 @@ class TaskMemoryStore:
                     tasks[task_id] = dict(task)
         return tasks
 
+    def delete_task(self, task_id: str) -> bool:
+        """Remove one persisted task snapshot without touching other entries."""
+        if not task_id:
+            return False
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            tasks: dict[str, object] = {}
+            found = False
+            for existing in entries:
+                existing_tasks = existing.get(TASKS_KEY)
+                if isinstance(existing_tasks, dict):
+                    tasks.update(existing_tasks)
+                    continue
+                updated_entries.append(existing)
+            if task_id not in tasks:
+                return False
+            tasks.pop(task_id, None)
+            found = True
+            if tasks:
+                updated_entries.append({TASKS_KEY: tasks})
+            self._write_entries(updated_entries)
+            return found
+
     def record_task(
         self,
         task_id: str,

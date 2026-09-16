@@ -169,6 +169,13 @@ class FakeCoordinator:
     def cancel(self, _task_id):
         return True
 
+    def delete_task(self, task_id):
+        record = self.get(task_id)
+        if record is None or record.status in {"queued", "running", "planning", "verifying"}:
+            return False
+        self.records.remove(record)
+        return True
+
     def retry(self, task_id):
         self.retry_actions.append(task_id)
         return True
@@ -1309,10 +1316,33 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Ctrl+P", shortcut_text)
             self.assertIn("Ctrl+T", shortcut_text)
             self.assertIn("gg / G", shortcut_text)
+            self.assertIn("dd", shortcut_text)
 
             await pilot.press("escape")
             await pilot.pause()
             self.assertNotIsInstance(app.screen, KeyboardShortcutsScreen)
+
+    async def test_dd_deletes_task_under_sidebar_cursor(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("Remove this task")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            record.status = "completed"
+            await pilot.pause()
+
+            task_list = app.query_one("#task-list", DataTable)
+            task_list.focus()
+            task_list.move_cursor(row=0, column=0)
+            await pilot.press("d")
+            await pilot.press("d")
+            await pilot.pause()
+
+            self.assertIsNone(coordinator.get(record.task_id))
+            self.assertNotIn(app._task_row_key(app._active_project_path, record.task_id), app._task_rows)
+            self.assertIsNone(app._selected_task_id)
+            self.assertIn("Deleted task", str(app.query_one("#status", Static).render()))
 
     async def test_ctrl_t_opens_coding_statistics_with_usage_columns_and_metrics(self):
         app, coordinator = self.make_app()

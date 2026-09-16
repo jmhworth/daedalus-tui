@@ -186,6 +186,10 @@ SHORTCUT_SECTIONS = (
         ),
     ),
     (
+        "Task sidebar",
+        (("dd", "Delete the task under the sidebar cursor"),),
+    ),
+    (
         "Prompt (Vim mode)",
         (
             ("Esc", "Normal mode; clears selection and pending keys"),
@@ -1090,6 +1094,7 @@ class DaedalusTuiApp(App[None]):
         self._updated_task_rows: set[str] = set()
         self._new_task_mode = True
         self._vim_pending_g = False
+        self._vim_pending_d = False
         self._showing_error_output = False
         self._plan_review_generation = 0
         self._accept_task_events = False
@@ -1370,15 +1375,30 @@ class DaedalusTuiApp(App[None]):
 
         if isinstance(self.focused, TextArea) and not self._focus_in_viewer():
             self._vim_pending_g = False
+            self._vim_pending_d = False
             return
 
         key = event.key
+        task_list_focused = isinstance(self.focused, DataTable) and self.focused.id == "task-list"
+        if self._vim_pending_d:
+            self._vim_pending_d = False
+            if key == "d" and task_list_focused:
+                self._delete_task_at_cursor()
+                event.stop()
+                return
+
         if self._vim_pending_g:
             self._vim_pending_g = False
             if key == "g":
                 self._scroll_output("home")
             else:
                 self._handle_vim_key(key)
+            event.stop()
+            return
+
+        if key == "d" and task_list_focused:
+            self._vim_pending_d = True
+            self._set_status("d-")
             event.stop()
             return
 
@@ -3064,6 +3084,70 @@ class DaedalusTuiApp(App[None]):
     @staticmethod
     def _task_row_key(project_path: Path, task_id: str) -> str:
         return f"{project_path.resolve()}::{task_id}"
+
+    def _delete_task_at_cursor(self) -> None:
+        """Delete the task currently under the focused sidebar cursor."""
+        task_list = self.query_one("#task-list", DataTable)
+        row_keys = tuple(self._task_rows)
+        if task_list.cursor_row < 0 or task_list.cursor_row >= len(row_keys):
+            self._set_status("No task selected in the sidebar")
+            return
+
+        row_key = row_keys[task_list.cursor_row]
+        task_target = self._task_rows.get(row_key)
+        if task_target is None:
+            self._set_status("No task selected in the sidebar")
+            return
+        project_path, task_id = task_target
+        coordinator = self._coordinators.get(project_path)
+        if coordinator is None:
+            self._set_status("Task coordinator unavailable")
+            return
+        record = coordinator.get(task_id)
+        if record is None:
+            self._refresh_task_list()
+            self._set_status("Task is no longer available")
+            return
+        delete_task = getattr(coordinator, "delete_task", None)
+        if not callable(delete_task):
+            self._set_status("Task deletion unavailable")
+            return
+
+        selected = (
+            project_path == self._active_project_path
+            and task_id == self._selected_task_id
+        )
+        if selected and not self._flush_draft(force=True):
+            self._set_status("Task not deleted: draft could not be saved")
+            return
+        try:
+            deleted = bool(delete_task(task_id))
+        except (RuntimeError, OSError, ValueError) as error:
+            self._set_status(f"Task not deleted: {error}")
+            return
+        if not deleted:
+            if record.status in ACTIVE_RUN_STATUSES:
+                self._set_status("Stop the active task before deleting it")
+            else:
+                self._set_status("Task could not be deleted")
+            return
+
+        if selected:
+            try:
+                self.prompt_store.delete_draft(project_path, task_id)
+            except (PromptStoreError, OSError):
+                pass
+            self._selected_task_id = None
+            self._new_task_mode = True
+            self._selection_settings = None
+            self._load_composer_for_selection(restore_status=False)
+        self._session_task_rows.discard(row_key)
+        self._updated_task_rows.discard(row_key)
+        self._refresh_task_list()
+        if selected:
+            self._render_selected_task_safely("task deletion")
+            task_list.focus()
+        self._set_status(f"Deleted task: {self._record_title(record)}")
 
     @staticmethod
     def _fit_task_cell(value: str, width: int) -> str:

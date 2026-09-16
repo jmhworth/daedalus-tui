@@ -119,6 +119,17 @@ class TaskMemoryStoreTests(unittest.TestCase):
                 ],
             )
 
+    def test_deletes_one_task_snapshot_without_removing_other_tasks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ".daedalus-memory.json"
+            store = TaskMemoryStore(path)
+            store.record_task("task-one", "Keep me", "codex", "luna", "medium", "coding", "completed")
+            store.record_task("task-two", "Delete me", "codex", "luna", "medium", "coding", "completed")
+
+            self.assertTrue(store.delete_task("task-two"))
+            self.assertFalse(store.delete_task("task-two"))
+            self.assertEqual(tuple(store.get_tasks()), ("task-one",))
+
     def test_records_plan_prompt_history_when_a_task_has_followups(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ".daedalus-memory.json"

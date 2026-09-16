@@ -1,0 +1,3 @@
+# This feature has no runtime-tunable parameters. The `dd` key sequence is an
+# intentionally fixed Vim convention. Paired with
+# feature_files/daedalus-tui-task-deletion.md.

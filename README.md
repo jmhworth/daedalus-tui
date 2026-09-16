@@ -254,6 +254,9 @@ earlier prompt (or a saved follow-up) into the editor without changing its
 archived file. The **All tasks** toggle under the inbox lists completed and
 interrupted conversations so they can be reopened after a restart.
 
+Focus a task row and press **`dd`** to delete an inactive conversation and its
+task snapshot; active runs must be stopped first.
+
 **`Ctrl+C`, Cancel, and `Ctrl+X`** all stop the selected task's active run
 without discarding anything: the worktree, branch, and uncommitted files are
 kept, the run is recorded as `interrupted` (not an error), and the interrupted
