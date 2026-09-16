@@ -241,6 +241,13 @@ class PersonalSupabaseTests(unittest.TestCase):
             self._seed_project(launch, "demo-app")
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
+            # API credentials alone are not enough when database access is required.
+            (launch / ".env").write_text(
+                "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                "SUPABASE_SECRET_KEY=secret-key\n",
+                encoding="utf-8",
+            )
 
             result = bootstrap_personal_supabase(project, launch)
 
