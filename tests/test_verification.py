@@ -1,3 +1,4 @@
+import os
 import tempfile
 import sys
 import time
@@ -7,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tui.agent_runner import AgentControl
-from tui.verification import discover_commands, run_verification
+from tui.verification import discover_commands, python_executable, run_verification
 
 
 class VerificationTests(unittest.TestCase):
@@ -19,10 +20,42 @@ class VerificationTests(unittest.TestCase):
             child = root / "child"
             child.mkdir()
             (child / "tests").mkdir()
+            interpreter = python_executable(root)
             self.assertEqual(
                 discover_commands(root, []),
-                [["npm", "test"], ["python", "-m", "pytest"], ["python", "-m", "pytest", "child/tests"]],
+                [
+                    ["npm", "test"],
+                    [interpreter, "-m", "pytest"],
+                    [interpreter, "-m", "pytest", "child/tests"],
+                ],
             )
+
+    def test_discovered_interpreter_is_an_existing_executable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tests").mkdir()
+            command = discover_commands(root, [])[0]
+
+            self.assertTrue(Path(command[0]).is_file(), command[0])
+            self.assertTrue(os.access(command[0], os.X_OK), command[0])
+
+    def test_prefers_a_virtual_environment_belonging_to_the_code_under_test(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binaries = root / ".venv" / "bin"
+            binaries.mkdir(parents=True)
+            interpreter = binaries / "python"
+            interpreter.write_text("#!/bin/sh\n", encoding="utf-8")
+            interpreter.chmod(0o755)
+
+            self.assertEqual(python_executable(root), str(interpreter))
+
+    def test_missing_executable_is_reported_as_an_environment_problem(self):
+        result = run_verification(Path("/"), [["daedalus-missing-executable"]])
+
+        self.assertFalse(result.succeeded)
+        self.assertIn("was not found on PATH", result.output)
+        self.assertIn("verification_commands", result.output)
 
     @patch("tui.verification.subprocess.run")
     def test_stops_at_first_failed_command(self, run):
