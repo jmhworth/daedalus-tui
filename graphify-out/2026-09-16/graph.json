@@ -1778,26 +1778,26 @@
       "norm_label": ".test_ctrl_k_opens_shortcuts_menu_with_global_and_vim_keys()"
     },
     {
-      "label": ".test_f2_opens_new_project_modal()",
+      "label": ".test_ctrl_shift_n_opens_new_project_modal()",
       "file_type": "code",
       "source_file": "tests/test_app.py",
       "source_location": "L1151",
       "_origin": "ast",
-      "id": "tests_test_app_tuiapptests_test_f2_opens_new_project_modal",
+      "id": "tests_test_app_tuiapptests_test_ctrl_shift_n_opens_new_project_modal",
       "community": 51,
       "community_name": "CompactSettingsSelect",
-      "norm_label": ".test_f2_opens_new_project_modal()"
+      "norm_label": ".test_ctrl_shift_n_opens_new_project_modal()"
     },
     {
-      "label": ".test_f3_opens_create_topic_modal()",
+      "label": ".test_ctrl_shift_t_opens_create_topic_modal()",
       "file_type": "code",
       "source_file": "tests/test_app.py",
       "source_location": "L1159",
       "_origin": "ast",
-      "id": "tests_test_app_tuiapptests_test_f3_opens_create_topic_modal",
+      "id": "tests_test_app_tuiapptests_test_ctrl_shift_t_opens_create_topic_modal",
       "community": 51,
       "community_name": "CompactSettingsSelect",
-      "norm_label": ".test_f3_opens_create_topic_modal()"
+      "norm_label": ".test_ctrl_shift_t_opens_create_topic_modal()"
     },
     {
       "label": ".test_ctrl_u_opens_coding_statistics_with_usage_columns_and_metrics()",
@@ -22332,6 +22332,30 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_app.py",
+      "source_location": "L1155",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_test_app_tuiapptests_test_ctrl_shift_n_opens_new_project_modal",
+      "target": "tests_test_app_fakecoordinator_pause",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/test_app.py",
+      "source_location": "L1163",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_test_app_tuiapptests_test_ctrl_shift_t_opens_create_topic_modal",
+      "target": "tests_test_app_fakecoordinator_pause",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/test_app.py",
       "source_location": "L1176",
       "weight": 1.0,
       "_origin": "ast",
@@ -22372,30 +22396,6 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_app_tuiapptests_test_existing_activated_supabase_opens_completed_progress_modal",
-      "target": "tests_test_app_fakecoordinator_pause",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_app.py",
-      "source_location": "L1155",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "tests_test_app_tuiapptests_test_f2_opens_new_project_modal",
-      "target": "tests_test_app_fakecoordinator_pause",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_app.py",
-      "source_location": "L1163",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "tests_test_app_tuiapptests_test_f3_opens_create_topic_modal",
       "target": "tests_test_app_fakecoordinator_pause",
       "confidence_score": 1.0
     },
@@ -23450,6 +23450,28 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_app.py",
+      "source_location": "L1151",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_test_app_tuiapptests",
+      "target": "tests_test_app_tuiapptests_test_ctrl_shift_n_opens_new_project_modal",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/test_app.py",
+      "source_location": "L1159",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_test_app_tuiapptests",
+      "target": "tests_test_app_tuiapptests_test_ctrl_shift_t_opens_create_topic_modal",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/test_app.py",
       "source_location": "L1167",
       "weight": 1.0,
       "_origin": "ast",
@@ -23499,28 +23521,6 @@
       "_origin": "ast",
       "source": "tests_test_app_tuiapptests",
       "target": "tests_test_app_tuiapptests_test_existing_activated_supabase_opens_completed_progress_modal",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "method",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_app.py",
-      "source_location": "L1151",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "tests_test_app_tuiapptests",
-      "target": "tests_test_app_tuiapptests_test_f2_opens_new_project_modal",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "method",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_app.py",
-      "source_location": "L1159",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "tests_test_app_tuiapptests",
-      "target": "tests_test_app_tuiapptests_test_f3_opens_create_topic_modal",
       "confidence_score": 1.0
     },
     {
@@ -24647,6 +24647,30 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_app.py",
+      "source_location": "L1152",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_test_app_tuiapptests_test_ctrl_shift_n_opens_new_project_modal",
+      "target": "tests_test_app_tuiapptests_make_app",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/test_app.py",
+      "source_location": "L1160",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_test_app_tuiapptests_test_ctrl_shift_t_opens_create_topic_modal",
+      "target": "tests_test_app_tuiapptests_make_app",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/test_app.py",
       "source_location": "L1168",
       "weight": 1.0,
       "_origin": "ast",
@@ -24687,30 +24711,6 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_app_tuiapptests_test_escape_clears_visual_line_highlighting_and_cursor_does_not_blink",
-      "target": "tests_test_app_tuiapptests_make_app",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_app.py",
-      "source_location": "L1152",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "tests_test_app_tuiapptests_test_f2_opens_new_project_modal",
-      "target": "tests_test_app_tuiapptests_make_app",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/test_app.py",
-      "source_location": "L1160",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "tests_test_app_tuiapptests_test_f3_opens_create_topic_modal",
       "target": "tests_test_app_tuiapptests_make_app",
       "confidence_score": 1.0
     },
@@ -25875,7 +25875,7 @@
       "source_location": "L1157",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tests_test_app_tuiapptests_test_f2_opens_new_project_modal",
+      "source": "tests_test_app_tuiapptests_test_ctrl_shift_n_opens_new_project_modal",
       "target": "tui_app_projectinitializerscreen"
     },
     {
@@ -25887,7 +25887,7 @@
       "source_location": "L1165",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tests_test_app_tuiapptests_test_f3_opens_create_topic_modal",
+      "source": "tests_test_app_tuiapptests_test_ctrl_shift_t_opens_create_topic_modal",
       "target": "tui_app_createtopicscreen"
     },
     {
@@ -68625,5 +68625,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "afde13d3e89b4ec7a16a88554558f0956fd711e9"
+  "built_at_commit": "0edbed54f0ba117e537b487994fa813a0576312a"
 }
