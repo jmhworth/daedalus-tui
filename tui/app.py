@@ -54,6 +54,7 @@ from .personal_supabase import (
     is_personal_supabase_activated,
     load_personal_supabase_settings,
     load_personal_supabase_status,
+    remove_personal_supabase,
     schema_from_project_root,
     temporary_supabase_cli_config,
 )
@@ -394,6 +395,11 @@ class CommandMenuScreen(ModalScreen[str | None]):
                 id="command-register-supabase-button",
             )
             yield Button(
+                self.settings.remove_personal_supabase_label,
+                id="command-remove-supabase-button",
+                variant="error",
+            )
+            yield Button(
                 self.settings.push_branch_label,
                 id="command-push-branch-button",
             )
@@ -411,6 +417,7 @@ class CommandMenuScreen(ModalScreen[str | None]):
             "command-new-task-button": "new_task",
             "command-create-topic-button": "show_create_topic",
             "command-register-supabase-button": "register_personal_supabase",
+            "command-remove-supabase-button": "remove_personal_supabase",
             "command-push-branch-button": "push_branch",
             "command-show-shortcuts-button": "show_shortcuts",
         }
@@ -495,6 +502,79 @@ class PersonalSupabaseConfirmationScreen(ModalScreen[bool]):
                 "Type the project name exactly to enable Activate."
             )
             self.query_one("#personal-supabase-confirmation-input", Input).focus()
+            return
+        self.dismiss(True)
+
+
+class PersonalSupabaseRemovalConfirmationScreen(ModalScreen[bool]):
+    """Require an exact project-name confirmation before local cleanup."""
+
+    BINDINGS = [
+        ("escape", "cancel_removal", "Cancel"),
+    ]
+
+    def __init__(self, project_name: str) -> None:
+        super().__init__()
+        self.project_name = project_name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="personal-supabase-removal-dialog"):
+            yield Static("Remove personal Supabase", id="personal-supabase-removal-title")
+            yield Static(
+                "This removes the local supabase folder, registration marker, generated profile guidance, and Supabase environment values. It does not change the remote database.",
+                id="personal-supabase-removal-warning",
+                markup=False,
+            )
+            yield Static(
+                f"Type the project name exactly to confirm:\n{self.project_name}",
+                id="personal-supabase-removal-prompt",
+                markup=False,
+            )
+            yield Input(
+                id="personal-supabase-removal-input",
+                placeholder=self.project_name,
+            )
+            yield Static("", id="personal-supabase-removal-status")
+            with Horizontal(id="personal-supabase-removal-actions"):
+                yield Button(
+                    "Remove",
+                    id="confirm-personal-supabase-removal-button",
+                    variant="error",
+                    disabled=True,
+                )
+                yield Button("Cancel", id="cancel-personal-supabase-removal-button")
+
+    def on_mount(self) -> None:
+        self.query_one("#personal-supabase-removal-input", Input).focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "personal-supabase-removal-input":
+            return
+        matches = event.value == self.project_name
+        self.query_one("#confirm-personal-supabase-removal-button", Button).disabled = not matches
+        if matches:
+            self.query_one("#personal-supabase-removal-status", Static).update("")
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "personal-supabase-removal-input":
+            self._confirm()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel-personal-supabase-removal-button":
+            self.dismiss(False)
+        elif event.button.id == "confirm-personal-supabase-removal-button":
+            self._confirm()
+
+    def action_cancel_removal(self) -> None:
+        self.dismiss(False)
+
+    def _confirm(self) -> None:
+        entered = self.query_one("#personal-supabase-removal-input", Input).value
+        if entered != self.project_name:
+            self.query_one("#personal-supabase-removal-status", Static).update(
+                "Type the project name exactly to enable removal."
+            )
+            self.query_one("#personal-supabase-removal-input", Input).focus()
             return
         self.dismiss(True)
 
@@ -1644,6 +1724,7 @@ class DaedalusTuiApp(App[None]):
             "new_task": self.action_new_task,
             "show_create_topic": self.action_show_create_topic,
             "register_personal_supabase": self.action_register_personal_supabase,
+            "remove_personal_supabase": self.action_remove_personal_supabase,
             "push_branch": self._push_selected_branch,
             "show_shortcuts": self.action_show_shortcuts,
         }
@@ -1697,6 +1778,33 @@ class DaedalusTuiApp(App[None]):
                 schema,
             ),
         )
+
+    def action_remove_personal_supabase(self) -> None:
+        """Confirm, then remove local personal-Supabase artifacts for the project."""
+        project_path = self._active_project_path
+        self.push_screen(
+            PersonalSupabaseRemovalConfirmationScreen(project_path.name),
+            lambda confirmed: self._on_personal_supabase_removal_confirmation(
+                confirmed,
+                project_path,
+            ),
+        )
+
+    def _on_personal_supabase_removal_confirmation(
+        self,
+        confirmed: bool,
+        project_path: Path,
+    ) -> None:
+        if not confirmed:
+            self._set_status("Personal Supabase removal cancelled")
+            return
+        result = remove_personal_supabase(project_path)
+        if result.succeeded:
+            self._set_error("")
+            self._set_status("Personal Supabase local artifacts removed")
+        else:
+            self._set_error(_redact_supabase_diagnostic(result.message))
+            self._set_status("Personal Supabase removal incomplete")
 
     def _on_personal_supabase_confirmation(
         self,

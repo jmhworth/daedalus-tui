@@ -106,6 +106,16 @@ class GitScaffoldCommitResult:
     committed: bool = False
 
 
+@dataclass(frozen=True)
+class PersonalSupabaseRemovalResult:
+    """Outcome of removing the local personal-Supabase integration artifacts."""
+
+    succeeded: bool
+    message: str
+    project_root: Path
+    removed_paths: tuple[str, ...] = ()
+
+
 def personal_supabase_environment_settings(settings: dict | None = None) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Return canonical and required environment keys from the feature parameters."""
     values = settings or load_personal_supabase_settings()
@@ -141,6 +151,196 @@ def personal_supabase_scaffold_relative_paths(
         str(PROFILE_RELATIVE_PATHS[1]),
         DAEDALUS_CONFIG_FILENAME,
     )
+
+
+def remove_personal_supabase(project_root: Path) -> PersonalSupabaseRemovalResult:
+    """Remove local personal-Supabase artifacts without touching remote state.
+
+    The Supabase directory is owned wholly by this feature and is removed in
+    full. Shared project files are edited surgically: the personal marker table,
+    generated env assignments, and generated profile sections are removed while
+    unrelated project configuration and guidance remain intact. The ignored
+    project ``.env`` is reduced to non-Supabase settings rather than deleting
+    unrelated application credentials.
+    """
+    root = project_root.expanduser().resolve()
+    settings = load_personal_supabase_settings()
+    removed: list[str] = []
+    failures: list[str] = []
+
+    def record(path: Path, operation: Callable[[], bool]) -> None:
+        try:
+            changed = operation()
+        except (OSError, UnicodeError) as error:
+            failures.append(f"{path.relative_to(root)}: {error}")
+            return
+        if changed:
+            removed.append(str(path.relative_to(root)))
+
+    supabase = root / "supabase"
+    if supabase.is_symlink():
+        record(supabase, lambda: _remove_path(supabase))
+    elif supabase.is_dir():
+        record(supabase, lambda: _remove_path(supabase))
+    elif supabase.exists():
+        failures.append("supabase: expected a directory, so it was left untouched")
+
+    marker = root / DAEDALUS_CONFIG_FILENAME
+    record(marker, lambda: _remove_personal_supabase_marker(marker))
+
+    env_example = root / ".env.example"
+    record(env_example, lambda: _remove_personal_supabase_env_example(env_example))
+
+    project_env = root / ".env"
+    record(project_env, lambda: _remove_personal_supabase_env_values(project_env, settings))
+
+    for relative in PROFILE_RELATIVE_PATHS:
+        profile = root / relative
+        record(profile, lambda profile=profile: _remove_personal_supabase_profile(profile, settings))
+
+    if failures:
+        message = "Personal Supabase cleanup was incomplete: " + "; ".join(failures)
+        return PersonalSupabaseRemovalResult(False, message, root, tuple(removed))
+    if not removed:
+        return PersonalSupabaseRemovalResult(True, "No local personal Supabase artifacts were found.", root)
+    return PersonalSupabaseRemovalResult(
+        True,
+        f"Removed local personal Supabase artifacts ({', '.join(removed)}).",
+        root,
+        tuple(removed),
+    )
+
+
+def _remove_personal_supabase_marker(path: Path) -> bool:
+    """Remove only the personal-Supabase table from a project marker."""
+    if not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8")
+    pattern = re.compile(rf"(?ms)^\[{re.escape(SECTION_TABLE)}\]\n.*?(?=^\[|\Z)")
+    match = pattern.search(text)
+    if match is None:
+        return False
+    updated = _remove_text_span(text, match.start(), match.end())
+    if updated.strip():
+        path.write_text(updated, encoding="utf-8")
+    else:
+        path.unlink()
+    return True
+
+
+def _remove_path(path: Path) -> bool:
+    """Remove one already-resolved file, symlink, or directory."""
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+    else:
+        return False
+    return True
+
+
+def _remove_personal_supabase_env_example(path: Path) -> bool:
+    """Remove the generated shared-Supabase block from ``.env.example``."""
+    if not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8")
+    updated = text
+    start_marker = "# Shared personal Supabase project."
+    start = next(
+        (match.start() for match in re.finditer(rf"(?m)^{re.escape(start_marker)}.*$", updated)),
+        None,
+    )
+    if start is not None:
+        end_match = re.search(
+            r"(?m)^# After migrations apply, allow-list schema .*?settings\.\s*$",
+            updated[start:],
+        )
+        if end_match is not None:
+            end = start + end_match.end()
+            updated = _remove_text_span(updated, start, end)
+
+    # Older or hand-edited examples may have the schema assignments without
+    # the generated block marker; remove those assignments too.
+    updated = re.sub(
+        r"(?m)^# After migrations apply, allow-list schema .*?settings\.\s*\n?",
+        "",
+        updated,
+    )
+    updated = _without_personal_supabase_env_values(updated)
+    if updated == text:
+        return False
+    if updated.strip():
+        path.write_text(updated, encoding="utf-8")
+    else:
+        path.unlink()
+    return True
+
+
+def _remove_personal_supabase_env_values(path: Path, settings: dict) -> bool:
+    """Remove synchronized Supabase assignments while preserving other env values."""
+    if not path.is_file():
+        return False
+    keys = {
+        str(settings["env_schema_key"]),
+        *(str(key) for key in settings["canonical_env_keys"]),
+    }
+    text = path.read_text(encoding="utf-8")
+    updated = _without_personal_supabase_env_values(text, keys)
+    if updated == text:
+        return False
+    if updated.strip():
+        path.write_text(updated, encoding="utf-8")
+    else:
+        path.unlink()
+    return True
+
+
+def _without_personal_supabase_env_values(text: str, keys: set[str] | None = None) -> str:
+    """Return env text without the configured Supabase assignments."""
+    if keys is None:
+        settings = load_personal_supabase_settings()
+        keys = {
+            str(settings["env_schema_key"]),
+            *(str(key) for key in settings["canonical_env_keys"]),
+        }
+    lines = text.splitlines(keepends=True)
+    assignment = re.compile(r"^\s*(?:export\s+)?(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*=")
+    return "".join(
+        line
+        for line in lines
+        if not ((match := assignment.match(line.rstrip("\r\n"))) and match.group("key") in keys)
+    )
+
+
+def _remove_personal_supabase_profile(path: Path, settings: dict) -> bool:
+    """Remove the generated Personal Supabase section from one profile."""
+    if not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8")
+    heading = str(settings["profile_section_heading"])
+    pattern = re.compile(rf"(?ms)^{re.escape(heading)}\n.*?(?=^## |\Z)")
+    match = pattern.search(text)
+    if match is None:
+        return False
+    updated = _remove_text_span(text, match.start(), match.end())
+    if updated.strip():
+        path.write_text(updated, encoding="utf-8")
+    else:
+        path.unlink()
+    return True
+
+
+def _remove_text_span(text: str, start: int, end: int) -> str:
+    """Remove a generated block and normalize the blank lines around it."""
+    before = text[:start].rstrip()
+    after = text[end:].lstrip()
+    if before and after:
+        return f"{before}\n\n{after.rstrip()}\n"
+    if before:
+        return f"{before}\n"
+    if after:
+        return f"{after.rstrip()}\n"
+    return ""
 
 
 def load_personal_supabase_status(project_root: Path) -> PersonalSupabaseStatus:
@@ -553,6 +753,8 @@ def commit_personal_supabase_scaffold(
             committed=False,
         )
 
+    # Keep deleted tracked paths in the selection so ``git add -A`` records the
+    # removal instead of silently omitting it.
     existing = [path for path in allowed if (root / path).exists() or path in scaffold_dirty]
     return _commit_paths(root, existing, message)
 
@@ -562,21 +764,44 @@ def _commit_paths(
     paths: tuple[str, ...] | list[str],
     message: str,
 ) -> GitScaffoldCommitResult:
-    selected = [path for path in paths if (directory / path).exists()]
+    selected = list(dict.fromkeys(path.replace("\\", "/") for path in paths))
     if not selected:
         return GitScaffoldCommitResult(True, "Nothing to commit.", committed=False)
-    add = _run_git(["add", "--", *selected], directory)
-    if not add.succeeded:
-        return GitScaffoldCommitResult(False, add.message or "Failed to stage paths.")
-    staged = _git_output(["diff", "--cached", "--name-only"], directory)
-    if staged is None:
-        return GitScaffoldCommitResult(False, "Could not inspect staged Activate changes.")
-    if not staged.strip():
-        return GitScaffoldCommitResult(True, "Nothing to commit.", committed=False)
-    commit = _run_git(["commit", "-m", message], directory)
-    if not commit.succeeded:
-        return GitScaffoldCommitResult(False, commit.message or "Failed to commit paths.")
-    return GitScaffoldCommitResult(True, "Committed personal Supabase changes.", committed=True)
+    # A narrow ``add`` followed by an ordinary commit can include stale index
+    # entries. ``--only`` makes the commit boundary explicit and keeps an
+    # unrelated pre-staged file out of the software-owned commit.
+    for attempt in range(2):
+        add = _run_git(["add", "-A", "--", *selected], directory)
+        if not add.succeeded:
+            return GitScaffoldCommitResult(False, add.message or "Failed to stage paths.")
+        staged = _git_output(["diff", "--cached", "--name-only", "--", *selected], directory)
+        if staged is None:
+            return GitScaffoldCommitResult(False, "Could not inspect staged Activate changes.")
+        if not staged.strip():
+            return GitScaffoldCommitResult(True, "Nothing to commit.", committed=False)
+        commit = _run_git(["commit", "--only", "-m", message, "--", *selected], directory)
+        if not commit.succeeded:
+            return GitScaffoldCommitResult(False, commit.message or "Failed to commit paths.")
+        remaining = _git_porcelain_paths(directory)
+        if remaining is None:
+            return GitScaffoldCommitResult(
+                False,
+                "Commit completed, but Activate could not verify the worktree state.",
+                committed=True,
+            )
+        changed_again = sorted(path for path in remaining if path in selected)
+        if not changed_again:
+            return GitScaffoldCommitResult(True, "Committed personal Supabase changes.", committed=True)
+        if attempt == 0:
+            continue
+        preview = ", ".join(changed_again[:5])
+        suffix = "…" if len(changed_again) > 5 else ""
+        return GitScaffoldCommitResult(
+            False,
+            f"Files changed while Activate was committing ({preview}{suffix}); retry Activate.",
+            committed=True,
+        )
+    return GitScaffoldCommitResult(False, "Failed to commit paths.")
 
 
 def preflight_personal_supabase(

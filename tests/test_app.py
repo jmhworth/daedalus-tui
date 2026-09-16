@@ -20,6 +20,7 @@ from tui.app import (
     KeyboardShortcutsScreen,
     PersonalSupabaseConfirmationScreen,
     PersonalSupabaseActivationProgressScreen,
+    PersonalSupabaseRemovalConfirmationScreen,
     ProjectInitializerScreen,
     TopicViewerScreen,
 )
@@ -306,6 +307,46 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     "Activated Supabase schema",
                     str(app.query_one("#status", Static).render()),
                 )
+
+    async def test_command_menu_remove_supabase_requires_confirmation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "demo-app"
+            (project / "feature_files").mkdir(parents=True)
+            app = DaedalusTuiApp(
+                runner=FakeRunner(),
+                directory=project,
+                settings=settings(),
+                coordinator=FakeCoordinator(),
+            )
+            from tui.personal_supabase import PersonalSupabaseRemovalResult
+
+            with patch(
+                "tui.app.remove_personal_supabase",
+                return_value=PersonalSupabaseRemovalResult(
+                    True,
+                    "Removed local personal Supabase artifacts.",
+                    project,
+                    ("supabase",),
+                ),
+            ) as remove:
+                async with app.run_test() as pilot:
+                    await pilot.press("ctrl+k")
+                    await pilot.pause()
+                    app.screen.query_one("#command-remove-supabase-button", Button).press()
+                    await pilot.pause()
+                    self.assertIsInstance(app.screen, PersonalSupabaseRemovalConfirmationScreen)
+                    remove_button = app.screen.query_one(
+                        "#confirm-personal-supabase-removal-button",
+                        Button,
+                    )
+                    self.assertTrue(remove_button.disabled)
+                    app.screen.query_one("#personal-supabase-removal-input", Input).value = "demo-app"
+                    await pilot.pause()
+                    self.assertFalse(remove_button.disabled)
+                    remove_button.press()
+                    await pilot.pause()
+
+                remove.assert_called_once_with(project)
 
     async def test_new_project_modal_omits_personal_supabase_checkbox(self):
         app, _ = self.make_app()
@@ -1149,6 +1190,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 "#command-new-task-button",
                 "#command-create-topic-button",
                 "#command-register-supabase-button",
+                "#command-remove-supabase-button",
                 "#command-push-branch-button",
                 "#command-show-shortcuts-button",
             ):

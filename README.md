@@ -64,8 +64,10 @@ Registered projects store only their schema marker; Daedalus synchronizes each
 ignored project `.env` from the launch-root file at startup. When
 `supabase_db_push_enabled` is enabled, startup pushes migrations only for
 projects that have been Activated (ecosystem-ready); scaffolded projects wait
-for explicit Activate via the Command Menu (`Ctrl+K`). Process environment variables remain
-runtime overrides and are never written to disk. Copy the root `.env.example`
+for explicit Activate via the Command Menu (`Ctrl+K`). The same menu provides an
+exact-project-name-confirmed local cleanup action for removing a broken
+personal-Supabase scaffold; cleanup does not change the remote database. Process
+environment variables remain runtime overrides and are never written to disk. Copy the root `.env.example`
 to `.env`; do not put Supabase credentials in tracked feature, parameter, or
 `.env.example` files.
 

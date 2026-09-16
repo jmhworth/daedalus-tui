@@ -580,6 +580,47 @@ TopicViewerScreen {
     margin-right: 1;
 }
 
+#personal-supabase-removal-dialog {
+    width: 76;
+    height: auto;
+    border: round $error;
+    background: $surface;
+    padding: 1 2;
+}
+
+#personal-supabase-removal-title {
+    color: $error;
+    text-style: bold;
+    height: 2;
+}
+
+#personal-supabase-removal-warning,
+#personal-supabase-removal-prompt,
+#personal-supabase-removal-status {
+    color: $text-muted;
+    height: auto;
+    margin-bottom: 1;
+}
+
+#personal-supabase-removal-prompt {
+    color: $text;
+}
+
+#personal-supabase-removal-input {
+    margin-bottom: 1;
+}
+
+#personal-supabase-removal-actions {
+    height: 3;
+    align: left middle;
+}
+
+#confirm-personal-supabase-removal-button,
+#cancel-personal-supabase-removal-button {
+    width: 20;
+    margin-right: 1;
+}
+
 #personal-supabase-progress-dialog {
     width: 76;
     height: auto;

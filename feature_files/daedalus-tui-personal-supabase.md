@@ -28,6 +28,10 @@ ecosystem-ready.
 - **Retry**: Scaffolded or Activate-blocked projects reuse the Command Menu (`Ctrl+K`) with the
   same name confirmation; skip re-scaffold when registered, validate completeness,
   and re-run Phase 2. Incomplete scaffolds fail closed.
+- **Local cleanup**: The Command Menu also offers an exact-name-confirmed debug
+  cleanup that removes the local `supabase/` directory and generated integration
+  content while preserving unrelated `.daedalus`, profile, and environment values;
+  it never changes the remote database.
 - **Status model**: Distinguish unregistered, scaffolded (`registered`, not
   `activated`), activated, and blocked reasons (`last_activate_status` /
   redacted error class—no credentials). Launch env-syncs all registered projects;
@@ -47,9 +51,9 @@ ecosystem-ready.
   commits and migration push.
 
 ## Relevant Files
-- `tui/personal_supabase.py`: Scaffold helper, marker I/O, Git gate/commit, live
-  preflight, Activate orchestration, canonical environment bootstrap, and temporary
-  CLI configuration.
+- `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
+  gate/commit, live preflight, Activate orchestration, canonical environment
+  bootstrap, and temporary CLI configuration.
 - `tui/environment.py`: Comment-preserving atomic `.env` synchronization and runtime loading.
 - `tui/app.py`: Command Menu, confirmation modal, activation progress modal, and scaffold+Activate / retry worker.
 - `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
@@ -73,3 +77,4 @@ HACKING
 - 2026-09-15: Replaced the non-portable CapsLock/Option activation chord with the Textual-native `F4` binding.
 - 2026-09-16: Rebound personal-Supabase activation and retry from F4 to the Control-based Ctrl+Shift+S shortcut.
 - 2026-09-16: Moved personal-Supabase activation into the Ctrl+K Command Menu and removed its standalone keyboard shortcut.
+- 2026-09-16: Added exact-name-confirmed local Supabase cleanup for debugging and hardened scaffold commits to preserve deletions, isolate selected paths, and detect files changing during the commit.

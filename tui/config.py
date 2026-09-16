@@ -76,6 +76,7 @@ class CommandMenuSettings:
     new_task_label: str = "New Task"
     create_topic_label: str = "Create Topic"
     personal_supabase_label: str = "Activate personal Supabase"
+    remove_personal_supabase_label: str = "Remove personal Supabase"
     push_branch_label: str = "Push to GitHub"
     keyboard_shortcuts_label: str = "Keyboard Shortcuts"
 
@@ -219,6 +220,9 @@ def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMen
         create_topic_label=str(labels.get("create_topic", "Create Topic")),
         personal_supabase_label=str(
             labels.get("personal_supabase", "Activate personal Supabase")
+        ),
+        remove_personal_supabase_label=str(
+            labels.get("remove_personal_supabase", "Remove personal Supabase")
         ),
         push_branch_label=str(labels.get("push_branch", "Push to GitHub")),
         keyboard_shortcuts_label=str(labels.get("keyboard_shortcuts", "Keyboard Shortcuts")),

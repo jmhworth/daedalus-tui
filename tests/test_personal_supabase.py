@@ -15,6 +15,7 @@ from tui.personal_supabase import (
     load_personal_supabase_status,
     preflight_personal_supabase,
     profile_guidance_section,
+    remove_personal_supabase,
     register_personal_supabase,
     schema_from_project_root,
     temporary_supabase_cli_config,
@@ -135,6 +136,40 @@ class PersonalSupabaseTests(unittest.TestCase):
                 list((project / "supabase" / "migrations").iterdir()),
                 [project / "supabase" / "migrations" / "20260101000000_create_personal_schema.sql"],
             )
+
+    def test_remove_personal_supabase_removes_owned_artifacts_preserves_shared_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp), "demo-app")
+            register_personal_supabase(project, schema="demo-app")
+            (project / ".env").write_text(
+                "APP_SETTING=keep\nSUPABASE_PROJECT_REF=shared-ref\nSUPABASE_SCHEMA=demo-app\n",
+                encoding="utf-8",
+            )
+
+            result = remove_personal_supabase(project)
+
+            self.assertTrue(result.succeeded)
+            self.assertFalse((project / "supabase").exists())
+            self.assertFalse((project / ".env.example").exists())
+            self.assertEqual((project / ".env").read_text(encoding="utf-8"), "APP_SETTING=keep\n")
+            self.assertEqual(
+                (project / ".agents" / "profiles" / "coding.md").read_text(encoding="utf-8"),
+                "# Coding\n",
+            )
+            marker = (project / ".daedalus").read_text(encoding="utf-8")
+            self.assertIn("[worktree]", marker)
+            self.assertNotIn("personal_supabase", marker)
+
+    def test_remove_personal_supabase_deletes_marker_when_it_has_no_other_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "demo-app"
+            project.mkdir()
+            register_personal_supabase(project, schema="demo-app")
+
+            result = remove_personal_supabase(project)
+
+            self.assertTrue(result.succeeded)
+            self.assertFalse((project / ".daedalus").exists())
 
     def test_conflicting_marker_and_foreign_migrations_fail_safely(self):
         with tempfile.TemporaryDirectory() as tmp:
