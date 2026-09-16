@@ -829,7 +829,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 project_select = app.query_one("#project-select", Select)
                 self.assertEqual(
                     [str(label) for label, _value in project_select._options],
-                    ["alpha", "outside-project (external)", "Open directory…"],
+                    ["alpha", "outside-project", "Open directory…"],
                 )
                 self.assertEqual(project_select.value, str(outside.resolve()))
                 self.assertEqual(app._active_project_path, outside.resolve())
@@ -842,7 +842,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 app._reload_projects()
                 await pilot.pause()
                 self.assertIn(
-                    "outside-project (external)",
+                    "outside-project",
                     [str(label) for label, _value in project_select._options],
                 )
 
@@ -874,7 +874,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(app._active_project_path, outside.resolve())
                 self.assertEqual(
                     [str(label) for label, _value in app.query_one("#project-select", Select)._options],
-                    ["alpha", "outside-project (external)", "Open directory…"],
+                    ["alpha", "outside-project", "Open directory…"],
                 )
                 self.assertEqual(
                     store.get_opened_project_directories(), (outside.resolve(),)

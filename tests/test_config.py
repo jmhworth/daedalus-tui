@@ -250,6 +250,9 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         self.assertEqual(settings.task_title_length, 60)
         self.assertFalse(settings.viewer_visible_by_default)
         self.assertEqual((settings.viewer_minimum_width, settings.main_minimum_width), (40, 80))
+        self.assertTrue(settings.viewer_hard_line_breaks)
+        self.assertTrue(settings.viewer_action_items_by_default)
+        self.assertEqual(settings.viewer_action_item_limit, 6)
         self.assertEqual(settings.error_log_max_bytes, 2_000_000)
         self.assertEqual(settings.error_log_backup_count, 3)
 
@@ -287,3 +290,7 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         self.assertEqual(set(settings.usage.providers), {"claude", "codex"})
         self.assertEqual(settings.usage.providers["codex"].command, ())
         self.assertEqual(settings.usage.providers["claude"].label, "Claude")
+        # Scalar tuning keys must not be mistaken for provider tables.
+        self.assertEqual(settings.usage.session_scan_limit, 12)
+        self.assertEqual(settings.usage.session_tail_bytes, 262_144)
+        self.assertEqual(settings.usage.bar_width, 12)

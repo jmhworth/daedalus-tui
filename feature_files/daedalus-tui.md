@@ -28,8 +28,9 @@ The standalone Daedalus TUI is an installable Textual application that runs from
   only; orchestration owns every remote apply.
 - **Launch-root breadth**: Project discovery lists Daedalus-formatted children
   first and, per the `[projects]` parameter table, also plain Git checkouts
-  (default) or every immediate child directory, labelling the non-Daedalus ones
-  `(unformatted)` so the difference stays visible in the selector.
+  (default) or every immediate child directory. Formatting still orders the
+  selector, but it is not written into the label: every option shows the plain
+  directory name so the list stays readable.
 - **Responsive layouts**: Terminal resize events switch narrow screens to a
   vertical workspace with a compact full-width task inbox and stacked toolbar
   actions. The wide task and settings bars are measured after layout, so the
@@ -54,7 +55,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Full-size output toggle**: Agent transcript and task diagnostics share one full-height output panel; a toggle shows either log at the same readable size while preserving selection and copying.
 - **Readable streamed output**: Assistant messages are separated by a blank line, transcript lines reflow at word boundaries with hyphenation only for overlong words, and the output pane keeps a small width buffer so long responses remain visible.
 - **Incremental Vim input**: The prompt uses a modal VimTextArea with a practical command subset; additional Vim commands can be added as they become useful instead of implementing the entire Vim language up front.
-- **Project selection**: Launching from a root directory discovers only immediate child directories with `feature_files` folders; nested descendants are excluded, and the launch root is used only as a fallback when no eligible child exists. A trailing `Open directory…` entry in the selector takes one path and adds that directory as a project labelled `(external)`, so projects outside the launch root are reachable without relaunching the TUI and without listing unopened directories. The task toolbar selects the project for new submissions, editable prompt drafts survive project switches, and focusing an inbox row synchronizes the active project without mixing transcripts or worktrees. Each project's remembered operating branch is restored independently when focus returns.
+- **Project selection**: Launching from a root directory discovers only immediate child directories with `feature_files` folders; nested descendants are excluded, and the launch root is used only as a fallback when no eligible child exists. A trailing `Open directory…` entry in the selector takes one path and adds that directory as a project under its own name, so projects outside the launch root are reachable without relaunching the TUI and without listing unopened directories. The task toolbar selects the project for new submissions, editable prompt drafts survive project switches, and focusing an inbox row synchronizes the active project without mixing transcripts or worktrees. Each project's remembered operating branch is restored independently when focus returns.
 - **Project initialization**: New Project materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Stable task inbox layout**: The task inbox uses fixed, parameterized marker/project/task/status widths and visible ellipses so background update markers cannot resize or horizontally scroll the sidebar.
@@ -93,6 +94,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-16: Dropped the `(external)` and `(unformatted)` markers from project selector labels so every option shows the plain directory name; the flags still order discovery and drive behavior.
 - 2026-09-15: Reworked prompting around conversations: composer drafts, verbatim archives, `Ctrl+C`/Cancel interruption that restores the prompt, follow-up turns, generated titles with an All tasks filter, the right-third Markdown viewer, `errors/` diagnostics, completed Vim clipboard commands, and a usage bar (details in `daedalus-tui-prompting.md`).
 - 2026-09-15: Added an `Open directory…` entry to the project selector that opens any directory by path, labels it `(external)`, remembers it in `.daedalus-memory.json` for later launches, and forgets it once the directory is gone.
 - 2026-09-15: Added launch-root discovery of plain Git checkouts and, optionally, every immediate child directory, labelling non-Daedalus folders `(unformatted)` so the TUI is not limited to already-converted projects.

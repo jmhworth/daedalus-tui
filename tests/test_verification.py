@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 import sys
 import time
@@ -12,14 +13,17 @@ from tui.verification import discover_commands, python_executable, run_verificat
 
 
 class VerificationTests(unittest.TestCase):
+    def _suite_tree(self, root: Path) -> None:
+        (root / "tests").mkdir()
+        (root / "package.json").write_text('{"scripts":{"test":"pytest"}}', encoding="utf-8")
+        child = root / "child"
+        child.mkdir()
+        (child / "tests").mkdir()
+
     def test_discovers_root_and_nested_test_suites(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "tests").mkdir()
-            (root / "package.json").write_text('{"scripts":{"test":"pytest"}}', encoding="utf-8")
-            child = root / "child"
-            child.mkdir()
-            (child / "tests").mkdir()
+            self._suite_tree(root)
             interpreter = python_executable(root)
             self.assertEqual(
                 discover_commands(root, []),
@@ -29,6 +33,34 @@ class VerificationTests(unittest.TestCase):
                     [interpreter, "-m", "pytest", "child/tests"],
                 ],
             )
+
+    def test_falls_back_to_path_when_no_virtual_environment_is_available(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._suite_tree(root)
+            with patch.dict(os.environ, {}, clear=True), patch(
+                "tui.verification.shutil.which",
+                side_effect=lambda name: "/usr/bin/python3" if name == "python3" else None,
+            ):
+                self.assertEqual(
+                    discover_commands(root, []),
+                    [
+                        ["npm", "test"],
+                        ["/usr/bin/python3", "-m", "pytest"],
+                        ["/usr/bin/python3", "-m", "pytest", "child/tests"],
+                    ],
+                )
+
+    def test_never_emits_a_bare_python_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._suite_tree(root)
+            for command in discover_commands(root, []):
+                self.assertNotEqual(command[0], "python")
+
+    def test_python_executable_resolves_to_an_existing_interpreter(self):
+        resolved = python_executable()
+        self.assertTrue(shutil.which(resolved) or Path(resolved).exists())
 
     def test_discovered_interpreter_is_an_existing_executable(self):
         with tempfile.TemporaryDirectory() as directory:

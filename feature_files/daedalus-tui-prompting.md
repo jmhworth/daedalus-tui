@@ -99,6 +99,27 @@ provider usage every minute.
   at the bottom, falls back to a Raw read-only text surface on render failure
   (logged once), reports links instead of opening them, and never executes
   code or fetches images. Its visibility is remembered in launch-root memory.
+- **Automatic line breaks**: `apply_hard_line_breaks` gives every single
+  newline inside a paragraph the CommonMark two-space hard break before the
+  text reaches the `Markdown` widget. Agents hard-wrap prose and write one line
+  per thought, which strict paragraph joining would collapse into a block that
+  looks nothing like the response. Fenced and indented code are left
+  byte-exact, an unterminated fence keeps its streamed content intact while a
+  response is still arriving, lines that already end in a hard break are not
+  doubled, and the Raw surface and `current_text()` still carry the response
+  unmodified. `[viewer] hard_line_breaks` turns it off.
+- **Action items header**: `extract_action_items` reads the selected source and
+  the viewer shows the result above the rendered output, in place of the muted
+  run-identity line that used to sit there; the identity now rides on the
+  header. Three signals are collected, strongest first: unchecked task-list
+  boxes, list items under a heading naming follow-up work (next steps,
+  follow-ups, todo, remaining work, recommendations), and `TODO:`/`NEXT:`/
+  `ACTION:` lines. Checked boxes are finished work and are skipped, code blocks
+  are ignored so a template checklist is not mistaken for real work, items are
+  deduplicated case-insensitively, and the list is capped by `[viewer]
+  action_item_limit`. Extraction is keyed on the source's identity and text so
+  a streaming response is not re-scanned per chunk. `[viewer]
+  action_items_by_default` hides the header entirely.
 - **Diagnostics**: `tui/debug_log.py` writes `errors/daedalus.log` (rotating,
   default 2 MB × 3) from app construction onward, keeps fault-handler output
   in `errors/faults.log`, logs lifecycle events with UTC timestamp, severity,
@@ -114,9 +135,30 @@ provider usage every minute.
   non-interactive `usage` subcommand (Claude Code 2.1 waits for a terminal,
   Codex 0.154 refuses without one), so the default readers use the same local
   data those CLIs show in `/usage` and `/status`: Codex rate-limit windows from
-  its newest session log and Claude Code's per-day token statistics cache. A
+  its session logs and Claude Code's per-day token statistics cache. A
   `command` per provider runs any program instead (stdin closed, timeout,
   process-group kill) and shows its JSON usage fields or first line.
+- **Codex rate-limit reading**: Codex writes rate limits only after a turn
+  completes, so its most recently touched session log is frequently a
+  just-started session holding none. The reader therefore scans back through
+  `[usage] session_scan_limit` logs newest-first until a payload with a real
+  percentage appears, reads only the last `session_tail_bytes` of each (the
+  logs grow without bound and the newest payload is always at the end,
+  tolerating a truncated leading line), skips a payload whose windows are all
+  empty so a blank trailing entry cannot mask the current numbers, accepts both
+  the `resets_in_seconds` duration Codex sends and the older `resets_at` epoch,
+  takes `plan_type` from beside the windows or from the enclosing payload,
+  falls back to `session`/`weekly` labels when a window omits
+  `window_minutes`, and reports the reading's age in the tooltip so a stale
+  number is visible as stale rather than presented as current.
+- **Usage progress bars**: Each reading carries its percentage windows as
+  `UsageWindow` values, and `format_usage_bar` draws one labelled bar per
+  window beneath its provider's summary line, `[usage] bar_width` cells wide.
+  The bars are plain block text so they render on a markup-free `Static` in the
+  fixed-width task sidebar; any non-zero usage keeps at least one filled cell
+  and only a real 100% fills the bar, so neither a small number nor a near-limit
+  one is rounded into a lie. Providers that publish counts rather than limits
+  (Claude Code's statistics cache) keep their summary line alone.
 - **Vim composer**: `tui/vim_text_area.py` extends the installed
   `VimTextArea` with a line-aware register, counted `dd`/`yy`/`cc`, Vim `w`
   motion and in-line `dw`/`cw`/`yw`, anchor-based visual and visual-line
@@ -133,18 +175,19 @@ provider usage every minute.
 - `tui/orchestrator.py`: Interrupted results, stop-aware integration gate, promotion boundary.
 - `tui/agent_runner.py`: `AgentControl.request_interrupt`.
 - `tui/prompts.py`: Bounded conversation context for follow-up turns.
-- `tui/output_viewer.py`: Rendered/Raw Markdown viewer and source selection.
+- `tui/output_viewer.py`: Rendered/Raw Markdown viewer, source selection, hard line breaks, action-item extraction.
 - `tui/debug_log.py`: Rotating runtime log, fault log, redaction, per-run diagnostics.
-- `tui/usage_monitor.py`: Provider usage readers for the usage bar.
+- `tui/usage_monitor.py`: Provider usage readers, rate-limit windows, and progress-bar rendering.
 - `tui/vim_text_area.py`: Completed Vim cut/copy/paste, registers, key routing.
 - `tui/app.py`, `tui/app.tcss`: Composer drafts, interruption, follow-ups, viewer layout, history toggle, usage bar.
 - `tui/memory.py`, `tui/token_usage.py`: Conversation snapshot fields, UI preferences, prompt/attempt accounting.
-- `parameter_files/daedalus-tui-prompting.toml`: Storage root, autosave delay, title length, viewer widths, context budget, error rotation.
-- `parameter_files/daedalus-tui.toml`: `[usage]` cadence and per-provider sources.
+- `parameter_files/daedalus-tui-prompting.toml`: Storage root, autosave delay, title length, viewer widths, line breaks, action-item header, context budget, error rotation.
+- `parameter_files/daedalus-tui.toml`: `[usage]` cadence, per-provider sources, session scan depth and tail size, bar width.
 - `tests/test_vim_text_area.py`, `tests/test_prompt_store.py`, `tests/test_debug_log.py`, `tests/test_output_viewer.py`, `tests/test_usage_monitor.py`, plus extended `tests/test_app.py`, `tests/test_task_coordinator.py`, `tests/test_orchestrator.py`, `tests/test_agent_runner.py`, `tests/test_prompts.py`, `tests/test_token_usage.py`, `tests/test_memory.py`, `tests/test_config.py`.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-16: Gave the Markdown viewer automatic line breaks and replaced its muted run-identity line with an action-items header extracted from the response; fixed the Codex usage reader, which reported "no usage data yet" whenever the newest session log was a just-started session and never read Codex's `resets_in_seconds` reset times, and added per-window progress bars to the usage panel.
 - 2026-09-15: Added conversation turns and runs, verbatim prompt archives and autosaved drafts under `prompts/`, non-destructive `Ctrl+C`/Cancel that restores the interrupted prompt, follow-up prompts within one named task, stable generated titles with an All tasks history filter, the optional right-third Markdown viewer, consolidated diagnostics under `errors/`, completed Vim cut/copy/paste with system-register commands, and a bottom-left usage bar that refreshes Codex and Claude usage every minute.
