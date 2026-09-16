@@ -14,6 +14,7 @@ from vimkeys_input import VimMode
 
 from tui.app import (
     CodingStatisticsScreen,
+    CommandMenuScreen,
     CreateTopicScreen,
     DaedalusTuiApp,
     KeyboardShortcutsScreen,
@@ -183,7 +184,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.query_one("#mode-select", Select).value, "coding")
             self.assertEqual(app.query_one("#target-branch-select", Select).value, "main")
             self.assertEqual(app.query_one("#topic-select", Select).value, TOPIC_NONE_VALUE)
-            self.assertIsInstance(app.query_one("#push-branch-button", Button), Button)
             self.assertIn("/workspace/project", str(app.query_one("#directory", Static).render()))
             self.assertIsInstance(app.query_one("#task-list", DataTable), DataTable)
             task_list = app.query_one("#task-list", DataTable)
@@ -206,7 +206,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.query_one("#start-coding-button", Button), Button)
             self.assertEqual(app.query("#new-task-button, #new-project-button").nodes, [])
             self.assertEqual(
-                app.query("#create-topic-button, #register-supabase-schema-button").nodes,
+                app.query(
+                    "#create-topic-button, #register-supabase-schema-button, "
+                    "#command-push-branch-button"
+                ).nodes,
                 [],
             )
             self.assertEqual(
@@ -218,7 +221,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.query_one("#output-toggle-button", Button), Button)
             await pilot.pause()
 
-    async def test_register_supabase_schema_shortcut_opens_confirmation(self):
+    async def test_command_menu_register_supabase_opens_confirmation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             project = root / "demo-app"
@@ -240,7 +243,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 coordinator=FakeCoordinator(),
             )
             async with app.run_test() as pilot:
-                await pilot.press("ctrl+shift+s")
+                await pilot.press("ctrl+k")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, CommandMenuScreen)
+                app.screen.query_one("#command-register-supabase-button", Button).press()
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
                 self.assertFalse((project / "supabase" / "config.toml").exists())
@@ -340,7 +346,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             )
             app._supabase_bootstrap_started = True
             async with app.run_test() as pilot:
-                await pilot.press("ctrl+shift+s")
+                await pilot.press("ctrl+k")
+                await pilot.pause()
+                app.screen.query_one("#command-register-supabase-button", Button).press()
                 await pilot.pause()
 
                 self.assertIsInstance(app.screen, PersonalSupabaseActivationProgressScreen)
@@ -532,7 +540,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
     async def test_push_button_disabled_without_origin(self, _remote_exists):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            self.assertTrue(app.query_one("#push-branch-button", Button).disabled)
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            self.assertTrue(app.screen.query_one("#command-push-branch-button", Button).disabled)
             await pilot.pause()
 
     @patch("tui.app.push_branch")
@@ -540,7 +550,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
     async def test_push_button_pushes_selected_operating_branch(self, _remote_exists, push_branch):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            push_button = app.query_one("#push-branch-button", Button)
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            push_button = app.screen.query_one("#command-push-branch-button", Button)
             self.assertFalse(push_button.disabled)
 
             workers = []
@@ -559,7 +571,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(workers[0][1].get("thread"))
             push_branch.assert_called_once_with(app._active_project_path, "main")
             self.assertEqual(str(app.query_one("#status", Static).render()), "Pushed main to origin")
-            self.assertFalse(app.query_one("#push-branch-button", Button).disabled)
+            self.assertFalse(app._push_in_flight)
             await pilot.pause()
 
     @patch("tui.app.remote_exists", return_value=True)
@@ -568,13 +580,16 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
         app, _ = self.make_app()
         async with app.run_test() as pilot:
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+
             def run_inline(work, **kwargs):
                 work()
 
             with patch("tui.app.push_branch", side_effect=GitWorktreeError("auth failed")), patch.object(
                 app, "run_worker", side_effect=run_inline
             ), patch.object(app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)):
-                app.query_one("#push-branch-button", Button).press()
+                app.screen.query_one("#command-push-branch-button", Button).press()
                 await pilot.pause()
 
             self.assertEqual(str(app.query_one("#status", Static).render()), "Push failed")
@@ -1123,12 +1138,28 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 [{"last_opened_project": str(first.resolve())}],
             )
 
-    async def test_ctrl_k_opens_shortcuts_menu_with_global_and_vim_keys(self):
+    async def test_ctrl_k_opens_command_menu_with_low_frequency_actions(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
             await pilot.press("ctrl+k")
             await pilot.pause()
 
+            self.assertIsInstance(app.screen, CommandMenuScreen)
+            for button_id in (
+                "#command-new-task-button",
+                "#command-create-topic-button",
+                "#command-register-supabase-button",
+                "#command-push-branch-button",
+                "#command-show-shortcuts-button",
+            ):
+                self.assertIsInstance(app.screen.query_one(button_id, Button), Button)
+            binding_keys = [binding[0] for binding in app.BINDINGS]
+            self.assertNotIn("ctrl+t", binding_keys)
+            self.assertNotIn("ctrl+shift+t", binding_keys)
+            self.assertNotIn("ctrl+shift+s", binding_keys)
+
+            app.screen.query_one("#command-show-shortcuts-button", Button).press()
+            await pilot.pause()
             self.assertIsInstance(app.screen, KeyboardShortcutsScreen)
             shortcut_text = "\n".join(
                 str(widget.render()) for widget in app.screen.query(".shortcut-row")
@@ -1137,11 +1168,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Ctrl+Enter", shortcut_text)
             self.assertIn("Ctrl+K", shortcut_text)
             self.assertIn("Ctrl+P", shortcut_text)
-            self.assertIn("Ctrl+T", shortcut_text)
             self.assertIn("Ctrl+U", shortcut_text)
             self.assertIn("Ctrl+Shift+N", shortcut_text)
-            self.assertIn("Ctrl+Shift+T", shortcut_text)
-            self.assertIn("Ctrl+Shift+S", shortcut_text)
             self.assertIn("gg / G", shortcut_text)
 
             await pilot.press("escape")
@@ -1156,10 +1184,12 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertIsInstance(app.screen, ProjectInitializerScreen)
 
-    async def test_ctrl_shift_t_opens_create_topic_modal(self):
+    async def test_command_menu_opens_create_topic_modal(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            await pilot.press("ctrl+shift+t")
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            app.screen.query_one("#command-create-topic-button", Button).press()
             await pilot.pause()
 
             self.assertIsInstance(app.screen, CreateTopicScreen)
@@ -1385,7 +1415,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_submit_prompt()
             await pilot.pause()
 
-            await pilot.press("ctrl+t")
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            app.screen.query_one("#command-new-task-button", Button).press()
             await pilot.pause()
 
             self.assertEqual(prompt.text, "")

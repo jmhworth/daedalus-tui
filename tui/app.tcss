@@ -94,10 +94,6 @@ Screen {
     margin-right: 1;
 }
 
-#push-branch-button {
-    width: 10;
-}
-
 #directory, #phase, #title, #task-context, #status,
 #resume-notes-label {
     color: $text-muted;
@@ -433,6 +429,10 @@ CreateTopicScreen {
     align: center middle;
 }
 
+CommandMenuScreen {
+    align: center middle;
+}
+
 TopicViewerScreen {
     align: center middle;
 }
@@ -755,6 +755,31 @@ TopicViewerScreen {
     border: round $primary;
     background: $surface;
     padding: 1 2;
+}
+
+#command-menu-dialog {
+    width: 48;
+    height: auto;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#command-menu-title {
+    color: $text-accent;
+    text-style: bold;
+    height: 2;
+}
+
+#command-menu-subtitle {
+    color: $text-muted;
+    height: 2;
+    margin-bottom: 1;
+}
+
+#command-menu-dialog Button {
+    width: 1fr;
+    margin-bottom: 1;
 }
 
 #shortcuts-title {

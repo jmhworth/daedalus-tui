@@ -13,6 +13,7 @@ PARAMETER_DIRECTORY = "parameter_files"
 TUI_PARAMETER_FILE = "daedalus-tui.toml"
 ORCHESTRATION_PARAMETER_FILE = "daedalus-tui-orchestration.toml"
 CODING_STATISTICS_PARAMETER_FILE = "daedalus-tui-coding-statistics.toml"
+COMMAND_MENU_PARAMETER_FILE = "daedalus-tui-command-menu.toml"
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,17 @@ class CodingStatisticsSettings:
     recent_window_hours: int = 1
     forecast_days: int = 7
     thirty_day_forecast_days: int = 30
+
+
+@dataclass(frozen=True)
+class CommandMenuSettings:
+    title: str = "Command Menu"
+    subtitle: str = "Choose an action, or press Esc / Ctrl+K to close"
+    new_task_label: str = "New Task"
+    create_topic_label: str = "Create Topic"
+    personal_supabase_label: str = "Activate personal Supabase"
+    push_branch_label: str = "Push to GitHub"
+    keyboard_shortcuts_label: str = "Keyboard Shortcuts"
 
 
 def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
@@ -189,6 +201,28 @@ def load_coding_statistics_settings(parameter_path: Path | None = None) -> Codin
             f"{path} recent_window_hours, forecast_days, and thirty_day_forecast_days must be positive."
         )
     return CodingStatisticsSettings(recent_window_hours, forecast_days, thirty_day_forecast_days)
+
+
+def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMenuSettings:
+    path = parameter_path or (
+        Path(__file__).resolve().parents[1] / PARAMETER_DIRECTORY / COMMAND_MENU_PARAMETER_FILE
+    )
+    with path.open("rb") as source:
+        values = tomllib.load(source)
+    labels = values.get("labels", {})
+    return CommandMenuSettings(
+        title=str(values.get("title", "Command Menu")),
+        subtitle=str(
+            values.get("subtitle", "Choose an action, or press Esc / Ctrl+K to close")
+        ),
+        new_task_label=str(labels.get("new_task", "New Task")),
+        create_topic_label=str(labels.get("create_topic", "Create Topic")),
+        personal_supabase_label=str(
+            labels.get("personal_supabase", "Activate personal Supabase")
+        ),
+        push_branch_label=str(labels.get("push_branch", "Push to GitHub")),
+        keyboard_shortcuts_label=str(labels.get("keyboard_shortcuts", "Keyboard Shortcuts")),
+    )
 
 
 def _options(items, kind: str) -> list[ModelOption]:

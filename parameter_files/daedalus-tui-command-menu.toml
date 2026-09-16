@@ -1,0 +1,10 @@
+# Tunable presentation text for the low-frequency Command Menu.
+title = "Command Menu"
+subtitle = "Choose an action, or press Esc / Ctrl+K to close"
+
+[labels]
+new_task = "New Task"
+create_topic = "Create Topic"
+personal_supabase = "Activate personal Supabase"
+push_branch = "Push to GitHub"
+keyboard_shortcuts = "Keyboard Shortcuts"

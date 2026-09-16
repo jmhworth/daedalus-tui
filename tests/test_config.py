@@ -2,7 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tui.config import LayoutSettings, load_coding_statistics_settings, load_orchestration_settings, load_tui_settings
+from tui.config import (
+    LayoutSettings,
+    load_coding_statistics_settings,
+    load_command_menu_settings,
+    load_orchestration_settings,
+    load_tui_settings,
+)
 
 
 class ConfigTests(unittest.TestCase):
@@ -51,6 +57,18 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(statistics.recent_window_hours, 1)
         self.assertEqual(statistics.forecast_days, 7)
         self.assertEqual(statistics.thirty_day_forecast_days, 30)
+
+    def test_loads_command_menu_settings(self):
+        root = Path(__file__).resolve().parents[1]
+        command_menu = load_command_menu_settings(
+            root / "parameter_files" / "daedalus-tui-command-menu.toml"
+        )
+
+        self.assertEqual(command_menu.title, "Command Menu")
+        self.assertEqual(command_menu.new_task_label, "New Task")
+        self.assertEqual(command_menu.create_topic_label, "Create Topic")
+        self.assertEqual(command_menu.personal_supabase_label, "Activate personal Supabase")
+        self.assertEqual(command_menu.push_branch_label, "Push to GitHub")
 
     def test_rejects_non_positive_layout_settings(self):
         with tempfile.TemporaryDirectory() as directory:

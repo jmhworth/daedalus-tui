@@ -64,7 +64,7 @@ Registered projects store only their schema marker; Daedalus synchronizes each
 ignored project `.env` from the launch-root file at startup. When
 `supabase_db_push_enabled` is enabled, startup pushes migrations only for
 projects that have been Activated (ecosystem-ready); scaffolded projects wait
-for explicit Activate via `Ctrl+Shift+S`. Process environment variables remain
+for explicit Activate via the Command Menu (`Ctrl+K`). Process environment variables remain
 runtime overrides and are never written to disk. Copy the root `.env.example`
 to `.env`; do not put Supabase credentials in tracked feature, parameter, or
 `.env.example` files.
@@ -75,9 +75,9 @@ alias), runs Codex or Cursor there, verifies the result, resolves integration
 failures with the selected agent, and fast-forwards that target branch after
 successful checks. The operator does not need the target branch checked out.
 Up to four prompts can run concurrently; integration and promotion remain
-serialized. Automated orchestration never pushes remotes; use the settings-bar
-Push control when you want to publish the selected operating branch to
-`origin`. Failed worktrees are preserved
+serialized. Automated orchestration never pushes remotes; use the Command Menu
+(`Ctrl+K`) when you want to publish the selected operating branch to `origin`.
+Failed worktrees are preserved
 for inspection. After a successful promotion, the orchestrator refreshes and
 commits `graphify-out` onto the target branch when the target repository has
 graphify configured; graph refresh failures are reported as warnings and never

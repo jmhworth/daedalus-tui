@@ -131,7 +131,7 @@ class DaedalusVimTextArea(VimTextArea):
         if event.key == "ctrl+k":
             # VimTextArea handles several Ctrl keys itself, so route the
             # application's shortcut before its mode-specific processing.
-            self.app.action_show_shortcuts()
+            self.app.action_show_command_menu()
             event.stop()
             return
         if event.key == "tab" and len(self.app.screen_stack) == 1:

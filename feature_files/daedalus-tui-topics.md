@@ -12,7 +12,7 @@ markdown.
   Select defaults to `(None)` and remembers the selected topic per project in
   launch-root memory; New Task and project switches restore that project-local
   default. Selecting `(None)` clears the project default.
-- **Create Topic flow**: The `Ctrl+Shift+T` shortcut opens a modal for a topic
+- **Create Topic flow**: The Command Menu (`Ctrl+K`) opens a modal for a topic
   name and the desired end state. It queues a coding task with the initialized
   template and asks the agent to expand the durable context in
   `topic_files/{slug}.md`.
@@ -40,7 +40,7 @@ markdown.
 - `tui/orchestrator.py`: Loads tagged topics from the task worktree before prompts.
 - `tui/task_coordinator.py`: Optional `topic` on `TaskRecord` / submit and inheritance.
 - `tui/memory.py`: Optional `topic` on persisted task snapshots.
-- `tui/app.py`: Create Topic modal, task handoff, and Topic Select beside Mode / Branch.
+- `tui/app.py`: Command Menu, Create Topic modal, task handoff, and Topic Select beside Mode / Branch.
 - `parameter_files/daedalus-tui-topics.toml`: Topic creation length limits and paired settings.
 - `tests/test_topics.py`, `tests/test_prompts.py`, `tests/test_app.py`,
   `tests/test_memory.py`, `tests/test_task_coordinator.py`: Coverage for
@@ -65,3 +65,4 @@ HACKING
 - 2026-09-15: Kept Create Topic on the Textual-native `F3` binding while the
   non-portable CapsLock chord family was removed.
 - 2026-09-16: Rebound Create Topic from F3 to the Control-based Ctrl+Shift+T shortcut.
+- 2026-09-16: Moved Create Topic into the Ctrl+K Command Menu and removed its standalone keyboard shortcut.

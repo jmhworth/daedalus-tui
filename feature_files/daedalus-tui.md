@@ -9,8 +9,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
   light, medium, high, extra-high, and max reasoning; Cursor CLI is a
   provider-only choice with model and reasoning disabled. The settings bar also
   exposes a per-project
-  Branch Select for the operating branch used by new task worktrees, with an
-  operator Push control that publishes that branch to `origin`.
+  Branch Select for the operating branch used by new task worktrees.
 - **Responsive layouts**: Terminal resize events switch narrow screens to a
   vertical workspace with a compact full-width task inbox and stacked project
   selector. The wide task and settings bars are measured after layout, so the
@@ -23,7 +22,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Optional Topics**: A Topic Select lists `(None)` plus `topic_files/*.md`
   stems so related tasks can share goal/status/state-log memory without
   requiring a topic on every submission.
-- **Local execution**: Prompts run in isolated Git worktrees without daemon RPC or a local database; orchestration may push pending Supabase migrations for target projects when migration files change, while agents still do not own DB push or Git remotes. An explicit operator Push button may publish the selected operating branch.
+- **Local execution**: Prompts run in isolated Git worktrees without daemon RPC or a local database; orchestration may push pending Supabase migrations for target projects when migration files change, while agents still do not own DB push or Git remotes. An explicit Command Menu action may publish the selected operating branch.
 - **Concurrent task inbox**: Up to four independent prompts can run at once, each with its own configuration snapshot, branch, worktree, status, and transcript; the left-side inbox promotes tasks with unseen updates.
 - **Plan-first task route**: Plan tasks remain selectable through `planning` and `questioning` states, support follow-up planning passes, and can promote their preserved context into the normal coding, verification, and integration route.
 - **Plan custom answers**: Plan review renders a software-owned custom-answer choice alongside the agent's reasonable options and collects free text only when that choice is selected; the agent protocol remains unchanged.
@@ -42,14 +41,14 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
-- **Keyboard-first actions**: Low-frequency actions stay out of the project toolbar and are available through `Ctrl+Shift+N` (new project), `Ctrl+Shift+T` (create topic), `Ctrl+Shift+S` (activate personal Supabase), and `Ctrl+T` (new task); `Ctrl+U` opens coding statistics, while `Ctrl+K` opens the shortcut reference and is the only global binding shown in the bottom footer.
+- **Command Menu**: `Ctrl+K` opens a discoverable action menu for New Task, Create Topic, Activate personal Supabase, and Push to GitHub. The menu also links to the full keyboard-shortcut reference; New Project remains available through `Ctrl+Shift+N`, while coding statistics remains on `Ctrl+U`.
 - **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a three-column settings grid above the output and composer, giving the transcript and prompt larger starting heights while retaining independent scrolling inside each widget.
 
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
 - `tui/app.tcss`: Shared full-height output-panel layout and readable transcript/diagnostic styling.
 - `tui/config.py`: Read-only provider and responsive-layout configuration models and loaders.
-- `tui/git_worktree.py`: Local Git helpers including operating-branch push for the operator Push control.
+- `tui/git_worktree.py`: Local Git helpers including operating-branch push for the Command Menu action.
 - `tui/prompts.py`: Task, repair, and resolver prompt wrappers, including plan-mode recommended-option instructions.
 - `tui/topics.py`: Optional topic discovery, load, and prompt embedding.
 - `tui/plan.py`: Agent plan parsing plus UI-owned custom-answer encoding, clarification prompts, and prompt formatting.
@@ -90,8 +89,8 @@ HACKING
 - 2026-09-05: Routed `Tab` from the focused prompt editor to the main-screen mode action so Vim input handling cannot consume the Coding/Plan toggle.
 - 2026-09-05: Added a main-screen `Tab` shortcut that toggles the prompt mode between Coding and Plan and documents the shortcut in the keyboard help.
 - 2026-08-25: Clarified that orchestration may push pending Supabase migrations for target projects while agents remain file-only for DB push and Git remotes.
-- 2026-08-25: Guarded Push button refresh so Select.Changed during mount or teardown cannot query a missing #push-branch-button.
-- 2026-08-25: Added a settings-bar Push control that publishes the Branch Select operating branch to origin without changing agent or orchestration auto-push boundaries.
+- 2026-08-25: Guarded Push button refresh so Select.Changed during mount or teardown cannot query a missing command-menu Push button.
+- 2026-08-25: Added an operator Push control that publishes the Branch Select operating branch to origin without changing agent or orchestration auto-push boundaries.
 - 2026-08-24: Preserved a final complete word at the reserved transcript edge buffer while retaining hyphenation for overlong words.
 - 2026-08-24: Tightened transcript wrapping to the content region, hyphenated only overlong words, and set the output surface to a narrower border-box with horizontal overflow disabled.
 - 2026-08-24: Repaired transcript boundary fitting and reserved a one-cell right-edge buffer so resized output reflows without clipping the final glyph.
@@ -174,3 +173,4 @@ HACKING
 - 2026-09-15: Rebound personal-Supabase activation from CapsLock+4 to Option+4 because the Caps Lock number-row chord is not usable in the target terminal setup.
 - 2026-09-15: Replaced the non-portable CapsLock/Option project-action chords with Textual-native F2/F3/F4 bindings.
 - 2026-09-16: Replaced F2/F3/F4 with Control-based Ctrl+Shift+N/T/S chords for terminal keyboards without a usable function-key layer.
+- 2026-09-16: Replaced the low-frequency topic, personal-Supabase, New Task, and GitHub Push controls with a discoverable Command Menu opened by Ctrl+K; the keyboard-shortcut reference remains available from that menu.

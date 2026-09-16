@@ -34,7 +34,9 @@ from .agent_runner import AgentRunner
 from .clipboard import copy_to_system_clipboard, paste_from_system_clipboard
 from .config import (
     CodingStatisticsSettings,
+    CommandMenuSettings,
     TuiSettings,
+    load_command_menu_settings,
     load_coding_statistics_settings,
     load_orchestration_settings,
     load_tui_settings,
@@ -142,14 +144,11 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+P", "Pause task", "pause_task"),
     ("Ctrl+R", "Resume task", "resume_task"),
     ("Ctrl+X", "Cancel task", "cancel_task"),
-    # Use Control-based chords for low-frequency actions so they work without
-    # relying on a terminal's function-key layer.
+    # New Project remains a direct shortcut; the other low-frequency actions
+    # are discoverable from the Command Menu opened with Ctrl+K.
     ("Ctrl+Shift+N", "New project", "show_new_project"),
-    ("Ctrl+Shift+T", "Create topic", "show_create_topic"),
-    ("Ctrl+Shift+S", "Activate personal Supabase", "register_personal_supabase"),
-    ("Ctrl+T", "New task", "new_task"),
     ("Ctrl+Q", "Quit", "quit"),
-    ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
+    ("Ctrl+K", "Open command menu", "show_command_menu"),
     ("Ctrl+U", "Show coding statistics", "show_statistics"),
 )
 
@@ -362,6 +361,64 @@ class KeyboardShortcutsScreen(ModalScreen[None]):
                     yield Static(f"{shortcut:<18}{description}", classes="shortcut-row")
 
     def action_close_shortcuts(self) -> None:
+        self.dismiss(None)
+
+
+class CommandMenuScreen(ModalScreen[str | None]):
+    """Offer low-frequency actions as discoverable buttons."""
+
+    BINDINGS = [
+        ("escape", "close_command_menu", "Close"),
+        ("ctrl+k", "close_command_menu", "Close"),
+    ]
+
+    def __init__(self, settings: CommandMenuSettings | None = None) -> None:
+        super().__init__()
+        self.settings = settings or load_command_menu_settings()
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="command-menu-dialog"):
+            yield Static(self.settings.title, id="command-menu-title")
+            yield Static(
+                self.settings.subtitle,
+                id="command-menu-subtitle",
+            )
+            yield Button(
+                self.settings.new_task_label,
+                id="command-new-task-button",
+                variant="primary",
+            )
+            yield Button(self.settings.create_topic_label, id="command-create-topic-button")
+            yield Button(
+                self.settings.personal_supabase_label,
+                id="command-register-supabase-button",
+            )
+            yield Button(
+                self.settings.push_branch_label,
+                id="command-push-branch-button",
+            )
+            yield Button(
+                self.settings.keyboard_shortcuts_label,
+                id="command-show-shortcuts-button",
+            )
+
+    def on_mount(self) -> None:
+        self.app._refresh_push_button()
+        self.query_one("#command-new-task-button", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        actions = {
+            "command-new-task-button": "new_task",
+            "command-create-topic-button": "show_create_topic",
+            "command-register-supabase-button": "register_personal_supabase",
+            "command-push-branch-button": "push_branch",
+            "command-show-shortcuts-button": "show_shortcuts",
+        }
+        action = actions.get(event.button.id)
+        if action is not None:
+            self.dismiss(action)
+
+    def action_close_command_menu(self) -> None:
         self.dismiss(None)
 
 
@@ -1001,6 +1058,7 @@ class DaedalusTuiApp(App[None]):
         self.launch_root = (directory or Path.cwd()).resolve()
         self.memory = TaskMemoryStore(self.launch_root / DEFAULT_MEMORY_FILE)
         self.settings = settings or load_tui_settings()
+        self.command_menu_settings = load_command_menu_settings()
         self.statistics_settings = statistics_settings or load_coding_statistics_settings()
         self.orchestration_settings = load_orchestration_settings()
         self.debug_log_path = self.launch_root / self.orchestration_settings.debug_log_filename
@@ -1122,7 +1180,6 @@ class DaedalusTuiApp(App[None]):
                             value=self.orchestration_settings.primary_branch,
                             id="target-branch-select",
                         )
-                        yield Button("Push", id="push-branch-button")
                     with Vertical(id="compact-settings"):
                         yield CompactSettingsSelect(
                             _literal_select_options(list(COMPACT_SETTING_CATEGORIES)),
@@ -1573,6 +1630,27 @@ class DaedalusTuiApp(App[None]):
     def action_show_shortcuts(self) -> None:
         self.push_screen(KeyboardShortcutsScreen())
 
+    def action_show_command_menu(self) -> None:
+        if len(self.screen_stack) != 1:
+            return
+        self.push_screen(
+            CommandMenuScreen(self.command_menu_settings),
+            self._on_command_menu_action,
+        )
+
+    def _on_command_menu_action(self, action: str | None) -> None:
+        """Run a command after the command menu has been removed."""
+        handlers = {
+            "new_task": self.action_new_task,
+            "show_create_topic": self.action_show_create_topic,
+            "register_personal_supabase": self.action_register_personal_supabase,
+            "push_branch": self._push_selected_branch,
+            "show_shortcuts": self.action_show_shortcuts,
+        }
+        handler = handlers.get(action)
+        if handler is not None:
+            self.call_after_refresh(handler)
+
     def action_show_statistics(self) -> None:
         self.push_screen(CodingStatisticsScreen(self._usage_entries(), self.statistics_settings))
 
@@ -1717,7 +1795,7 @@ class DaedalusTuiApp(App[None]):
             reason = result.blocked_reason or "blocked"
             self._set_error(detail)
             self._set_status(
-                f"Activate blocked ({reason}) for schema {result.schema!r}; retry with Ctrl+Shift+S"
+                f"Activate blocked ({reason}) for schema {result.schema!r}; retry in the Command Menu (Ctrl+K)"
             )
             self.call_after_refresh(
                 self._finish_personal_supabase_progress,
@@ -1764,8 +1842,6 @@ class DaedalusTuiApp(App[None]):
             self._submit_prompt()
         elif event.button.id == "view-topic-button":
             self.action_view_topic()
-        elif event.button.id == "push-branch-button":
-            self._push_selected_branch()
         elif event.button.id == "continue-plan-button":
             self._continue_plan()
         elif event.button.id == "start-coding-button":
@@ -2353,10 +2429,10 @@ class DaedalusTuiApp(App[None]):
     def _refresh_push_button(self) -> None:
         """Enable Push only when an origin remote and operating branch are available."""
         # Select.Changed can fire while siblings are still mounting or during
-        # teardown, before/after #push-branch-button is in the DOM.
-        if not self.query("#push-branch-button"):
+        # teardown, before/after the command-menu Push button is in the DOM.
+        if not self.query("#command-push-branch-button"):
             return
-        button = self.query_one("#push-branch-button", Button)
+        button = self.query_one("#command-push-branch-button", Button)
         if self._push_in_flight:
             button.disabled = True
             return

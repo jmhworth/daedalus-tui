@@ -17,15 +17,15 @@ ecosystem-ready.
   `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
   claim ecosystem readiness.
-- **Phase 2 — Activate**: Operator `Ctrl+Shift+S` after name confirmation runs
+- **Phase 2 — Activate**: The Command Menu (`Ctrl+K`) opens the action. After name confirmation, it runs
   scaffold (when unregistered) then Activate when gates pass: require HEAD already
   on the selected operating/target branch (no checkout/switch), refuse unrelated
   dirty files, software-owned local commit of known scaffold paths + marker, launch-root
   env sync, access-method-aware live preflight, then `db push`. Remote Git publish
-  remains the optional operator Push button.
+  remains the optional operator Push action in the Command Menu.
 - **Existing projects only**: Personal Supabase is post-init for projects already
   in the Daedalus format. New Project has no personal-Supabase opt-in.
-- **Retry**: Scaffolded or Activate-blocked projects reuse `Ctrl+Shift+S` with the
+- **Retry**: Scaffolded or Activate-blocked projects reuse the Command Menu (`Ctrl+K`) with the
   same name confirmation; skip re-scaffold when registered, validate completeness,
   and re-run Phase 2. Incomplete scaffolds fail closed.
 - **Status model**: Distinguish unregistered, scaffolded (`registered`, not
@@ -51,7 +51,7 @@ ecosystem-ready.
   preflight, Activate orchestration, canonical environment bootstrap, and temporary
   CLI configuration.
 - `tui/environment.py`: Comment-preserving atomic `.env` synchronization and runtime loading.
-- `tui/app.py`: Confirmation modal, activation progress modal, and `Ctrl+Shift+S` scaffold+Activate / retry worker.
+- `tui/app.py`: Command Menu, confirmation modal, activation progress modal, and scaffold+Activate / retry worker.
 - `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation copy,
   activate commit message, and preflight timeout.
@@ -72,3 +72,4 @@ HACKING
 - 2026-09-15: Rebound personal-Supabase activation and retry from CapsLock+4 to Option+4 for terminal compatibility.
 - 2026-09-15: Replaced the non-portable CapsLock/Option activation chord with the Textual-native `F4` binding.
 - 2026-09-16: Rebound personal-Supabase activation and retry from F4 to the Control-based Ctrl+Shift+S shortcut.
+- 2026-09-16: Moved personal-Supabase activation into the Ctrl+K Command Menu and removed its standalone keyboard shortcut.
