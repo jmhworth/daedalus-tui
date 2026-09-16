@@ -20,6 +20,7 @@ from .firebase import (
 from .graphify import update_repository
 from .git_worktree import (
     DAEDALUS_RUNTIME_ARTIFACTS,
+    DIRTY_PRIMARY_COMMIT_MESSAGE,
     GitWorktreeError,
     GitWorktreeManager,
     WorktreeContext,
@@ -64,6 +65,12 @@ class OrchestrationSettings:
     firebase_executable: str = "firebase"
     shutdown_grace_seconds: float = 8.0
     debug_log_filename: str = ".daedalus-debug.log"
+    # A dirty operating branch is committed (and published) instead of failing
+    # the task before its agent ever runs.
+    dirty_primary_autocommit_enabled: bool = True
+    dirty_primary_commit_message: str = DIRTY_PRIMARY_COMMIT_MESSAGE
+    dirty_primary_push_enabled: bool = True
+    git_remote: str = "origin"
 
 
 @dataclass(frozen=True)
@@ -139,6 +146,11 @@ class LocalOrchestrator:
                 *DAEDALUS_RUNTIME_ARTIFACTS,
                 self.settings.debug_log_filename,
             ),
+            autocommit_primary=self.settings.dirty_primary_autocommit_enabled,
+            autocommit_message=self.settings.dirty_primary_commit_message,
+            autocommit_push=self.settings.dirty_primary_push_enabled,
+            remote=self.settings.git_remote,
+            on_notice=lambda message, kind="status": self.emit("worktree", message, kind),
         )
         try:
             project_worktree_settings = load_project_worktree_settings(self.repository)

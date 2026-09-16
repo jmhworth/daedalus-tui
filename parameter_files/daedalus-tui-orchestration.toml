@@ -11,6 +11,17 @@ max_concurrent_tasks = 4
 agent_timeout_seconds = 450
 shutdown_grace_seconds = 8
 debug_log_filename = ".daedalus-debug.log"
+# A dirty operating branch no longer blocks a task. Orchestration stages the
+# pending changes (Daedalus' own runtime files stay untracked), commits them
+# with the message below, and publishes the branch to git_remote before the
+# task worktree is created. A failed or missing push is reported and the task
+# still starts. Set the autocommit flag to false to restore the old
+# "primary worktree must be clean" error instead.
+dirty_primary_autocommit_enabled = true
+dirty_primary_commit_message = "Daedalus: commit pending changes before starting a task"
+dirty_primary_push_enabled = true
+git_remote = "origin"
+
 graphify_update_enabled = true
 graphify_executable = "graphify"
 supabase_db_push_enabled = true

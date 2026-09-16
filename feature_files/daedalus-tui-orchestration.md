@@ -21,6 +21,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
   launch-root memory. New task worktrees are based on that effective local
   branch and successful tasks promote into it; the operator does not need it
   checked out.
+- **Dirty operating branch auto-commit**: When the target branch is checked out with uncommitted work, validation stages those paths (Daedalus' own runtime files stay untracked), commits them with the parameterized message, and pushes the branch to the configured remote before the task worktree is created, so a dirty checkout starts the task instead of failing it. A missing remote or a failed push is reported as a warning and never blocks the run; `dirty_primary_autocommit_enabled = false` restores the original clean-worktree error.
 - **Safe promotion**: The target branch tip must remain unchanged during integration; when it is checked out the working tree must stay clean for merge-based promotion, otherwise promotion fast-forwards the target ref in place; failed worktrees remain available for inspection.
 - **Concurrent integration**: Up to four task agents and their verification runs execute concurrently, then ready tasks pass through a first-ready serialized integration gate before promotion.
 - **Connectivity recovery**: Agent subprocesses have a bounded timeout, report actionable offline/service diagnostics, and failed requests can be retried without losing their task context.
@@ -28,7 +29,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Profile prompt boundary**: The orchestrator reloads the selected repository profile from the active task worktree and embeds it inline before each task, repair, follow-up planning, or resolver prompt; agents apply supplied profile content directly without reopening the file, while the mode and orchestration constraints that follow remain authoritative.
 - **Topic prompt boundary**: When a task carries a topic slug, the orchestrator reloads that topic markdown from the task worktree and embeds it with mode-specific instructions before task, repair, and resolver prompts; missing topics emit a non-fatal diagnostic and omit the embed.
 - **Graph refresh boundary**: Graphify runs only after successful primary promotion, and a failed refresh is cleaned up and reported without starting a resolver.
-- **Local-only boundary**: No persistence or daemon communications. Orchestration may push pending Supabase migrations for target projects via the Supabase CLI; agents still do not own DB push. Automated orchestration never pushes Git remotes; an explicit operator Push in the TUI may publish the selected operating branch.
+- **Local-only boundary**: No persistence or daemon communications. Orchestration may push pending Supabase migrations for target projects via the Supabase CLI; agents still do not own DB push. The only Git remote push orchestration performs is publishing the operating branch after auto-committing a dirty primary worktree; otherwise an explicit operator Push in the TUI publishes the selected operating branch.
 - **Project discovery boundary**: The TUI discovers only immediate launch-root child directories; nested paths are excluded, with the launch root used only when no eligible child exists. Daedalus-formatted children (those with `feature_files`) always qualify, and the `[projects]` parameter table decides whether plain Git checkouts and other directories are listed alongside them.
 - **Project-scoped execution**: The TUI creates one coordinator per discovered `feature_files` project, so task numbering, worktrees, branches, and integration gates stay scoped to the selected repository.
 - **Shutdown diagnostics**: A rotating project-local debug log records agent process IDs, task transitions, Textual exceptions, worker shutdown, and on-demand all-thread stack dumps.
@@ -37,18 +38,19 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - `tui/orchestrator.py`: Single-task lifecycle, verification repair, migration push repair, Firebase deploy repair, integration, and resolver loops.
 - `tui/firebase.py`: Firebase change detection and the non-interactive deploy wrapper.
 - `tui/task_coordinator.py`: Concurrent task records, executor limit, and serialized integration gate.
-- `tui/git_worktree.py`: Git validation, worktree, branch listing, operator push helper, merge, and cleanup operations.
+- `tui/git_worktree.py`: Git validation, dirty-primary auto-commit and push, worktree, branch listing, operator push helper, merge, and cleanup operations.
 - `tui/project_config.py`: Target-project `.daedalus` worktree provisioning settings.
 - `tui/memory.py`: Atomic task snapshots, worktree identity, restart metadata, and per-project target branches.
 - `tui/topics.py`: Topic discovery and embed helpers used at prompt-build time.
 - `tui/verification.py`: Configured and convention-based verification execution.
 - `tui/supabase_migrations.py`: Pending migration detection and non-interactive `supabase db push`.
-- `parameter_files/daedalus-tui-orchestration.toml`: Default target branch seed, worktree, verification, migration push, and retry settings.
+- `parameter_files/daedalus-tui-orchestration.toml`: Default target branch seed, worktree, dirty-primary auto-commit and push, verification, migration push, and retry settings.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-16: Replaced the dirty-primary start-up error with an auto-commit of the operator's pending changes plus a best-effort push of the operating branch, so a dirty checkout starts the task instead of failing it.
 - 2026-09-15: Added non-destructive interruption (`interrupted` results, a stop-aware integration gate, and a pre-promotion stop check), execution suffixes for follow-up worktrees, and per-run diagnostics files under `errors/`.
 - 2026-09-15: Added an orchestration-owned Firebase deploy step that applies changed Firestore rules and indexes after verification and repairs failures with the coding profile before blocking integration.
 - 2026-09-13: Noted that personal shared-Supabase schema registration scaffolds migrations only; orchestration remains the sole `supabase db push` owner.

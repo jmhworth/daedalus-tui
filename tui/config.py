@@ -7,6 +7,7 @@ from pathlib import Path
 import tomllib
 
 from .agent_runner import ProviderAuthPolicy
+from .git_worktree import DIRTY_PRIMARY_COMMIT_MESSAGE
 from .local_storage import GENERATED_DIRECTORY_NAMES, tui_project_root
 from .orchestrator import OrchestrationSettings
 from .usage_monitor import UsageProviderSettings, UsageSettings
@@ -398,6 +399,15 @@ def load_orchestration_settings(parameter_path: Path | None = None) -> Orchestra
         firebase_executable=str(values.get("firebase_executable", "firebase")),
         shutdown_grace_seconds=shutdown_grace_seconds,
         debug_log_filename=str(values.get("debug_log_filename", ".daedalus-debug.log")),
+        dirty_primary_autocommit_enabled=bool(
+            values.get("dirty_primary_autocommit_enabled", True)
+        ),
+        dirty_primary_commit_message=str(
+            values.get("dirty_primary_commit_message", DIRTY_PRIMARY_COMMIT_MESSAGE)
+        ).strip()
+        or DIRTY_PRIMARY_COMMIT_MESSAGE,
+        dirty_primary_push_enabled=bool(values.get("dirty_primary_push_enabled", True)),
+        git_remote=str(values.get("git_remote", "origin")).strip() or "origin",
     )
 
 

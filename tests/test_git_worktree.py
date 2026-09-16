@@ -3,7 +3,12 @@ import tempfile
 from pathlib import Path
 from unittest.mock import call, patch
 
-from tui.git_worktree import GitWorktreeError, GitWorktreeManager, WorktreeContext
+from tui.git_worktree import (
+    DIRTY_PRIMARY_COMMIT_MESSAGE,
+    GitWorktreeError,
+    GitWorktreeManager,
+    WorktreeContext,
+)
 from tui.project_config import ProjectWorktreeSettings
 
 
@@ -50,17 +55,73 @@ class GitWorktreeTests(unittest.TestCase):
             self.assertEqual(context.path, Path(directory).resolve() / ".daedalus-worktrees" / "repo" / "task-task-1")
             self.assertEqual(run_git.call_args.args[0][:4], ["worktree", "add", "-b", "agent/task-task-1"])
 
-    def test_primary_validation_rejects_dirty_repository_when_target_checked_out(self):
+    def test_primary_validation_commits_and_pushes_a_dirty_repository(self):
+        """A dirty operating branch starts the task instead of failing it."""
         manager = GitWorktreeManager(Path("/repo"))
         with patch("tui.git_worktree.subprocess.run") as run, patch.object(
-            manager, "git_output", return_value="main"
-        ), patch.object(manager, "run_git", return_value=status_process(" M changed.py\n")):
+            manager, "git_output", side_effect=["main", "changed.py"]
+        ), patch.object(
+            manager, "run_git", return_value=status_process(" M changed.py\n")
+        ) as run_git, patch("tui.git_worktree.push_branch") as push_branch:
             run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
-            with self.assertRaises(GitWorktreeError):
-                manager._validate_primary()
+            manager._validate_primary()
 
-    def test_primary_validation_names_the_uncommitted_paths(self):
+        commands = [call.args[0] for call in run_git.call_args_list]
+        self.assertIn(["add", "-A", "--", "changed.py"], commands)
+        self.assertIn(["commit", "-m", DIRTY_PRIMARY_COMMIT_MESSAGE], commands)
+        push_branch.assert_called_once_with(Path("/repo").resolve(), "main", "origin")
+
+    def test_primary_autocommit_leaves_daedalus_runtime_files_untracked(self):
+        """Staging is limited to real changes so the debug log stays untracked."""
         manager = GitWorktreeManager(Path("/repo"))
+        status = " M .daedalus-debug.log\n M tui/app.py\n"
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "git_output", side_effect=["main", "tui/app.py"]
+        ), patch.object(manager, "run_git", return_value=status_process(status)) as run_git, patch(
+            "tui.git_worktree.push_branch"
+        ):
+            run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            manager.validate_primary()
+
+        commands = [call.args[0] for call in run_git.call_args_list]
+        self.assertIn(["add", "-A", "--", "tui/app.py"], commands)
+
+    def test_primary_autocommit_reports_a_failed_push_without_blocking(self):
+        notices: list[tuple[str, str]] = []
+        manager = GitWorktreeManager(
+            Path("/repo"), on_notice=lambda message, kind="status": notices.append((message, kind))
+        )
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "git_output", side_effect=["main", "changed.py"]
+        ), patch.object(manager, "run_git", return_value=status_process(" M changed.py\n")), patch(
+            "tui.git_worktree.push_branch", side_effect=GitWorktreeError("Authentication failed")
+        ):
+            run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            manager.validate_primary()
+
+        self.assertTrue(any("Authentication failed" in message for message, _ in notices))
+
+    def test_primary_autocommit_keeps_the_commit_local_without_a_remote(self):
+        notices: list[tuple[str, str]] = []
+        manager = GitWorktreeManager(
+            Path("/repo"), on_notice=lambda message, kind="status": notices.append((message, kind))
+        )
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "git_output", side_effect=["main", "changed.py"]
+        ), patch.object(manager, "run_git", return_value=status_process(" M changed.py\n")), patch(
+            "tui.git_worktree.push_branch"
+        ) as push_branch:
+            run.side_effect = [
+                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+                type("Process", (), {"returncode": 2, "stdout": "", "stderr": "no remote"})(),
+            ]
+            manager.validate_primary()
+
+        push_branch.assert_not_called()
+        self.assertTrue(any("kept the commit local" in message for message, _ in notices))
+
+    def test_primary_validation_names_the_uncommitted_paths_when_autocommit_is_off(self):
+        manager = GitWorktreeManager(Path("/repo"), autocommit_primary=False)
         with patch("tui.git_worktree.subprocess.run") as run, patch.object(
             manager, "git_output", return_value="main"
         ), patch.object(manager, "run_git", return_value=status_process(" M changed.py\n")):
