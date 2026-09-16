@@ -2430,9 +2430,9 @@ class DaedalusTuiApp(App[None]):
         """Enable Push only when an origin remote and operating branch are available."""
         # Select.Changed can fire while siblings are still mounting or during
         # teardown, before/after the command-menu Push button is in the DOM.
-        if not self.query("#command-push-branch-button"):
+        if not self.screen.query("#command-push-branch-button"):
             return
-        button = self.query_one("#command-push-branch-button", Button)
+        button = self.screen.query_one("#command-push-branch-button", Button)
         if self._push_in_flight:
             button.disabled = True
             return

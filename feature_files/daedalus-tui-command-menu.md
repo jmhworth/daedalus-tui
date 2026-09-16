@@ -23,3 +23,4 @@ HACKING
 ## State Log
 - 2026-09-16: Added a Ctrl+K Command Menu for low-frequency task, topic, Supabase, and GitHub Push actions while retaining shortcut-reference access.
 - 2026-09-16: Completed the Command Menu wiring, parameter loading, toolbar removal, shortcut migration, and read-only diff review.
+- 2026-09-16: Fixed Command Menu Push state refresh to query the active modal screen, restoring disabled-state enforcement when no origin remote exists.
