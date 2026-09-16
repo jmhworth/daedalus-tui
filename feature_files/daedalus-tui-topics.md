@@ -12,7 +12,7 @@ markdown.
   Select defaults to `(None)` and remembers the selected topic per project in
   launch-root memory; New Task and project switches restore that project-local
   default. Selecting `(None)` clears the project default.
-- **Create Topic flow**: The `CapsLock+3` shortcut opens a modal for a topic
+- **Create Topic flow**: The `F3` shortcut opens a modal for a topic
   name and the desired end state. It queues a coding task with the initialized
   template and asks the agent to expand the durable context in
   `topic_files/{slug}.md`.
@@ -62,3 +62,5 @@ HACKING
   read-only markdown modal for the active project topic.
 - 2026-09-14: Moved Create Topic from the project toolbar to the `F3` keyboard
   shortcut after terminal encodings made Ctrl+Shift+T unreliable.
+- 2026-09-15: Kept Create Topic on the Textual-native `F3` binding while the
+  non-portable CapsLock chord family was removed.
