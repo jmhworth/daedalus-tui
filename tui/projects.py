@@ -18,7 +18,9 @@ class DaedalusProject:
 
     ``formatted`` marks the Daedalus layout (a ``feature_files`` folder). Plain
     Git checkouts are listed too so the TUI is not limited to projects that have
-    already been converted; they are labelled so the difference stays visible.
+    already been converted. Both flags still order the selector and drive
+    behavior, but neither appears in the label: the selector shows the plain
+    directory name so the list stays readable.
     """
 
     path: Path
@@ -37,16 +39,6 @@ class DaedalusProject:
         base = project_path.name or self.name
         if project_path == launch_root:
             return f"{base} (root)"
-        markers: list[str] = []
-        if project_path.parent != launch_root:
-            # Opened by path from outside the launch root, where the basename
-            # alone would not say which directory the option refers to.
-            markers.append("external")
-        if not self.formatted:
-            # Tasks still run here, but no feature files exist to update yet.
-            markers.append("unformatted")
-        if markers:
-            return f"{base} ({', '.join(markers)})"
         return base
 
 

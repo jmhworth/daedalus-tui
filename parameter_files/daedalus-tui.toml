@@ -125,6 +125,16 @@ interval_seconds = 60
 command_timeout_seconds = 20
 codex_sessions_dir = "~/.codex/sessions"
 claude_stats_file = "~/.claude/stats-cache.json"
+# Codex only writes rate limits after a turn completes, so the most recently
+# touched session log is often a just-started session with no usage in it.
+# Scan back through this many logs (newest first) before reporting no data.
+session_scan_limit = 12
+# Only the tail of each session log is read; the newest rate-limit payload is
+# always at the end and the files grow without bound.
+session_tail_bytes = 262144
+# Cells used by each percentage progress bar in the usage panel. The panel
+# lives in the fixed-width task sidebar, so keep this well under its width.
+bar_width = 12
 
 [usage.claude]
 label = "Claude"

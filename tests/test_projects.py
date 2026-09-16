@@ -61,7 +61,7 @@ class ProjectDiscoveryTests(unittest.TestCase):
 
             self.assertEqual(
                 [project.display_name for project in projects],
-                ["formatted", "plain-repo (unformatted)"],
+                ["formatted", "plain-repo"],
             )
             self.assertTrue(projects[0].formatted)
             self.assertFalse(projects[1].formatted)
@@ -80,7 +80,7 @@ class ProjectDiscoveryTests(unittest.TestCase):
 
             self.assertEqual(
                 [project.display_name for project in projects],
-                ["formatted", "just-a-folder (unformatted)"],
+                ["formatted", "just-a-folder"],
             )
 
     def test_unformatted_folders_stay_hidden_by_default(self):
@@ -102,7 +102,7 @@ class ProjectDiscoveryTests(unittest.TestCase):
 
 
 class ProjectFromDirectoryTests(unittest.TestCase):
-    def test_builds_a_labelled_project_for_a_directory_outside_the_launch_root(self):
+    def test_builds_a_project_for_a_directory_outside_the_launch_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "launch-root"
             elsewhere = Path(directory) / "elsewhere" / "outside-project"
@@ -115,9 +115,11 @@ class ProjectFromDirectoryTests(unittest.TestCase):
             self.assertEqual(project.path, elsewhere.resolve())
             self.assertTrue(project.formatted)
             self.assertTrue(project.git_repository)
-            self.assertEqual(project.display_name, "outside-project (external)")
+            # The selector shows the plain directory name; neither an
+            # out-of-root origin nor a missing Daedalus layout is labelled.
+            self.assertEqual(project.display_name, "outside-project")
 
-    def test_marks_an_unformatted_external_directory_in_its_label(self):
+    def test_an_unformatted_directory_outside_the_root_keeps_its_plain_name(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "launch-root"
             elsewhere = Path(directory) / "elsewhere" / "plain"
@@ -127,7 +129,7 @@ class ProjectFromDirectoryTests(unittest.TestCase):
             project = project_from_directory(elsewhere, root)
 
             self.assertFalse(project.formatted)
-            self.assertEqual(project.display_name, "plain (external, unformatted)")
+            self.assertEqual(project.display_name, "plain")
 
     def test_direct_children_keep_their_plain_label(self):
         with tempfile.TemporaryDirectory() as directory:

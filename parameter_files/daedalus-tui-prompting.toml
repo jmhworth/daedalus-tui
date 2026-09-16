@@ -30,6 +30,17 @@ minimum_width = 40
 main_minimum_width = 80
 # Milliseconds between Markdown re-renders while a response is streaming.
 render_debounce_ms = 150
+# Treat every single newline inside a paragraph as a real line break. Agents
+# hard-wrap prose and write one line per thought, which CommonMark would
+# otherwise join into one block. Fenced and indented code stay byte-exact, and
+# the Raw tab always shows the unmodified response.
+hard_line_breaks = true
+# Summarize the response's action items above the rendered output instead of
+# showing a muted run-identity line there.
+action_items_by_default = true
+# Most action items to list in that header before the rest are left to the
+# rendered response below it.
+action_item_limit = 6
 
 [conversation]
 # Character budget for the conversation history transmitted with a follow-up

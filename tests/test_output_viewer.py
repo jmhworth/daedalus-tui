@@ -7,9 +7,17 @@ from unittest.mock import patch
 
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
-from textual.widgets import Markdown, Select, TextArea
+from textual.widgets import Markdown, Select, Static, TextArea
 
-from tui.output_viewer import LATEST_SOURCE, PLAN_SOURCE, OutputViewer, ViewerSource, response_sources
+from tui.output_viewer import (
+    LATEST_SOURCE,
+    PLAN_SOURCE,
+    OutputViewer,
+    ViewerSource,
+    apply_hard_line_breaks,
+    extract_action_items,
+    response_sources,
+)
 
 
 LONG_MARKDOWN = "\n".join(
@@ -146,6 +154,150 @@ class OutputViewerTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             await pilot.pause()
             self.assertEqual(app.links, ["https://example.com"])
+
+    async def test_action_items_head_the_output_and_carry_the_run_identity(self):
+        app = ViewerHarness()
+        async with app.run_test(size=(100, 30)) as pilot:
+            viewer = app.query_one("#viewer", OutputViewer)
+            response = "\n".join(
+                [
+                    "Done.",
+                    "",
+                    "## Next steps",
+                    "- Rerun the migration",
+                    "- [ ] Review the parameter file",
+                ]
+            )
+            viewer.show_sources("task-1", response_sources(response, [], None, "Task · run 1 · completed"))
+            await pilot.pause()
+            await pilot.pause()
+            self.assertEqual(
+                viewer.action_items,
+                ("Review the parameter file", "Rerun the migration"),
+            )
+            panel = str(app.query_one("#viewer-action-items", Static).render())
+            self.assertIn("Action items · Task · run 1 · completed", panel)
+            self.assertIn("1. Review the parameter file", panel)
+
+    async def test_a_response_without_follow_ups_still_names_the_run(self):
+        app = ViewerHarness()
+        async with app.run_test(size=(100, 30)) as pilot:
+            viewer = app.query_one("#viewer", OutputViewer)
+            viewer.show_sources("task-1", response_sources("All finished.", [], None, "Task · run 2"))
+            await pilot.pause()
+            self.assertEqual(viewer.action_items, ())
+            self.assertIn("No action items · Task · run 2", str(app.query_one("#viewer-action-items", Static).render()))
+
+    async def test_switching_sources_re_reads_the_action_items(self):
+        app = ViewerHarness()
+        async with app.run_test(size=(100, 30)) as pilot:
+            viewer = app.query_one("#viewer", OutputViewer)
+            sources = response_sources(
+                "- [ ] latest work",
+                [("run:1", "Turn 1 response", "- [ ] earlier work")],
+                None,
+                "id",
+            )
+            viewer.show_sources("task-1", sources)
+            await pilot.pause()
+            self.assertEqual(viewer.action_items, ("latest work",))
+            viewer.query_one("#viewer-source-select", Select).value = "run:1"
+            await pilot.pause()
+            await pilot.pause()
+            self.assertEqual(viewer.action_items, ("earlier work",))
+
+    async def test_line_breaks_are_rendered_without_altering_the_raw_source(self):
+        app = ViewerHarness()
+        async with app.run_test(size=(100, 30)) as pilot:
+            viewer = app.query_one("#viewer", OutputViewer)
+            wrapped = "first line\nsecond line\n\nnew paragraph"
+            rendered: list[str] = []
+            original = Markdown.update
+
+            async def capture(self, markdown):
+                rendered.append(markdown)
+                return await original(self, markdown)
+
+            with patch.object(Markdown, "update", capture):
+                viewer.show_sources("task-1", response_sources(wrapped, [], None, "id"))
+                await pilot.pause()
+                await pilot.pause()
+            self.assertEqual(rendered[-1], "first line  \nsecond line\n\nnew paragraph")
+            # The Raw tab keeps the response exactly as the agent wrote it.
+            self.assertEqual(viewer.query_one("#viewer-raw", TextArea).text, wrapped)
+            self.assertEqual(viewer.current_text(), wrapped)
+
+
+class HardLineBreakTests(unittest.TestCase):
+    def test_paragraph_lines_gain_a_hard_break(self):
+        self.assertEqual(
+            apply_hard_line_breaks("one\ntwo\n\nthree"),
+            "one  \ntwo\n\nthree",
+        )
+
+    def test_fenced_and_indented_code_stay_byte_exact(self):
+        source = "\n".join(
+            [
+                "intro",
+                "",
+                "```sh",
+                "echo one",
+                "echo two",
+                "```",
+                "",
+                "    indented one",
+                "    indented two",
+            ]
+        )
+        self.assertEqual(apply_hard_line_breaks(source), source)
+
+    def test_an_unterminated_fence_keeps_its_streamed_content_intact(self):
+        source = "intro\n\n```python\nprint('a')\nprint('b')"
+        self.assertEqual(apply_hard_line_breaks(source), source)
+
+    def test_existing_hard_breaks_are_not_doubled(self):
+        self.assertEqual(apply_hard_line_breaks("one  \ntwo\\\nthree"), "one  \ntwo\\\nthree")
+
+
+class ActionItemTests(unittest.TestCase):
+    def test_unchecked_boxes_outrank_headed_lists_and_done_work_is_skipped(self):
+        response = "\n".join(
+            [
+                "## Follow-ups",
+                "- run the tests",
+                "",
+                "- [x] already done",
+                "- [ ] publish the branch",
+            ]
+        )
+        self.assertEqual(
+            extract_action_items(response),
+            ["publish the branch", "run the tests"],
+        )
+
+    def test_a_bold_line_introduces_its_section_like_a_heading(self):
+        response = "**Next steps:**\n- restart the daemon\n\n**Changes**\n- renamed a module"
+        self.assertEqual(extract_action_items(response), ["restart the daemon"])
+
+    def test_bullets_outside_an_action_heading_are_not_action_items(self):
+        response = "## Changes\n- renamed a function\n- deleted a file"
+        self.assertEqual(extract_action_items(response), [])
+
+    def test_a_heading_after_the_action_heading_ends_the_section(self):
+        response = "## Next steps\n- deploy\n\n## Notes\n- unrelated detail"
+        self.assertEqual(extract_action_items(response), ["deploy"])
+
+    def test_checklists_inside_code_blocks_are_ignored(self):
+        response = "```md\n- [ ] sample from a template\n```"
+        self.assertEqual(extract_action_items(response), [])
+
+    def test_prefixed_lines_are_collected_and_emphasis_is_stripped(self):
+        response = "TODO: **tighten** the timeout\nNEXT: tighten the timeout"
+        self.assertEqual(extract_action_items(response), ["tighten the timeout"])
+
+    def test_the_limit_bounds_the_list(self):
+        response = "\n".join(f"- [ ] item {index}" for index in range(10))
+        self.assertEqual(len(extract_action_items(response, limit=3)), 3)
 
 
 if __name__ == "__main__":

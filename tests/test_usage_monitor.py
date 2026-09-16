@@ -9,7 +9,15 @@ import sys
 import tempfile
 import unittest
 
-from tui.usage_monitor import ProviderUsage, UsageMonitor, UsageProviderSettings, UsageSettings, format_usage_bar
+from tui.usage_monitor import (
+    ProviderUsage,
+    UsageMonitor,
+    UsageProviderSettings,
+    UsageSettings,
+    UsageWindow,
+    format_bar,
+    format_usage_bar,
+)
 
 
 class UsageMonitorTests(unittest.TestCase):
@@ -114,15 +122,152 @@ class UsageMonitorTests(unittest.TestCase):
         self.assertFalse(by_provider["claude"].ok)
         self.assertIn("stdin is not a terminal", by_provider["claude"].detail)
 
-    def test_format_usage_bar_joins_summaries_with_a_timestamp(self):
+    def test_format_usage_bar_lists_each_summary_with_a_timestamp(self):
         readings = (
             ProviderUsage("claude", "Claude", "Claude today 1.0k tok · 2 msgs", checked_at=1_800_000_000.0),
             ProviderUsage("codex", "Codex", "Codex 5h 30% · week 46%", checked_at=1_800_000_000.0),
         )
         text = format_usage_bar(readings)
         self.assertTrue(text.startswith("Usage ("))
-        self.assertIn("Claude today 1.0k tok · 2 msgs   Codex 5h 30% · week 46%", text)
+        lines = text.splitlines()
+        self.assertIn("Claude today 1.0k tok · 2 msgs", lines)
+        self.assertIn("Codex 5h 30% · week 46%", lines)
         self.assertEqual(format_usage_bar(()), "Usage: —")
+
+    def test_percentage_windows_are_drawn_as_progress_bars(self):
+        readings = (
+            ProviderUsage(
+                "codex",
+                "Codex",
+                "Codex 5h 30% · week 46%",
+                checked_at=1_800_000_000.0,
+                windows=(UsageWindow("5h", 30.0, "resets in 2h"), UsageWindow("week", 46.0)),
+            ),
+            # Claude publishes token counts, not limits, so it gets no bar.
+            ProviderUsage("claude", "Claude", "Claude today 1.0k tok", checked_at=1_800_000_000.0),
+        )
+        lines = format_usage_bar(readings, bar_width=10).splitlines()
+        self.assertEqual(lines[2], "  5h   ███░░░░░░░  30%")
+        self.assertEqual(lines[3], "  week █████░░░░░  46%")
+        self.assertEqual(lines[4], "Claude today 1.0k tok")
+
+    def test_bars_keep_any_usage_visible_and_the_limit_distinct(self):
+        self.assertEqual(format_bar(0, 10), "░░░░░░░░░░")
+        # Rounding to zero would hide real usage; a full bar must mean 100%.
+        self.assertEqual(format_bar(1, 10), "█░░░░░░░░░")
+        self.assertEqual(format_bar(99.6, 10), "█████████░")
+        self.assertEqual(format_bar(100, 10), "██████████")
+        self.assertEqual(format_bar(140, 10), "██████████")
+
+    def test_codex_reading_skips_a_started_session_without_rate_limits(self):
+        """A just-started session has no usage yet; older numbers still apply."""
+        now = 1_800_000_000.0
+        self.write_codex_session("rollout-old.jsonl", 62, 31, now)
+        directory = self.home / ".codex" / "sessions" / "2026" / "09" / "15"
+        started = directory / "rollout-fresh.jsonl"
+        started.write_text(
+            json.dumps({"type": "event_msg", "payload": {"type": "agent_message", "message": "hi"}}) + "\n",
+            encoding="utf-8",
+        )
+        os.utime(started, (now + 30, now + 30))
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        self.assertTrue(reading.ok)
+        self.assertEqual(reading.summary, "Codex 5h 62% · week 31% (plus)")
+        self.assertEqual([window.used_percent for window in reading.windows], [62, 31])
+
+    def test_codex_reading_accepts_the_relative_reset_field(self):
+        """Codex reports ``resets_in_seconds``; only ``resets_at`` was read."""
+        now = 1_800_000_000.0
+        path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / "rollout.jsonl"
+        path.write_text(
+            json.dumps(
+                {
+                    "type": "event_msg",
+                    "payload": {
+                        "type": "token_count",
+                        "plan_type": "pro",
+                        "rate_limits": {
+                            "primary": {"used_percent": 12.4, "window_minutes": 300, "resets_in_seconds": 5_400},
+                            "secondary": {"used_percent": 88.0, "window_minutes": 10080, "resets_in_seconds": 90_000},
+                        },
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        self.assertTrue(reading.ok)
+        self.assertEqual(reading.summary, "Codex 5h 12% · week 88% (pro)")
+        self.assertIn("resets in 1h 30m", reading.detail)
+        self.assertIn("resets in 1d 1h", reading.detail)
+
+    def test_an_empty_trailing_payload_does_not_hide_the_real_numbers(self):
+        now = 1_800_000_000.0
+        path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / "rollout.jsonl"
+        events = [
+            {
+                "type": "event_msg",
+                "payload": {
+                    "type": "token_count",
+                    "rate_limits": {"primary": {"used_percent": 55, "window_minutes": 300}},
+                },
+            },
+            {"type": "event_msg", "payload": {"type": "token_count", "rate_limits": {"primary": None, "secondary": None}}},
+        ]
+        path.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        self.assertTrue(reading.ok)
+        self.assertEqual(reading.summary, "Codex 5h 55%")
+
+    def test_only_the_session_tail_is_read(self):
+        now = 1_800_000_000.0
+        path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / "rollout.jsonl"
+        filler = json.dumps({"type": "event_msg", "payload": {"type": "agent_message", "message": "x" * 500}})
+        current = json.dumps(
+            {
+                "type": "event_msg",
+                "payload": {
+                    "type": "token_count",
+                    "rate_limits": {"primary": {"used_percent": 7, "window_minutes": 300}},
+                },
+            }
+        )
+        path.write_text("\n".join([filler] * 200 + [current]) + "\n", encoding="utf-8")
+        monitor = UsageMonitor(UsageSettings(session_tail_bytes=2_000), home=self.home)
+        reading = monitor.read_codex("Codex", now)
+        self.assertTrue(reading.ok)
+        self.assertEqual(reading.summary, "Codex 5h 7%")
+
+    def test_windows_without_a_declared_length_fall_back_to_named_labels(self):
+        now = 1_800_000_000.0
+        path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / "rollout.jsonl"
+        path.write_text(
+            json.dumps(
+                {
+                    "type": "event_msg",
+                    "payload": {
+                        "type": "token_count",
+                        "rate_limits": {
+                            "primary": {"used_percent": 4},
+                            "secondary": {"used_percent": 9},
+                        },
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        self.assertEqual(reading.summary, "Codex session 4% · weekly 9%")
+
+    def test_a_reading_reports_how_old_the_session_data_is(self):
+        now = 1_800_000_000.0
+        self.write_codex_session("rollout.jsonl", 20, 30, now)
+        path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / "rollout.jsonl"
+        os.utime(path, (now - 7_200, now - 7_200))
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        self.assertIn("2h 00m ago", reading.detail)
 
 
 if __name__ == "__main__":
