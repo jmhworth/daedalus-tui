@@ -317,3 +317,6 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         # The statistics screen's account-wide total looks back much further
         # than the bar's recent window.
         self.assertEqual(settings.usage.claude_account_scan_days, 3650)
+        # 0 means the Claude bars calibrate against the busiest recorded window.
+        self.assertEqual(settings.usage.claude_five_hour_token_limit, 0)
+        self.assertEqual(settings.usage.claude_weekly_token_limit, 0)

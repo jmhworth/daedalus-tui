@@ -22,6 +22,11 @@ from tui.usage_monitor import (
 )
 
 
+def _stamp(moment: float) -> str:
+    """Render an epoch time the way Claude Code timestamps a transcript turn."""
+    return datetime.fromtimestamp(moment, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 class UsageMonitorTests(unittest.TestCase):
     def setUp(self):
         self._directory = tempfile.TemporaryDirectory()
@@ -240,6 +245,95 @@ class UsageMonitorTests(unittest.TestCase):
         self.assertFalse(account.ok)
         self.assertEqual(account.total_tokens, 0)
         self.assertIn("no transcripts found", account.detail)
+
+    def write_rolling_claude_history(self, now: float) -> None:
+        """Three turns: one inside 5h, one inside 7d, and an older busier one."""
+        self.write_claude_transcript(
+            "session-rolling.jsonl",
+            [
+                self.transcript_turn("a1", _stamp(now - 4 * 3600), tokens=4_000),
+                self.transcript_turn("a2", _stamp(now - 2 * 86_400), tokens=6_000),
+                self.transcript_turn("a3", _stamp(now - 20 * 86_400), tokens=30_000),
+            ],
+            now,
+        )
+
+    def test_claude_bars_are_drawn_from_rolling_transcript_windows(self):
+        """Without a published rate limit, Claude still gets 5h and 7d bars."""
+        now = 1_800_000_000.0
+        self.write_rolling_claude_history(now)
+
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_claude("Claude", now)
+
+        self.assertTrue(reading.ok)
+        windows = {window.label: window.used_percent for window in reading.windows}
+        # The busiest 5h and 7d stretches both hold the older 30k turn, so the
+        # current windows are measured against it.
+        self.assertAlmostEqual(windows["5h"], 4_000 / 30_000 * 100, places=1)
+        self.assertAlmostEqual(windows["7d"], 10_000 / 30_000 * 100, places=1)
+        self.assertIn("of your busiest 5h in 30d (30.0k)", reading.detail)
+        self.assertIn("frees up in", reading.detail)
+
+    def test_configured_claude_budgets_replace_the_calibrated_ones(self):
+        now = 1_800_000_000.0
+        self.write_rolling_claude_history(now)
+        settings = UsageSettings(
+            claude_five_hour_token_limit=20_000,
+            claude_weekly_token_limit=100_000,
+        )
+
+        reading = UsageMonitor(settings, home=self.home).read_claude("Claude", now)
+
+        self.assertEqual(
+            [(window.label, round(window.used_percent, 1)) for window in reading.windows],
+            [("5h", 20.0), ("7d", 10.0)],
+        )
+        self.assertIn("of a 20.0k budget", reading.detail)
+
+    def test_published_rate_limits_win_over_the_transcript_windows(self):
+        """A real limit from Claude Code must never be replaced by an estimate."""
+        now = 1_800_000_000.0
+        self.write_rolling_claude_history(now)
+        (self.home / ".claude" / "stats-cache.json").write_text(
+            json.dumps({"rate_limits": {"five_hour": {"used_percentage": 71.0}}}),
+            encoding="utf-8",
+        )
+
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_claude("Claude", now)
+
+        self.assertEqual([(window.label, window.used_percent) for window in reading.windows], [("5h", 71.0)])
+        self.assertNotIn("busiest", reading.detail)
+
+    def test_rolling_windows_sum_recent_tokens_and_track_the_peak(self):
+        now = 1_800_000_000.0
+        self.write_rolling_claude_history(now)
+        usage = ClaudeTranscriptUsage(self.home / ".claude" / "projects")
+        usage.refresh(now)
+
+        self.assertEqual(usage.window_tokens(now, 5 * 3600), 4_000)
+        self.assertEqual(usage.window_tokens(now, 7 * 86_400), 10_000)
+        self.assertEqual(usage.peak_window_tokens(5 * 3600), 30_000)
+        # The oldest tokens in the 5h window were spent four hours ago.
+        rolloff = usage.window_rolloff_seconds(now, 5 * 3600)
+        self.assertIsNotNone(rolloff)
+        self.assertLessEqual(abs(rolloff - 3600), 300)
+        # A window can never exceed the peak it is measured against.
+        self.assertLessEqual(usage.window_tokens(now, 7 * 86_400), usage.peak_window_tokens(7 * 86_400))
+
+    def test_rolling_buckets_are_pruned_to_the_scan_window(self):
+        """Buckets must not accumulate forever while daily totals stay whole."""
+        now = 1_800_000_000.0
+        self.write_claude_transcript(
+            "session-old.jsonl",
+            [self.transcript_turn("a1", _stamp(now - 40 * 86_400), tokens=7_000)],
+            now,
+        )
+        usage = ClaudeTranscriptUsage(self.home / ".claude" / "projects", scan_days=30)
+        usage.refresh(now)
+
+        self.assertEqual(usage.total_tokens, 7_000)
+        self.assertEqual(usage.buckets, {})
+        self.assertEqual(usage.peak_window_tokens(7 * 86_400), 0)
 
     def test_claude_reading_draws_rate_limit_windows_when_present(self):
         now = 1_800_000_000.0

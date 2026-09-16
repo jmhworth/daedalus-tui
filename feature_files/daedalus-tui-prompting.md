@@ -186,6 +186,25 @@ provider usage every minute.
   falls back to `session`/`weekly` labels when a window omits
   `window_minutes`, and reports the reading's age in the tooltip so a stale
   number is visible as stale rather than presented as current.
+- **Claude rolling-window bars**: Claude Code publishes a rate-limit payload
+  only on some builds, so the Claude row showed bare token counts beside
+  Codex's bars. When no payload is present, the reader measures the same
+  rolling `5h` and `7d` windows Claude's own `/usage` view reports from the
+  transcript tokens it already counts: turns are bucketed into five-minute
+  buckets (finer than any drawn window, under ten thousand buckets a month),
+  a window is the sum of its buckets, and buckets older than
+  `[usage] claude_transcript_days` are pruned while the day and lifetime
+  totals stay whole. The bars are drawn against
+  `[usage] claude_five_hour_token_limit` and `claude_weekly_token_limit`; both
+  default to `0`, meaning calibrate against the busiest equivalent window in
+  the scanned history, because no plan limit is stored locally and an invented
+  one would pin the bar at 100% or leave it permanently near empty. The
+  current window is one of the candidates for the peak, so a calibrated
+  percentage can never exceed 100%. A published rate-limit payload always
+  wins over the estimate. The tooltip names the basis (`of a 20.0k budget` or
+  `of your busiest 5h in 30d`) and says when the oldest tokens leave the
+  window -- "frees up in", not "resets in", because a rolling window never
+  resets.
 - **Usage progress bars**: Each reading carries its percentage windows as
   `UsageWindow` values, and `format_usage_bar` draws one labelled bar per
   window beneath its provider's summary line, `[usage] bar_width` cells wide.
@@ -219,7 +238,7 @@ provider usage every minute.
 - `tui/memory.py`, `tui/token_usage.py`: Conversation snapshot fields, UI
   preferences, prompt/attempt accounting, and shared push-history storage.
 - `parameter_files/daedalus-tui-prompting.toml`: Storage root, autosave delay, title length, viewer widths, line breaks, action-item header, context budget, error rotation.
-- `parameter_files/daedalus-tui.toml`: `[usage]` cadence, per-provider sources, session scan depth and tail size, transcript and account scan windows, bar width.
+- `parameter_files/daedalus-tui.toml`: `[usage]` cadence, per-provider sources, session scan depth and tail size, transcript and account scan windows, bar width, Claude rolling-window token budgets.
 - `tests/test_vim_text_area.py`, `tests/test_prompt_store.py`, `tests/test_debug_log.py`, `tests/test_output_viewer.py`, `tests/test_usage_monitor.py`, plus extended `tests/test_app.py`, `tests/test_task_coordinator.py`, `tests/test_orchestrator.py`, `tests/test_agent_runner.py`, `tests/test_prompts.py`, `tests/test_token_usage.py`, `tests/test_memory.py`, `tests/test_config.py`.
 
 ## Dev Mode
@@ -227,6 +246,11 @@ HACKING
 
 ## State Log
 - 2026-09-16: Added `UsageMonitor.read_claude_account_usage`, an account-wide Claude token total that scans `[usage] claude_account_scan_days` of transcripts through its own reader so the coding statistics screen can report total Claude usage without changing what the usage bar's recent window means.
+- 2026-09-16: Gave the Claude usage row progress bars of its own by bucketing
+  transcript tokens in time and measuring rolling 5-hour and 7-day windows
+  against configurable token budgets that default to the busiest equivalent
+  window on record, since Claude Code publishes no rate-limit payload locally
+  and the row previously showed only token counts beside Codex's bars.
 - 2026-09-16: Fixed the Claude usage reading, which reported zero tokens and
   zero messages whenever the statistics cache lacked today's entry, by counting
   Claude Code's session transcripts incrementally and showing the larger figure
