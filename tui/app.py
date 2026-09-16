@@ -41,7 +41,13 @@ from .debug_log import (
 from .local_storage import LocalStorage
 from .output_viewer import LATEST_SOURCE, OutputViewer, ViewerSource, response_sources
 from .prompt_store import DraftRecord, PromptStore, PromptStoreError
-from .git_worktree import GitWorktreeError, list_local_branches, push_branch, remote_exists
+from .git_worktree import (
+    GitWorktreeError,
+    list_local_branches,
+    parse_push_notice,
+    push_branch,
+    remote_exists,
+)
 from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
 from .project_initializer import (
     BACKENDS,
@@ -152,6 +158,7 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+Q", "Quit (drafts are saved first)", "quit"),
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
     ("Ctrl+T", "Show coding statistics", "show_statistics"),
+    ("Ctrl+H", "Show pushed commit history", "show_push_history"),
 )
 
 _ACTIVE_TASK_STATUSES = {
@@ -215,6 +222,7 @@ SHORTCUT_SECTIONS = (
             ("Drafts", "Saved automatically under prompts/"),
             ("Sent prompts", "Archived exactly as turn-NNNN.md"),
             ("Errors", "Written under errors/ with task and run ids"),
+            ("Pushed commits", "Recorded in launch-root memory; Ctrl+H opens the Push log"),
         ),
     ),
 )
@@ -991,6 +999,50 @@ class CodingStatisticsScreen(ModalScreen[None]):
         return "\n".join(lines)
 
 
+class PushedCommitsScreen(ModalScreen[None]):
+    """Show the persistent record of commits successfully pushed by Daedalus."""
+
+    BINDINGS = [
+        ("escape", "close_push_history", "Close"),
+        ("ctrl+h", "close_push_history", "Close"),
+    ]
+
+    def __init__(self, records: tuple[dict[str, object], ...], memory_path: Path) -> None:
+        super().__init__()
+        self.records = records
+        self.memory_path = memory_path
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="pushed-commits-dialog"):
+            yield Static("Pushed commits", id="pushed-commits-title")
+            yield Static(
+                f"Successful pushes are recorded in {self.memory_path}",
+                id="pushed-commits-subtitle",
+                markup=False,
+            )
+            yield TextArea(self._history_text(), id="pushed-commits-content", read_only=True, soft_wrap=False)
+            yield Static("Press Esc or Ctrl+H to close", id="pushed-commits-footer")
+
+    def on_mount(self) -> None:
+        self.query_one("#pushed-commits-content", TextArea).focus()
+
+    def action_close_push_history(self) -> None:
+        self.dismiss(None)
+
+    def _history_text(self) -> str:
+        if not self.records:
+            return "No pushed commits recorded yet."
+        lines = []
+        for record in reversed(self.records):
+            timestamp = str(record.get("timestamp", "—"))
+            project = str(record.get("project", "—"))
+            branch = str(record.get("branch", "—"))
+            remote = str(record.get("remote", "—"))
+            commit = str(record.get("commit", "—"))
+            lines.append(f"{timestamp}  {project}  {remote}/{branch}  {commit}")
+        return "\n".join(lines)
+
+
 def _format_tokens(tokens: int) -> str:
     return f"{tokens:,}"
 
@@ -1101,6 +1153,7 @@ class DaedalusTuiApp(App[None]):
         self._accept_task_events = False
         self._task_event_lock = threading.Lock()
         self._pending_task_events: dict[str, tuple[TaskRecord, str, str, str]] = {}
+        self._pending_push_notices: list[tuple[TaskRecord, str]] = []
         self._task_event_flush_scheduled = False
         self._shutdown_lock = threading.Lock()
         self._shutdown_started = False
@@ -1113,6 +1166,7 @@ class DaedalusTuiApp(App[None]):
         self._compact_setting_category = "provider"
         self._compact_setting_values: dict[str, str] = {}
         self._push_in_flight = False
+        self._push_confirmation_branch: str | None = None
         self._compact_mode = False
         self._short_height_mode = False
         self._responsive_measure_pending = False
@@ -1220,6 +1274,7 @@ class DaedalusTuiApp(App[None]):
                     id="target-branch-select",
                 )
                 yield Button("Push", id="push-branch-button")
+                yield Button("Push log", id="push-history-button")
             with Vertical(id="compact-settings"):
                 yield CompactSettingsSelect(
                     _literal_select_options(list(COMPACT_SETTING_CATEGORIES)),
@@ -1663,6 +1718,16 @@ class DaedalusTuiApp(App[None]):
     def action_show_statistics(self) -> None:
         self.push_screen(CodingStatisticsScreen(self._usage_entries(), self.statistics_settings))
 
+    def action_show_push_history(self) -> None:
+        """Show the launch-root record of successful branch pushes."""
+        try:
+            records = self.memory.get_pushed_commits()
+        except (OSError, ValueError) as error:
+            self._set_error(f"Could not read pushed commit history: {error}")
+            self._set_status("Push history unavailable")
+            return
+        self.push_screen(PushedCommitsScreen(records, self.memory.path))
+
     def action_show_new_project(self) -> None:
         self.push_screen(
             ProjectInitializerScreen(self.launch_root, self._default_backend()),
@@ -1746,6 +1811,8 @@ class DaedalusTuiApp(App[None]):
             self.action_view_topic()
         elif event.button.id == "push-branch-button":
             self._push_selected_branch()
+        elif event.button.id == "push-history-button":
+            self.action_show_push_history()
         elif event.button.id == "continue-plan-button":
             self._continue_plan()
         elif event.button.id == "start-coding-button":
@@ -2444,6 +2511,11 @@ class DaedalusTuiApp(App[None]):
             self._apply_task_event(record, phase, message, kind)
         else:
             with self._task_event_lock:
+                if kind == "pushed" and message:
+                    # A later lifecycle event can replace the pending task
+                    # event before the UI thread flushes it. Keep push notices
+                    # separately so a successful push is never swallowed.
+                    self._pending_push_notices.append((record, message))
                 self._pending_task_events[record.task_id] = (record, phase, message, kind)
                 if self._task_event_flush_scheduled:
                     return
@@ -2454,6 +2526,9 @@ class DaedalusTuiApp(App[None]):
                 with self._task_event_lock:
                     self._task_event_flush_scheduled = False
                     self._pending_task_events.pop(record.task_id, None)
+                    self._pending_push_notices = [
+                        item for item in self._pending_push_notices if item[0] is not record
+                    ]
                 # A worker can race with Textual's final shutdown transition.
                 # Do not let a late event print an exception after the UI closes.
                 if "App is not running" not in str(error):
@@ -2465,10 +2540,14 @@ class DaedalusTuiApp(App[None]):
         """Apply only the newest event per task to keep the UI responsive."""
         with self._task_event_lock:
             events_to_apply = tuple(self._pending_task_events.values())
+            push_notices = tuple(self._pending_push_notices)
             self._pending_task_events.clear()
+            self._pending_push_notices.clear()
             self._task_event_flush_scheduled = False
         for record, phase, message, kind in events_to_apply:
             self._apply_task_event(record, phase, message, kind)
+        for record, message in push_notices:
+            self._apply_push_confirmation(record, message)
 
     def _apply_task_event(self, record: TaskRecord, phase: str, message: str, kind: str) -> None:
         try:
@@ -2489,6 +2568,8 @@ class DaedalusTuiApp(App[None]):
                 self._refresh_task_list()
             if is_selected:
                 self._render_selected_task_safely(f"task event phase={phase}")
+            if kind == "pushed" and message:
+                self._apply_push_confirmation(record, message)
         except Exception as error:
             log_exception(f"Could not render task event task={record.task_id} phase={phase}", error)
             if not self._accept_task_events:
@@ -2498,6 +2579,18 @@ class DaedalusTuiApp(App[None]):
                 self._set_status("Error")
             except Exception as display_error:
                 log_exception("Could not show task rendering error", display_error)
+
+    def _apply_push_confirmation(self, record: TaskRecord, message: str) -> None:
+        """Keep an orchestration push visible after task events repaint the UI."""
+        project_path = self._project_for_record(record)
+        if project_path is None:
+            return
+        pushed = parse_push_notice(message)
+        if pushed is not None and project_path == self._active_project_path:
+            self._push_confirmation_branch = pushed[0]
+            self._refresh_push_button()
+        self._set_error("")
+        self._set_status(message)
 
     @staticmethod
     def _should_promote_task_update(record: TaskRecord, phase: str) -> bool:
@@ -2519,6 +2612,10 @@ class DaedalusTuiApp(App[None]):
             coordinator = self._external_coordinator
             self._external_coordinator = None
             coordinator.settings = settings
+            if isinstance(coordinator, TaskCoordinator):
+                # Keep injected coordinators on the same launch-root memory as
+                # coordinators created by the app, including push history.
+                coordinator.memory = self.memory
         else:
             coordinator = TaskCoordinator(
                 project_path,
@@ -2561,6 +2658,7 @@ class DaedalusTuiApp(App[None]):
 
     def _on_target_branch_selected(self, branch: str) -> None:
         project_path = self._active_project_path
+        self._push_confirmation_branch = None
         default_branch = self.orchestration_settings.primary_branch
         try:
             if branch == default_branch:
@@ -2633,6 +2731,7 @@ class DaedalusTuiApp(App[None]):
             button.disabled = True
             return
         branch = self._selected_operating_branch()
+        button.label = "Pushed" if branch and branch == self._push_confirmation_branch else "Push"
         button.disabled = not branch or not remote_exists(self._active_project_path)
 
     def _push_selected_branch(self) -> None:
@@ -2645,6 +2744,7 @@ class DaedalusTuiApp(App[None]):
             self._set_status("Error")
             return
         project_path = self._active_project_path
+        self._push_confirmation_branch = None
         if not remote_exists(project_path):
             self._set_error("Remote 'origin' is not configured for this project.")
             self._set_status("Error")
@@ -2658,13 +2758,13 @@ class DaedalusTuiApp(App[None]):
 
         def work() -> None:
             try:
-                push_branch(project_path, branch)
+                commit = push_branch(project_path, branch)
             except GitWorktreeError as error:
-                self.call_from_thread(self._on_push_finished, False, str(error), branch)
+                self.call_from_thread(self._on_push_finished, False, str(error), branch, "", project_path)
             except Exception as error:  # pragma: no cover - defensive UI boundary
-                self.call_from_thread(self._on_push_finished, False, str(error), branch)
+                self.call_from_thread(self._on_push_finished, False, str(error), branch, "", project_path)
             else:
-                self.call_from_thread(self._on_push_finished, True, "", branch)
+                self.call_from_thread(self._on_push_finished, True, "", branch, commit, project_path)
 
         self.run_worker(
             work,
@@ -2674,12 +2774,46 @@ class DaedalusTuiApp(App[None]):
             exit_on_error=False,
         )
 
-    def _on_push_finished(self, succeeded: bool, error: str, branch: str) -> None:
+    def _on_push_finished(
+        self,
+        succeeded: bool,
+        error: str,
+        branch: str,
+        commit: str = "",
+        project_path: Path | None = None,
+    ) -> None:
         self._push_in_flight = False
+        if succeeded:
+            self._push_confirmation_branch = branch
         self._refresh_push_button()
         if succeeded:
             self._set_error("")
-            self._set_status(f"Pushed {branch} to origin")
+            if isinstance(commit, str) and commit:
+                recorded = False
+                try:
+                    self.memory.record_pushed_commit(
+                        project_path or self._active_project_path,
+                        branch,
+                        "origin",
+                        commit,
+                    )
+                    recorded = True
+                except (OSError, ValueError) as storage_error:
+                    LOGGER.warning(
+                        "Could not persist pushed commit commit=%s error=%s",
+                        commit,
+                        storage_error,
+                    )
+                if recorded:
+                    self._set_status(
+                        f"Pushed {branch} to origin (commit {commit[:12]}); recorded in {self.memory.path}"
+                    )
+                else:
+                    self._set_status(
+                        f"Pushed {branch} to origin (commit {commit[:12]}); push history unavailable"
+                    )
+            else:
+                self._set_status(f"Pushed {branch} to origin")
             return
         self._set_error(error or "Push failed.")
         self._set_status("Push failed")
@@ -2876,6 +3010,7 @@ class DaedalusTuiApp(App[None]):
             draft = None
         self._active_project_path = project_path
         self.directory = project_path
+        self._push_confirmation_branch = None
         # Persist after the active focus changes so the marker mirrors the
         # project that is currently visible in the TUI.
         self._remember_project(project_path)
@@ -3092,12 +3227,13 @@ class DaedalusTuiApp(App[None]):
     def _delete_task_at_cursor(self) -> None:
         """Delete the task currently under the focused sidebar cursor."""
         task_list = self.query_one("#task-list", DataTable)
+        cursor_row = task_list.cursor_row
         row_keys = tuple(self._task_rows)
-        if task_list.cursor_row < 0 or task_list.cursor_row >= len(row_keys):
+        if cursor_row < 0 or cursor_row >= len(row_keys):
             self._set_status("No task selected in the sidebar")
             return
 
-        row_key = row_keys[task_list.cursor_row]
+        row_key = row_keys[cursor_row]
         task_target = self._task_rows.get(row_key)
         if task_target is None:
             self._set_status("No task selected in the sidebar")
@@ -3148,6 +3284,10 @@ class DaedalusTuiApp(App[None]):
         self._session_task_rows.discard(row_key)
         self._updated_task_rows.discard(row_key)
         self._refresh_task_list()
+        if self._task_rows:
+            # Rebuilds clear Textual's cursor. Keep the same visual position,
+            # clamping only when the deleted row was the last one.
+            task_list.move_cursor(row=min(cursor_row, len(self._task_rows) - 1), column=0)
         if selected:
             self._render_selected_task_safely("task deletion")
             task_list.focus()

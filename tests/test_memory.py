@@ -130,6 +130,25 @@ class TaskMemoryStoreTests(unittest.TestCase):
             self.assertFalse(store.delete_task("task-two"))
             self.assertEqual(tuple(store.get_tasks()), ("task-one",))
 
+    def test_records_and_reads_pushed_commit_tips_without_duplicates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ".daedalus-memory.json"
+            project = Path(directory) / "project"
+            store = TaskMemoryStore(path)
+
+            store.record_pushed_commit(project, "main", "origin", "a" * 40, pushed_at=1)
+            store.record_pushed_commit(project, "main", "origin", "a" * 40, pushed_at=2)
+            store.record_pushed_commit(project, "feature", "origin", "b" * 40, pushed_at=3)
+
+            records = store.get_pushed_commits()
+            self.assertEqual(len(records), 2)
+            self.assertEqual(records[0]["timestamp"], "1970-01-01T00:00:01Z")
+            self.assertEqual(records[1]["branch"], "feature")
+            self.assertEqual(
+                store.get_pushed_commits(project=project)[0]["commit"],
+                "a" * 40,
+            )
+
     def test_records_plan_prompt_history_when_a_task_has_followups(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ".daedalus-memory.json"

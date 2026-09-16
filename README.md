@@ -142,7 +142,10 @@ to get the old "primary worktree must be clean" error back, or
 that commit, automated orchestration does not push remotes; use the
 settings-bar Push control when you want to publish the selected operating
 branch to `origin`. Failed worktrees are preserved
-for inspection. After a successful promotion, the orchestrator refreshes and
+for inspection. A successful Push reports the branch and commit in the status
+line and records the full SHA in the launch-root `.daedalus-memory.json`; open
+the **Push log** settings action or press `Ctrl+H` to browse those records.
+After a successful promotion, the orchestrator refreshes and
 commits `graphify-out` onto the target branch when the target repository has
 graphify configured; graph refresh failures are reported as warnings and never
 trigger resolver attempts.
@@ -321,9 +324,12 @@ refuses without one), so by default the bar reads the same local data their
 own `/usage` and `/status` views show: Codex rate-limit windows (5-hour and
 weekly percentages with reset times) from its session logs under
 `~/.codex/sessions`, and today's token and message totals from Claude Code's
-`~/.claude/stats-cache.json`. Every window that reports a percentage is drawn
-as a progress bar under its provider's line; `[usage] bar_width` sets how many
-cells each bar uses. Set `[usage.<provider>] command` to run any program
+`~/.claude/stats-cache.json`. Claude rate-limit windows (`five_hour`,
+`seven_day`, and `spend_limit`) are also drawn when that cache or a configured
+JSON command provides them. A configured Claude JSON source may also expose a
+`context_window.used_percentage` bar. Every window that reports a percentage is
+drawn as a progress bar under its provider's line; `[usage] bar_width` sets how
+many cells each bar uses. Set `[usage.<provider>] command` to run any program
 instead; it runs with stdin closed and a timeout, and its JSON usage fields or
 first output line are shown. Hover the bar for details, including how old the
 reading is.

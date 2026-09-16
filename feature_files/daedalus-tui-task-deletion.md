@@ -14,6 +14,8 @@ coordinator and its durable task snapshot when the user presses `dd`.
 - **Cursor-targeted**: Deletion uses the row under the `DataTable` cursor, not
   only the currently rendered conversation, so a task can be deleted without
   opening it first.
+- **Cursor-preserving**: Rebuilding the inbox after deletion keeps the cursor
+  at the same row position, clamping only when the deleted row was the last one.
 - **Active-run safety**: Active tasks and running plan clarifications remain in
   the inbox until their work stops. Preserved inactive worktrees use the same
   explicit cleanup route as task cancellation before the task is removed.
@@ -24,7 +26,7 @@ coordinator and its durable task snapshot when the user presses `dd`.
 ## Relevant Files
 
 - `tui/app.py`: Sidebar cursor command sequence, deletion action, and shortcut
-  reference.
+  reference, including cursor-position restoration after a rebuild.
 - `tui/task_coordinator.py`: Inactive-task deletion and preserved-worktree
   cleanup.
 - `tui/memory.py`: Atomic removal of one persisted task snapshot.
@@ -41,3 +43,5 @@ HACKING
 
 - 2026-09-16: Added cursor-targeted `dd` deletion for inactive sidebar tasks,
   coordinator cleanup, and durable snapshot removal.
+- 2026-09-16: Preserved the sidebar cursor row after `dd` rebuilds the task
+  inbox, clamping it only when the deleted row was last.

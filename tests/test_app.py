@@ -19,6 +19,7 @@ from tui.app import (
     DaedalusTuiApp,
     KeyboardShortcutsScreen,
     OpenProjectDirectoryScreen,
+    PushedCommitsScreen,
     ProjectInitializerScreen,
     TopicViewerScreen,
 )
@@ -1343,6 +1344,52 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn(app._task_row_key(app._active_project_path, record.task_id), app._task_rows)
             self.assertIsNone(app._selected_task_id)
             self.assertIn("Deleted task", str(app.query_one("#status", Static).render()))
+
+    async def test_dd_keeps_the_sidebar_cursor_position_after_deletion(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            for prompt_text in ("First task", "Second task", "Third task"):
+                app.query_one("#prompt-input", DaedalusVimTextArea).insert(prompt_text)
+                app.action_submit_prompt()
+                coordinator.records[-1].status = "completed"
+            app._refresh_task_list()
+
+            task_list = app.query_one("#task-list", DataTable)
+            task_list.focus()
+            task_list.move_cursor(row=2, column=0)
+            deleted_task_id = tuple(app._task_rows.values())[2][1]
+            await pilot.press("d")
+            await pilot.press("d")
+            await pilot.pause()
+
+            self.assertIsNone(coordinator.get(deleted_task_id))
+            self.assertEqual(task_list.cursor_row, 1)
+
+    @patch("tui.app.push_branch", return_value="a" * 40)
+    @patch("tui.app.remote_exists", return_value=True)
+    async def test_successful_push_is_saved_and_browsable(self, _remote_exists, _push_branch):
+        app, _ = self.make_app()
+        async with app.run_test() as pilot:
+            def run_inline(work, **kwargs):
+                work()
+
+            with patch.object(app, "run_worker", side_effect=run_inline), patch.object(
+                app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)
+            ):
+                app.query_one("#push-branch-button", Button).press()
+                await pilot.pause()
+
+            records = app.memory.get_pushed_commits()
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["commit"], "a" * 40)
+            self.assertIn("recorded in", str(app.query_one("#status", Static).render()))
+
+            app.action_show_push_history()
+            await pilot.pause()
+            self.assertIsInstance(app.screen, PushedCommitsScreen)
+            self.assertIn("a" * 40, app.screen.query_one("#pushed-commits-content", TextArea).text)
+            await pilot.press("escape")
+            await pilot.pause()
 
     async def test_ctrl_t_opens_coding_statistics_with_usage_columns_and_metrics(self):
         app, coordinator = self.make_app()

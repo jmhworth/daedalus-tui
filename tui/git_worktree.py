@@ -30,6 +30,28 @@ DIRTY_PRIMARY_COMMIT_MESSAGE = "Daedalus: commit pending changes before starting
 NoticeCallback = Callable[[str, str], None]
 
 
+def format_push_notice(branch: str, remote: str, commit: str = "") -> str:
+    """Return the user-facing notice emitted after a successful branch push."""
+    suffix = f" (commit {commit})" if isinstance(commit, str) and commit else ""
+    return f"Pushed {branch} to {remote}{suffix}."
+
+
+def parse_push_notice(message: str) -> tuple[str, str, str] | None:
+    """Extract ``(branch, remote, commit)`` from :func:`format_push_notice`."""
+    body = message.strip()
+    if not body.startswith("Pushed ") or not body.endswith("."):
+        return None
+    body = body[:-1].removeprefix("Pushed ")
+    branch_remote, separator, commit_part = body.rpartition(" (commit ")
+    if not separator or not commit_part.endswith(")"):
+        return None
+    commit = commit_part[:-1].strip()
+    branch, separator, remote = branch_remote.partition(" to ")
+    if not branch.strip() or not remote.strip() or not commit:
+        return None
+    return branch.strip(), remote.strip(), commit
+
+
 class GitWorktreeError(RuntimeError):
     pass
 
@@ -64,11 +86,12 @@ def remote_exists(repository: Path, remote: str = "origin") -> bool:
     return process.returncode == 0
 
 
-def push_branch(repository: Path, branch: str, remote: str = "origin") -> None:
+def push_branch(repository: Path, branch: str, remote: str = "origin") -> str:
     """Push a local branch to ``remote``, setting upstream with ``-u`` when needed.
 
     Never force-pushes. Raises ``GitWorktreeError`` when the remote or branch is
-    missing, or when ``git push`` fails (including auth errors).
+    missing, or when ``git push`` fails (including auth errors). Returns the
+    local branch tip SHA captured immediately before the push.
     """
     branch = branch.strip()
     if not branch:
@@ -83,6 +106,7 @@ def push_branch(repository: Path, branch: str, remote: str = "origin") -> None:
     )
     if verify.returncode != 0:
         raise GitWorktreeError(f"Local branch {branch!r} does not exist.")
+    commit = verify.stdout.strip()
     command = ["git", "push", "-u", remote, branch]
     try:
         process = subprocess.run(
@@ -95,6 +119,7 @@ def push_branch(repository: Path, branch: str, remote: str = "origin") -> None:
         raise GitWorktreeError(f"Failed to run git push: {error}") from error
     if process.returncode != 0:
         raise GitWorktreeError(GitWorktreeManager.format_failure(command, process))
+    return commit
 
 
 @dataclass(frozen=True)
@@ -400,13 +425,16 @@ class GitWorktreeManager:
             )
             return False
         try:
-            push_branch(self.repository, self.primary_branch, self.remote)
+            commit = push_branch(self.repository, self.primary_branch, self.remote)
         except GitWorktreeError as error:
             self.notify(
                 f"Could not push {self.primary_branch} to {self.remote}: {error}", "warning"
             )
             return False
-        self.notify(f"Pushed {self.primary_branch} to {self.remote}.")
+        self.notify(
+            format_push_notice(self.primary_branch, self.remote, commit),
+            "pushed",
+        )
         return True
 
     def notify(self, message: str, kind: str = "status") -> None:

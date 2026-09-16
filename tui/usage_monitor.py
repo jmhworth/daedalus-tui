@@ -5,8 +5,9 @@ Code 2.1 hangs waiting for a terminal and Codex 0.154 refuses without one), so
 by default the monitor reads the same local data those CLIs display in their
 own ``/usage`` and ``/status`` views: Codex writes rate-limit windows into its
 session logs after every turn, and Claude Code maintains a per-day token
-statistics cache. A command can be configured per provider instead; it runs
-with stdin closed, a bounded timeout, and process-group termination.
+statistics cache that may also include its status-line rate-limit windows. A
+command can be configured per provider instead; it runs with stdin closed, a
+bounded timeout, and process-group termination.
 """
 
 from __future__ import annotations
@@ -32,6 +33,12 @@ DEFAULT_BAR_WIDTH = 12
 # Codex window keys in display order, with the label used when a payload omits
 # ``window_minutes`` (newer Codex builds send the windows without it).
 _CODEX_WINDOW_KEYS = (("primary", "session"), ("secondary", "weekly"))
+_CLAUDE_WINDOW_KEYS = (
+    ("five_hour", "5h"),
+    ("seven_day", "7d"),
+    ("spend_limit", "spend"),
+)
+_CLAUDE_CONTEXT_KEYS = (("used_percentage", "context"),)
 
 
 @dataclass(frozen=True)
@@ -106,19 +113,28 @@ def _number(value: object) -> float | None:
 
 
 def _window_reset_seconds(window: dict, now: float) -> float | None:
-    """Return seconds until a window resets from either Codex spelling.
+    """Return seconds until a window resets from provider duration or timestamp.
 
-    Codex reports ``resets_in_seconds`` (a duration); older payloads carried
-    ``resets_at`` (an absolute epoch). Reading only one of them silently drops
-    the reset time from the panel, so both are accepted.
+    Codex reports ``resets_in_seconds`` (a duration); other payloads carry
+    ``resets_at`` as an absolute epoch or ISO timestamp. Reading only one
+    spelling silently drops the reset time from the panel, so all are accepted.
     """
     relative = _number(window.get("resets_in_seconds"))
     if relative is not None:
         return relative
     absolute = _number(window.get("resets_at"))
-    if absolute is None:
+    if absolute is not None:
+        return absolute - now
+    reset_text = window.get("resets_at")
+    if not isinstance(reset_text, str) or not reset_text.strip():
         return None
-    return absolute - now
+    try:
+        reset_at = datetime.fromisoformat(reset_text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if reset_at.tzinfo is None:
+        reset_at = reset_at.replace(tzinfo=timezone.utc)
+    return reset_at.timestamp() - now
 
 
 def _format_duration(remaining: float | None) -> str:
@@ -396,7 +412,28 @@ class UsageMonitor:
         computed_text = f"as of {computed}" if isinstance(computed, str) and computed else ""
         summary = f"{label} today {_format_tokens(tokens_today)} tok · {messages_today} msgs"
         detail = f"all time {_format_tokens(total_tokens)} tokens; {sessions_today} sessions today {computed_text}".strip()
-        return ProviderUsage("claude", label, summary, detail, True, now, source)
+        return ProviderUsage(
+            "claude",
+            label,
+            summary,
+            detail,
+            True,
+            now,
+            source,
+            self._claude_windows(data, now),
+        )
+
+    @staticmethod
+    def _claude_windows(data: dict, now: float) -> tuple[UsageWindow, ...]:
+        """Read Claude's rate-limit and context percentages when present."""
+        payload = data.get("rate_limits") or data.get("rateLimits")
+        windows: tuple[UsageWindow, ...] = ()
+        if isinstance(payload, dict):
+            windows = UsageMonitor._windows_from_payload(payload, now, _CLAUDE_WINDOW_KEYS)
+        context = data.get("context_window") or data.get("contextWindow")
+        if isinstance(context, dict):
+            windows += UsageMonitor._windows_from_payload(context, now, _CLAUDE_CONTEXT_KEYS)
+        return windows
 
     # --- configured commands -----------------------------------------------------------
 
@@ -432,7 +469,56 @@ class UsageMonitor:
             reason = scrub_credentials((stderr or stdout).strip().splitlines()[-1] if (stderr or stdout).strip() else f"exit {process.returncode}")
             return ProviderUsage(provider, provider_settings.label, f"{provider_settings.label}: unavailable", f"{source}: {reason}", False, now, source)
         summary, detail = self._summarize_output(provider_settings.label, stdout)
-        return ProviderUsage(provider, provider_settings.label, summary, detail, True, now, source)
+        windows: tuple[UsageWindow, ...] = ()
+        try:
+            payload = json.loads(stdout.strip())
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            windows = self._windows_from_payload(payload, now, _CLAUDE_WINDOW_KEYS)
+            if provider == "claude" and not windows:
+                windows = self._windows_from_payload(
+                    payload,
+                    now,
+                    (("context_window", "context"), ("contextWindow", "context")),
+                )
+            if not windows:
+                windows = self._windows_from_payload(
+                    payload,
+                    now,
+                    (
+                        ("usage_percent", "usage"),
+                        ("used_percent", "usage"),
+                        ("used_percentage", "usage"),
+                    ),
+                )
+        return ProviderUsage(provider, provider_settings.label, summary, detail, True, now, source, windows)
+
+    @staticmethod
+    def _windows_from_payload(
+        payload: dict,
+        now: float,
+        keys: tuple[tuple[str, str], ...],
+    ) -> tuple[UsageWindow, ...]:
+        """Convert percentage-bearing provider JSON into display windows."""
+        nested = payload.get("rate_limits") or payload.get("rateLimits")
+        if isinstance(nested, dict):
+            payload = nested
+        windows: list[UsageWindow] = []
+        for key, label in keys:
+            value = payload.get(key)
+            if isinstance(value, dict):
+                used = _number(value.get("used_percentage"))
+                if used is None:
+                    used = _number(value.get("used_percent"))
+                if used is None:
+                    continue
+                windows.append(UsageWindow(label, used, _format_reset(value, now)))
+                continue
+            used = _number(value)
+            if used is not None:
+                windows.append(UsageWindow(label, used))
+        return tuple(windows)
 
     @staticmethod
     def _terminate(process: subprocess.Popen) -> None:
@@ -474,9 +560,9 @@ def format_usage_bar(
     """Render the usage panel shown at the bottom left of the UI.
 
     Each provider contributes its summary line, followed by one progress bar
-    per rate-limit window that reports a percentage. Providers without
-    percentages (Claude Code publishes token counts, not limits) keep their
-    summary line alone.
+    per rate-limit window that reports a percentage. Claude Code's daily
+    statistics remain in the summary while any accompanying rate-limit
+    windows are rendered beneath it.
     """
     if not readings:
         return "Usage: —"

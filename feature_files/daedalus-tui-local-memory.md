@@ -23,6 +23,10 @@ daemon, a remote service, or a database server.
   (see `daedalus-tui-prompting.md`); memory remains the index.
 - **UI preferences**: A `ui_preferences` entry remembers the output viewer
   visibility and the All tasks filter.
+- **Pushed commits**: A `pushed_commits` entry keeps each successful operating
+  branch push's timestamp, project, remote, branch, and full commit SHA. The
+  TUI exposes these records through its Push log view; duplicate notifications
+  for the same commit are ignored.
 - **Task history**: A single `tasks` entry maps each task worktree directory
   name to an ISO-8601 UTC submission `timestamp`, prompt, provider, model,
   reasoning, mode, current state, assistant outputs, non-negative token usage,
@@ -66,7 +70,7 @@ daemon, a remote service, or a database server.
 ## Relevant Files
 - `tui/memory.py`: `TaskMemoryStore`, the default memory filename, central JSON
   schema, task-history, last-project, and per-project target-branch entries,
-  validation, locking, and atomic file replacement.
+  pushed-commit history, validation, locking, and atomic file replacement.
 - `tui/app.py`: Restores the remembered project at startup and updates it on
   project selection; persists and restores each project's operating branch.
 - `tui/task_coordinator.py`: Records and rehydrates project task snapshots,
@@ -100,3 +104,5 @@ HACKING
 - 2026-08-17: Persisted Plan tasks while they await questions or approval so their planning state and transcript remain selectable.
 - 2026-08-17: Persisted generated plan-review prompts alongside the original task snapshot so submitted answers leave an auditable request history.
 - 2026-08-20: Added branch/worktree metadata and startup rehydration for failed and interrupted tasks, with shutdown pausing active work instead of deleting its worktree.
+- 2026-09-16: Added deduplicated pushed-commit records to launch-root memory
+  so successful branch pushes remain available through the TUI Push log.

@@ -125,9 +125,11 @@ width = "95%"
 # `usage` subcommand (Claude Code waits for a terminal; Codex refuses without
 # one), so by default the bar reads the same local data their own /usage and
 # /status views show: Codex rate-limit windows from its session logs, and
-# Claude Code's per-day token statistics cache. Set `command` for a provider
-# to run any program instead; it runs with stdin closed and a timeout, and its
-# JSON or first output line is shown.
+# Claude Code's per-day token statistics cache, including any `rate_limits`
+# payload it provides. Set `command` for a provider to run any program instead;
+# it runs with stdin closed and a timeout, and its JSON or first output line is
+# shown. JSON rate-limit fields and Claude `context_window` percentages produce
+# the same progress bars for Claude.
 [usage]
 enabled = true
 interval_seconds = 60

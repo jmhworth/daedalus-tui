@@ -14,7 +14,8 @@ The standalone Daedalus TUI is an installable Textual application that runs from
   provider falls back to that provider's first option instead of raising. The
   settings bar also exposes a per-project Branch Select for the operating branch
   used by new task worktrees, with an operator Push control that publishes that
-  branch to `origin`.
+  branch to `origin`; successful pushed commit tips are recorded in launch-root
+  memory and are browsable from the Push log view or Ctrl+H.
 - **Account sign-in**: `auth.mode = "account"` removes each provider's API-key
   variables from the agent subprocess environment so the CLI runs on the
   operator's signed-in plan rather than API credit, and a local `.env` cannot
@@ -69,7 +70,9 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
 - `tui/app.tcss`: Shared full-height output-panel layout and readable transcript/diagnostic styling.
 - `tui/config.py`: Read-only provider and responsive-layout configuration models and loaders.
-- `tui/git_worktree.py`: Local Git helpers including operating-branch push for the operator Push control.
+- `tui/git_worktree.py`: Local Git helpers including operating-branch push for
+  the operator Push control and user-facing pushed-commit notices.
+- `tui/memory.py`: Shared local pushed-commit history alongside task snapshots.
 - `tui/prompts.py`: Task, repair, and resolver prompt wrappers, including plan-mode recommended-option instructions.
 - `tui/topics.py`: Optional topic discovery, load, and prompt embedding.
 - `tui/plan.py`: Agent plan parsing plus UI-owned custom-answer encoding, clarification prompts, and prompt formatting.
@@ -97,6 +100,9 @@ HACKING
 
 ## State Log
 - 2026-09-16: Added `[claude] allowed_tools` so the agent runner passes `--allowedTools` to `claude --print`, letting Claude agents run test commands that acceptEdits alone auto-denies.
+- 2026-09-16: Preserved sidebar cursor position after task deletion, added
+  Claude rate-limit usage bars, and made successful pushed commit tips visible
+  and browsable from the launch-root push history.
 - 2026-09-16: Added Vim-style `dd` deletion for inactive tasks selected in the cross-project sidebar, including coordinator cleanup and durable snapshot removal.
 - 2026-09-16: Dropped the `(external)` and `(unformatted)` markers from project selector labels so every option shows the plain directory name; the flags still order discovery and drive behavior.
 - 2026-09-15: Reworked prompting around conversations: composer drafts, verbatim archives, `Ctrl+C`/Cancel interruption that restores the prompt, follow-up turns, generated titles with an All tasks filter, the right-third Markdown viewer, `errors/` diagnostics, completed Vim clipboard commands, and a usage bar (details in `daedalus-tui-prompting.md`).

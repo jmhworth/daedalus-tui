@@ -22,7 +22,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
   launch-root memory. New task worktrees are based on that effective local
   branch and successful tasks promote into it; the operator does not need it
   checked out.
-- **Dirty operating branch auto-commit**: When the target branch is checked out with uncommitted work, validation stages those paths (Daedalus' own runtime files stay untracked), commits them with the parameterized message, and pushes the branch to the configured remote before the task worktree is created, so a dirty checkout starts the task instead of failing it. A missing remote or a failed push is reported as a warning and never blocks the run; `dirty_primary_autocommit_enabled = false` restores the original clean-worktree error.
+- **Dirty operating branch auto-commit**: When the target branch is checked out with uncommitted work, validation stages those paths (Daedalus' own runtime files stay untracked), commits them with the parameterized message, and pushes the branch to the configured remote before the task worktree is created, so a dirty checkout starts the task instead of failing it. A successful push emits the pushed commit SHA as a durable notice in the TUI and records it in the shared launch-root memory; the Push log view makes the record browsable. A missing remote or a failed push is reported as a warning and never blocks the run; `dirty_primary_autocommit_enabled = false` restores the original clean-worktree error.
 - **Safe promotion**: The target branch tip must remain unchanged during integration; when it is checked out the working tree must stay clean for merge-based promotion, otherwise promotion fast-forwards the target ref in place; failed worktrees remain available for inspection.
 - **Concurrent integration**: Up to four task agents and their verification runs execute concurrently, then ready tasks pass through a first-ready serialized integration gate before promotion.
 - **Connectivity recovery**: Agent subprocesses have a bounded timeout, report actionable offline/service diagnostics, and failed requests can be retried without losing their task context.
@@ -42,7 +42,9 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - `tui/task_coordinator.py`: Concurrent task records, executor limit, and serialized integration gate.
 - `tui/git_worktree.py`: Git validation, dirty-primary auto-commit and push, worktree, branch listing, operator push helper, merge, and cleanup operations.
 - `tui/project_config.py`: Target-project `.daedalus` worktree provisioning settings.
-- `tui/memory.py`: Atomic task snapshots, worktree identity, restart metadata, and per-project target branches.
+- `tui/memory.py`: Atomic task snapshots, worktree identity, restart metadata,
+  per-project target branches, and pushed-commit history.
+- `tui/app.py`: Operator Push feedback and the browsable Push log view.
 - `tui/topics.py`: Topic discovery and embed helpers used at prompt-build time.
 - `tui/verification.py`: Configured and convention-based verification execution.
 - `tui/supabase_migrations.py`: Pending migration detection and non-interactive `supabase db push`.
@@ -54,6 +56,9 @@ HACKING
 ## State Log
 - 2026-09-16: Pre-approved discovered verification commands for non-interactive Claude runs and fell back to Daedalus' bundled profiles when a project has no `.agents/profiles/`, after msb and tex-manager tasks logged missing-profile warnings and Claude agents were denied `pytest`/`npm test`.
 - 2026-09-16: Replaced the dirty-primary start-up error with an auto-commit of the operator's pending changes plus a best-effort push of the operating branch, so a dirty checkout starts the task instead of failing it.
+- 2026-09-16: Added pushed commit SHAs to success notices and shared memory,
+  kept background push confirmations visible in the status line, and exposed a
+  Push log view through the settings bar and Ctrl+H.
 - 2026-09-16: Hardened interpreter discovery after the `PATH`-lookup fix still emitted a bare `python`, making `python_executable` accept the roots of the code under test and resolve, in order, a `.venv`/`venv` interpreter belonging to those roots, the active `VIRTUAL_ENV`, a `PATH` lookup, and finally the already-running `sys.executable`, so every discovered command names a real interpreter file rather than a name the child process must resolve itself.
 - 2026-09-16: Fixed convention-based verification failing with `[Errno 2] No such file or directory: 'python'` on hosts that only provide `python3` by resolving the interpreter in `discover_commands` instead of hardcoding `python`.
 - 2026-09-15: Added non-destructive interruption (`interrupted` results, a stop-aware integration gate, and a pre-promotion stop check), execution suffixes for follow-up worktrees, and per-run diagnostics files under `errors/`.

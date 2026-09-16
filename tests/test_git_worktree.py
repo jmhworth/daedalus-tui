@@ -362,12 +362,12 @@ class GitWorktreeTests(unittest.TestCase):
         with patch("tui.git_worktree.subprocess.run") as run:
             run.side_effect = [
                 type("Process", (), {"returncode": 0, "stdout": "git@example.com:repo.git\n", "stderr": ""})(),
-                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+                type("Process", (), {"returncode": 0, "stdout": "a" * 40 + "\n", "stderr": ""})(),
                 type("Process", (), {"returncode": 0, "stdout": "ok\n", "stderr": ""})(),
             ]
             from tui.git_worktree import push_branch
 
-            push_branch(Path("/repo"), "james")
+            self.assertEqual(push_branch(Path("/repo"), "james"), "a" * 40)
             self.assertEqual(
                 [call.args[0] for call in run.call_args_list],
                 [
@@ -376,6 +376,22 @@ class GitWorktreeTests(unittest.TestCase):
                     ["git", "push", "-u", "origin", "james"],
                 ],
             )
+
+    def test_push_primary_notice_names_the_pushed_commit(self):
+        notices: list[tuple[str, str]] = []
+        manager = GitWorktreeManager(
+            Path("/repo"),
+            on_notice=lambda message, kind="status": notices.append((message, kind)),
+        )
+        with patch("tui.git_worktree.remote_exists", return_value=True), patch(
+            "tui.git_worktree.push_branch", return_value="a" * 40
+        ):
+            self.assertTrue(manager.push_primary())
+
+        self.assertEqual(
+            notices,
+            [(f"Pushed main to origin (commit {'a' * 40}).", "pushed")],
+        )
 
     def test_push_branch_rejects_missing_remote(self):
         with patch("tui.git_worktree.subprocess.run") as run:

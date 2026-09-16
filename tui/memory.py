@@ -19,6 +19,7 @@ PROJECT_TARGET_BRANCHES_KEY = "project_target_branches"
 PROJECT_TOPICS_KEY = "project_topics"
 UI_PREFERENCES_KEY = "ui_preferences"
 TASKS_KEY = "tasks"
+PUSHED_COMMITS_KEY = "pushed_commits"
 
 
 class TaskMemoryStore:
@@ -273,6 +274,75 @@ class TaskMemoryStore:
                 updated_entries.append(existing)
             mapping[key] = value
             updated_entries.append({UI_PREFERENCES_KEY: mapping})
+            self._write_entries(updated_entries)
+
+    def get_pushed_commits(self, project: Path | None = None) -> tuple[dict[str, object], ...]:
+        """Return recorded successful pushes, optionally limited to one project."""
+        project_key = str(project.expanduser().resolve()) if project is not None else None
+        with self._lock:
+            entries = self._read_entries()
+        records: list[dict[str, object]] = []
+        for entry in entries:
+            value = entry.get(PUSHED_COMMITS_KEY)
+            if not isinstance(value, list):
+                continue
+            for record in value:
+                if not isinstance(record, dict):
+                    continue
+                if project_key is not None and record.get("project") != project_key:
+                    continue
+                records.append(dict(record))
+        return tuple(records)
+
+    def record_pushed_commit(
+        self,
+        project: Path,
+        branch: str,
+        remote: str,
+        commit: str,
+        pushed_at: float | None = None,
+    ) -> None:
+        """Persist one successful branch-push tip without disturbing task history."""
+        project_text = str(project.expanduser().resolve())
+        branch = branch.strip()
+        remote = remote.strip()
+        commit = commit.strip()
+        if not branch or not remote or not commit:
+            raise ValueError("A pushed commit requires a project, branch, remote, and commit SHA.")
+        record = {
+            "timestamp": datetime.fromtimestamp(pushed_at or 0, timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+            if pushed_at is not None
+            else datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "project": project_text,
+            "branch": branch,
+            "remote": remote,
+            "commit": commit,
+        }
+        identity = (project_text, branch, remote, commit)
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            records: list[dict[str, object]] = []
+            for existing in entries:
+                existing_records = existing.get(PUSHED_COMMITS_KEY)
+                if isinstance(existing_records, list):
+                    records.extend(item for item in existing_records if isinstance(item, dict))
+                    continue
+                updated_entries.append(existing)
+            if not any(
+                (
+                    item.get("project"),
+                    item.get("branch"),
+                    item.get("remote"),
+                    item.get("commit"),
+                )
+                == identity
+                for item in records
+            ):
+                records.append(record)
+            updated_entries.append({PUSHED_COMMITS_KEY: records})
             self._write_entries(updated_entries)
 
     def get_tasks(self) -> dict[str, dict[str, object]]:

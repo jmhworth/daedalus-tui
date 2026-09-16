@@ -79,6 +79,29 @@ class UsageMonitorTests(unittest.TestCase):
         self.assertIn("1.0M tokens", reading.detail)
         self.assertIn("2 sessions today", reading.detail)
 
+    def test_claude_reading_draws_rate_limit_windows_when_present(self):
+        now = 1_800_000_000.0
+        from datetime import datetime
+
+        today = datetime.fromtimestamp(now).date().isoformat()
+        stats = {
+            "dailyActivity": [{"date": today, "messageCount": 8, "sessionCount": 2}],
+            "dailyModelTokens": [{"date": today, "tokensByModel": {"claude-opus-5": 12_000}}],
+            "rate_limits": {
+                "five_hour": {"used_percentage": 23.5, "resets_at": now + 3600},
+                "seven_day": {"used_percentage": 41.2, "resets_at": "2026-12-01T00:00:00Z"},
+            },
+        }
+        (self.home / ".claude" / "stats-cache.json").write_text(json.dumps(stats), encoding="utf-8")
+
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_claude("Claude", now)
+
+        self.assertEqual(
+            [(window.label, window.used_percent) for window in reading.windows],
+            [("5h", 23.5), ("7d", 41.2)],
+        )
+        self.assertEqual(reading.windows[0].reset_text, "resets in 1h 00m")
+
     def test_missing_data_is_reported_without_raising(self):
         monitor = UsageMonitor(UsageSettings(), home=self.home)
         readings = monitor.poll(now=1_800_000_000.0)
@@ -143,13 +166,19 @@ class UsageMonitorTests(unittest.TestCase):
                 checked_at=1_800_000_000.0,
                 windows=(UsageWindow("5h", 30.0, "resets in 2h"), UsageWindow("week", 46.0)),
             ),
-            # Claude publishes token counts, not limits, so it gets no bar.
-            ProviderUsage("claude", "Claude", "Claude today 1.0k tok", checked_at=1_800_000_000.0),
+            ProviderUsage(
+                "claude",
+                "Claude",
+                "Claude today 1.0k tok",
+                checked_at=1_800_000_000.0,
+                windows=(UsageWindow("5h", 23.5),),
+            ),
         )
         lines = format_usage_bar(readings, bar_width=10).splitlines()
         self.assertEqual(lines[2], "  5h   ███░░░░░░░  30%")
         self.assertEqual(lines[3], "  week █████░░░░░  46%")
         self.assertEqual(lines[4], "Claude today 1.0k tok")
+        self.assertEqual(lines[5], "  5h   ██░░░░░░░░  24%")
 
     def test_bars_keep_any_usage_visible_and_the_limit_distinct(self):
         self.assertEqual(format_bar(0, 10), "░░░░░░░░░░")

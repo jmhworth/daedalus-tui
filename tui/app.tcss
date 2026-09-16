@@ -156,6 +156,11 @@ Screen {
     width: 10;
 }
 
+#push-history-button {
+    width: 12;
+    margin-left: 1;
+}
+
 #directory, #phase, #title, #task-context, #status,
 #resume-notes-label {
     color: $text-muted;
@@ -696,6 +701,37 @@ TopicViewerScreen {
     border: round $primary;
     background: $surface;
     padding: 1 2;
+}
+
+#pushed-commits-dialog {
+    width: 94%;
+    height: 78%;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#pushed-commits-title {
+    color: $text-accent;
+    text-style: bold;
+    height: 2;
+}
+
+#pushed-commits-subtitle {
+    color: $text-muted;
+    height: auto;
+    margin-bottom: 1;
+}
+
+#pushed-commits-content {
+    height: 1fr;
+    border: round $primary;
+    margin-bottom: 1;
+}
+
+#pushed-commits-footer {
+    color: $text-muted;
+    height: 1;
 }
 
 #coding-statistics-title {

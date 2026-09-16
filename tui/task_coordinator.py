@@ -30,7 +30,12 @@ from .conversation import (
     new_turn_id,
 )
 from .debug_log import LOGGER, append_run_diagnostic, log_event, log_exception
-from .git_worktree import GitWorktreeError, GitWorktreeManager, WorktreeContext
+from .git_worktree import (
+    GitWorktreeError,
+    GitWorktreeManager,
+    WorktreeContext,
+    parse_push_notice,
+)
 from .local_storage import LocalStorage, project_key
 from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
 from .orchestrator import AgentStopped, LocalOrchestrator, OrchestrationResult, OrchestrationSettings
@@ -1530,6 +1535,19 @@ class TaskCoordinator:
             if branch and worktree:
                 record.branch_name = branch
                 record.worktree_path = Path(worktree)
+        if kind == "pushed":
+            pushed = parse_push_notice(message)
+            if pushed is not None:
+                branch, remote, commit = pushed
+                try:
+                    self.memory.record_pushed_commit(self.repository, branch, remote, commit)
+                except (OSError, ValueError) as error:
+                    LOGGER.warning(
+                        "Could not persist pushed commit task=%s commit=%s error=%s",
+                        record.task_id,
+                        commit,
+                        error,
+                    )
         self._persist_task(record, force=kind != "message")
         self._notify(record, phase, message, kind)
 

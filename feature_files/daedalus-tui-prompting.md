@@ -135,7 +135,8 @@ provider usage every minute.
   non-interactive `usage` subcommand (Claude Code 2.1 waits for a terminal,
   Codex 0.154 refuses without one), so the default readers use the same local
   data those CLIs show in `/usage` and `/status`: Codex rate-limit windows from
-  its session logs and Claude Code's per-day token statistics cache. A
+  its session logs and Claude Code's per-day token statistics cache, including
+  Claude's `five_hour`, `seven_day`, and `spend_limit` windows when present. A
   `command` per provider runs any program instead (stdin closed, timeout,
   process-group kill) and shows its JSON usage fields or first line.
 - **Codex rate-limit reading**: Codex writes rate limits only after a turn
@@ -157,8 +158,9 @@ provider usage every minute.
   The bars are plain block text so they render on a markup-free `Static` in the
   fixed-width task sidebar; any non-zero usage keeps at least one filled cell
   and only a real 100% fills the bar, so neither a small number nor a near-limit
-  one is rounded into a lie. Providers that publish counts rather than limits
-  (Claude Code's statistics cache) keep their summary line alone.
+  one is rounded into a lie. Claude's daily token and message counts remain in
+  its summary while any available rate-limit windows or configured context
+  percentage get the same labelled bars as Codex.
 - **Vim composer**: `tui/vim_text_area.py` extends the installed
   `VimTextArea` with a line-aware register, counted `dd`/`yy`/`cc`, Vim `w`
   motion and in-line `dw`/`cw`/`yw`, anchor-based visual and visual-line
@@ -180,7 +182,8 @@ provider usage every minute.
 - `tui/usage_monitor.py`: Provider usage readers, rate-limit windows, and progress-bar rendering.
 - `tui/vim_text_area.py`: Completed Vim cut/copy/paste, registers, key routing.
 - `tui/app.py`, `tui/app.tcss`: Composer drafts, interruption, follow-ups, viewer layout, history toggle, usage bar.
-- `tui/memory.py`, `tui/token_usage.py`: Conversation snapshot fields, UI preferences, prompt/attempt accounting.
+- `tui/memory.py`, `tui/token_usage.py`: Conversation snapshot fields, UI
+  preferences, prompt/attempt accounting, and shared push-history storage.
 - `parameter_files/daedalus-tui-prompting.toml`: Storage root, autosave delay, title length, viewer widths, line breaks, action-item header, context budget, error rotation.
 - `parameter_files/daedalus-tui.toml`: `[usage]` cadence, per-provider sources, session scan depth and tail size, bar width.
 - `tests/test_vim_text_area.py`, `tests/test_prompt_store.py`, `tests/test_debug_log.py`, `tests/test_output_viewer.py`, `tests/test_usage_monitor.py`, plus extended `tests/test_app.py`, `tests/test_task_coordinator.py`, `tests/test_orchestrator.py`, `tests/test_agent_runner.py`, `tests/test_prompts.py`, `tests/test_token_usage.py`, `tests/test_memory.py`, `tests/test_config.py`.
@@ -190,4 +193,7 @@ HACKING
 
 ## State Log
 - 2026-09-16: Gave the Markdown viewer automatic line breaks and replaced its muted run-identity line with an action-items header extracted from the response; fixed the Codex usage reader, which reported "no usage data yet" whenever the newest session log was a just-started session and never read Codex's `resets_in_seconds` reset times, and added per-window progress bars to the usage panel.
+- 2026-09-16: Extended usage-window parsing to Claude's documented rate-limit
+  payloads and configured JSON sources, including 5-hour, 7-day, and spend
+  bars with reset countdowns.
 - 2026-09-15: Added conversation turns and runs, verbatim prompt archives and autosaved drafts under `prompts/`, non-destructive `Ctrl+C`/Cancel that restores the interrupted prompt, follow-up prompts within one named task, stable generated titles with an All tasks history filter, the optional right-third Markdown viewer, consolidated diagnostics under `errors/`, completed Vim cut/copy/paste with system-register commands, and a bottom-left usage bar that refreshes Codex and Claude usage every minute.
