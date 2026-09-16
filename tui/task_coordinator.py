@@ -1251,6 +1251,9 @@ class TaskCoordinator:
             lambda phase, message, kind="status": self._handle_event(record, run_id, phase, message, kind),
             integration_gate=self.integration.run_when_ready,
         )
+        set_task_title = getattr(orchestrator, "set_task_title", None)
+        if callable(set_task_title):
+            set_task_title(record.display_title)
         try:
             result = orchestrator.run(
                 prompt,

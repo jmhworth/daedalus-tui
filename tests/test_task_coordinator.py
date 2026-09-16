@@ -1127,10 +1127,14 @@ class InterruptionAndFollowUpTests(unittest.TestCase):
     def test_follow_up_after_cleanup_creates_a_fresh_worktree_under_the_same_task(self):
         class RecordingOrchestrator:
             calls = []
+            titles = []
 
             def __init__(self, repository, _runner, _settings, on_event, integration_gate=None):
                 self.repository = repository
                 self.on_event = on_event
+
+            def set_task_title(self, title):
+                type(self).titles.append(title)
 
             def run(self, prompt, provider, model, reasoning, task_id=None, existing_context=None, resume_from=None, resume_notes=(), **_kwargs):
                 type(self).calls.append((task_id, prompt, existing_context, resume_from, tuple(resume_notes)))
@@ -1160,6 +1164,7 @@ class InterruptionAndFollowUpTests(unittest.TestCase):
             self.assertEqual(record.reasoning, "high")
             self.assertEqual(len(record.runs), 3)
             self.assertEqual(record.tokens_consumed, 15)
+            self.assertEqual(RecordingOrchestrator.titles, ["Fix login validation"] * 3)
             calls = RecordingOrchestrator.calls
             self.assertEqual([call[0] for call in calls], [record.task_id, f"{record.task_id}-r2", f"{record.task_id}-r3"])
             self.assertTrue(all(call[2] is None for call in calls))

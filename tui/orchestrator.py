@@ -9,6 +9,7 @@ import uuid
 from typing import Callable
 
 from .agent_runner import AgentControl, AgentRequest, AgentResult, AgentRunner
+from .conversation import generate_task_title
 from .debug_log import LOGGER, log_exception
 from .environment import cursor_environment
 from .firebase import (
@@ -52,6 +53,24 @@ PROFILE_FILENAMES = {
 BUNDLED_PROFILE_ROOT = (
     Path(__file__).resolve().parent / "templates" / "project-initializer" / ".agents" / "profiles"
 )
+TASK_COMMIT_TITLE_LIMIT = 60
+
+
+def task_commit_subject(prompt: str, task_id: str, task_title: str | None = None) -> str:
+    """Build a stable commit subject from the task's human-readable goal."""
+    title = task_title.strip() if isinstance(task_title, str) else ""
+    if not title:
+        title = generate_task_title(prompt, TASK_COMMIT_TITLE_LIMIT, fallback_id=task_id)
+    else:
+        title = generate_task_title(title, TASK_COMMIT_TITLE_LIMIT, fallback_id=task_id)
+    return f"Daedalus: {title}"
+
+
+def task_commit_message(subject: str, detail: str | None = None) -> str:
+    """Add orchestration context without hiding the task that produced it."""
+    if not detail:
+        return subject
+    return f"{subject} ({detail})"
 
 
 def verification_tool_rules(commands: list[list[str]]) -> tuple[str, ...]:
@@ -138,6 +157,11 @@ class LocalOrchestrator:
         self.integration_gate = integration_gate or (lambda _sequence, operation, *_extra: operation())
         self._tokens_consumed = 0
         self._gate_accepts_stop_check = _accepts_stop_check(self.integration_gate)
+        self._task_title: str | None = None
+
+    def set_task_title(self, title: str | None) -> None:
+        """Supply the stable conversation title used for task-owned commits."""
+        self._task_title = title
 
     def run(
         self,
@@ -191,6 +215,7 @@ class LocalOrchestrator:
             self._raise_if_stopped(control)
 
             selection = (provider, model, reasoning)
+            commit_subject = task_commit_subject(prompt, task_id, self._task_title)
             skip_to_integration = (
                 mode not in {"ask", "plan"}
                 and resume_from == "integration"
@@ -250,17 +275,35 @@ class LocalOrchestrator:
                     )
 
                 manager.discard_graphify_changes(context.path)
-                manager.commit_changes(context.path, f"Daedalus task {task_id}")
+                manager.commit_changes(context.path, commit_subject)
                 if manager.head(context.path) == context.base_commit:
                     raise RuntimeError("Agent finished without creating a commit.")
                 self.verify_with_repairs(
-                    manager, context, selection, prompt, control, topic_slug=topic_slug
+                    manager,
+                    context,
+                    selection,
+                    prompt,
+                    control,
+                    topic_slug=topic_slug,
+                    commit_subject=commit_subject,
                 )
                 self.push_migrations_with_repairs(
-                    manager, context, selection, prompt, control, topic_slug=topic_slug
+                    manager,
+                    context,
+                    selection,
+                    prompt,
+                    control,
+                    topic_slug=topic_slug,
+                    commit_subject=commit_subject,
                 )
                 self.deploy_firebase_with_repairs(
-                    manager, context, selection, prompt, control, topic_slug=topic_slug
+                    manager,
+                    context,
+                    selection,
+                    prompt,
+                    control,
+                    topic_slug=topic_slug,
+                    commit_subject=commit_subject,
                 )
             else:
                 self.emit("ready", "Coding already complete; retrying from integration.")
@@ -269,14 +312,20 @@ class LocalOrchestrator:
                 self._raise_if_stopped(control)
                 integration_base = manager.capture_primary()
                 self.integrate(
-                    manager, context, selection, prompt, control, topic_slug=topic_slug
+                    manager,
+                    context,
+                    selection,
+                    prompt,
+                    control,
+                    topic_slug=topic_slug,
+                    commit_subject=commit_subject,
                 )
                 # Promotion is the last atomic Git step. Check for a stop
                 # right before it; once it starts it runs to a known state
                 # and the actual result is reported, never undone.
                 self._raise_if_stopped(control)
                 manager.promote(context, integration_base)
-                self.refresh_graphify(manager, task_id)
+                self.refresh_graphify(manager, task_id, commit_subject=commit_subject)
 
             self.emit("ready", "Task is ready for serialized integration.")
             self._run_integration_gate(submission_sequence, integrate_and_promote, control)
@@ -391,6 +440,7 @@ class LocalOrchestrator:
         original: str,
         control: AgentControl | None = None,
         topic_slug: str | None = None,
+        commit_subject: str | None = None,
     ) -> None:
         commands = discover_commands(
             context.path,
@@ -399,6 +449,11 @@ class LocalOrchestrator:
         attempts = 0
         failure_log: list[str] = []
         limit = self.settings.task_verification_attempt_limit
+        commit_subject = commit_subject or task_commit_subject(
+            original,
+            context.task_id,
+            self._task_title,
+        )
         while True:
             self.emit("verification", "Running verification checks.")
             self._raise_if_stopped(control)
@@ -437,7 +492,10 @@ class LocalOrchestrator:
             )
             if not repair.succeeded:
                 raise RuntimeError(repair.error or "Task repair agent failed.")
-            manager.commit_changes(context.path, f"Daedalus task repair {attempts}")
+            manager.commit_changes(
+                context.path,
+                task_commit_message(commit_subject, f"verification repair {attempts}"),
+            )
 
     def push_migrations_with_repairs(
         self,
@@ -447,12 +505,18 @@ class LocalOrchestrator:
         original: str,
         control: AgentControl | None = None,
         topic_slug: str | None = None,
+        commit_subject: str | None = None,
     ) -> None:
         if not self.settings.supabase_db_push_enabled:
             return
         attempts = 0
         failure_log: list[str] = []
         limit = self.settings.task_verification_attempt_limit
+        commit_subject = commit_subject or task_commit_subject(
+            original,
+            context.task_id,
+            self._task_title,
+        )
         environment = cursor_environment(context.path, (self.repository / ".env",))
         while True:
             if not migrations_pending(context.path, context.base_commit):
@@ -496,7 +560,10 @@ class LocalOrchestrator:
             )
             if not repair.succeeded:
                 raise RuntimeError(repair.error or "Migration repair agent failed.")
-            manager.commit_changes(context.path, f"Daedalus migration repair {attempts}")
+            manager.commit_changes(
+                context.path,
+                task_commit_message(commit_subject, f"Supabase migration repair {attempts}"),
+            )
 
     def deploy_firebase_with_repairs(
         self,
@@ -506,6 +573,7 @@ class LocalOrchestrator:
         original: str,
         control: AgentControl | None = None,
         topic_slug: str | None = None,
+        commit_subject: str | None = None,
     ) -> None:
         """Apply changed Firestore rules and indexes, repairing failures in place.
 
@@ -521,6 +589,11 @@ class LocalOrchestrator:
         attempts = 0
         failure_log: list[str] = []
         limit = self.settings.task_verification_attempt_limit
+        commit_subject = commit_subject or task_commit_subject(
+            original,
+            context.task_id,
+            self._task_title,
+        )
         environment = cursor_environment(context.path, (self.repository / ".env",))
         while True:
             if not firebase_changes_pending(context.path, context.base_commit, firebase_settings):
@@ -568,7 +641,10 @@ class LocalOrchestrator:
             )
             if not repair.succeeded:
                 raise RuntimeError(repair.error or "Firebase repair agent failed.")
-            manager.commit_changes(context.path, f"Daedalus Firebase repair {attempts}")
+            manager.commit_changes(
+                context.path,
+                task_commit_message(commit_subject, f"Firebase repair {attempts}"),
+            )
 
     def integrate(
         self,
@@ -578,7 +654,13 @@ class LocalOrchestrator:
         original: str,
         control: AgentControl | None = None,
         topic_slug: str | None = None,
+        commit_subject: str | None = None,
     ) -> None:
+        commit_subject = commit_subject or task_commit_subject(
+            original,
+            context.task_id,
+            self._task_title,
+        )
         failure = ""
         try:
             self._raise_if_stopped(control)
@@ -589,7 +671,14 @@ class LocalOrchestrator:
 
         if failure:
             self.resolve_integration(
-                manager, context, selection, original, failure, control, topic_slug=topic_slug
+                manager,
+                context,
+                selection,
+                original,
+                failure,
+                control,
+                topic_slug=topic_slug,
+                commit_subject=commit_subject,
             )
 
         commands = discover_commands(
@@ -607,6 +696,7 @@ class LocalOrchestrator:
                 result.output,
                 control,
                 topic_slug=topic_slug,
+                commit_subject=commit_subject,
             )
 
     def resolve_integration(
@@ -618,7 +708,13 @@ class LocalOrchestrator:
         failure: str,
         control: AgentControl | None = None,
         topic_slug: str | None = None,
+        commit_subject: str | None = None,
     ) -> None:
+        commit_subject = commit_subject or task_commit_subject(
+            original,
+            context.task_id,
+            self._task_title,
+        )
         for attempt in range(1, self.settings.resolver_attempt_limit + 1):
             self._raise_if_stopped(control)
             self.emit("resolving", f"Launching resolver attempt {attempt}/{self.settings.resolver_attempt_limit}.")
@@ -644,7 +740,10 @@ class LocalOrchestrator:
                     failure = "Resolver left unmerged Git paths in the task worktree."
                     continue
                 manager.discard_graphify_changes(context.path)
-                manager.commit_changes(context.path, f"Daedalus resolver attempt {attempt}")
+                manager.commit_changes(
+                    context.path,
+                    task_commit_message(commit_subject, f"integration resolver {attempt}"),
+                )
                 commands = discover_commands(
                     context.path,
                     [list(command) for command in self.settings.verification_commands],
@@ -704,7 +803,12 @@ class LocalOrchestrator:
         self.emit("topic", message, "error")
         return None
 
-    def refresh_graphify(self, manager: GitWorktreeManager, task_id: str) -> None:
+    def refresh_graphify(
+        self,
+        manager: GitWorktreeManager,
+        task_id: str,
+        commit_subject: str | None = None,
+    ) -> None:
         """Refresh graph metadata after promotion without blocking the task."""
         if not self.settings.graphify_update_enabled:
             return
@@ -736,7 +840,10 @@ class LocalOrchestrator:
                 return
             try:
                 committed = manager.commit_graphify_changes(
-                    f"Daedalus graphify update after task {task_id}",
+                    task_commit_message(
+                        commit_subject or task_commit_subject("", task_id, self._task_title),
+                        "graphify update",
+                    ),
                     checkout,
                 )
             except GitWorktreeError as error:
