@@ -146,8 +146,9 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+P", "Pause task", "pause_task"),
     ("Ctrl+R", "Resume task", "resume_task"),
     ("Ctrl+X", "Cancel task", "cancel_task"),
-    # New Project remains a direct shortcut; the other low-frequency actions
-    # are discoverable from the Command Menu opened with Ctrl+K.
+    ("Ctrl+T", "New task", "new_task"),
+    # New Task and New Project remain direct shortcuts; the other low-frequency
+    # actions are discoverable from the Command Menu opened with Ctrl+K.
     ("Ctrl+Shift+N", "New project", "show_new_project"),
     ("Ctrl+Q", "Quit", "quit"),
     ("Ctrl+K", "Open command menu", "show_command_menu"),

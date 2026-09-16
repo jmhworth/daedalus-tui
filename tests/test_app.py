@@ -1196,7 +1196,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             ):
                 self.assertIsInstance(app.screen.query_one(button_id, Button), Button)
             binding_keys = [binding[0] for binding in app.BINDINGS]
-            self.assertNotIn("ctrl+t", binding_keys)
+            self.assertIn("ctrl+t", binding_keys)
             self.assertNotIn("ctrl+shift+t", binding_keys)
             self.assertNotIn("ctrl+shift+s", binding_keys)
 
@@ -1210,6 +1210,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Ctrl+Enter", shortcut_text)
             self.assertIn("Ctrl+K", shortcut_text)
             self.assertIn("Ctrl+P", shortcut_text)
+            self.assertIn("Ctrl+T", shortcut_text)
             self.assertIn("Ctrl+U", shortcut_text)
             self.assertIn("Ctrl+Shift+N", shortcut_text)
             self.assertIn("gg / G", shortcut_text)
@@ -1217,6 +1218,22 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
             self.assertNotIsInstance(app.screen, KeyboardShortcutsScreen)
+
+    async def test_ctrl_t_starts_a_new_task(self):
+        app, _ = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("The previous prompt")
+            app.action_submit_prompt()
+            await pilot.pause()
+
+            await pilot.press("ctrl+t")
+            await pilot.pause()
+
+            self.assertEqual(prompt.text, "")
+            self.assertFalse(prompt.read_only)
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
+            self.assertEqual(str(app.query_one("#phase", Static).render()), "Phase: Idle")
 
     async def test_ctrl_shift_n_opens_new_project_modal(self):
         app, _ = self.make_app()
