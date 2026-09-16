@@ -64,9 +64,10 @@ For personal shared Supabase projects, keep `SUPABASE_URL`,
 is optional when the URL is `https://<ref>.supabase.co`. For Activate and
 migration push, also set either `SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`
 (API keys alone cannot push SQL). Registered projects store only their schema
-marker; Daedalus synchronizes each ignored project `.env` from the launch-root
-file at startup. When `supabase_db_push_enabled` is enabled, startup pushes
-migrations only for projects that have been Activated (ecosystem-ready);
+marker; New Project also copies the launch-root `.env` into the new project's
+ignored `.env`, and Daedalus synchronizes registered projects from the same
+launch-root file at startup. When `supabase_db_push_enabled` is enabled,
+startup pushes migrations only for projects that have been Activated (ecosystem-ready);
 scaffolded projects wait for explicit Activate via the Command Menu (`Ctrl+K`).
 The same menu provides an exact-project-name-confirmed local cleanup action for
 removing a broken personal-Supabase scaffold; cleanup does not change the remote

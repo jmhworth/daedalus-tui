@@ -150,6 +150,15 @@ def materialize_templates(destination: Path, project_name: str, settings: dict) 
         daedalus.unlink()
 
 
+def copy_launch_environment(launch_root: Path, destination: Path) -> bool:
+    """Copy the launch-root environment into a newly materialized project."""
+    source = launch_root / ".env"
+    if not source.is_file():
+        return False
+    shutil.copy2(source, destination / ".env")
+    return True
+
+
 def find_github_url(stdout: str, destination: Path, run_process) -> str | None:
     for token in stdout.split():
         if token.startswith("https://github.com/") or token.startswith("git@github.com:"):
@@ -249,6 +258,7 @@ def initialize_project(
     if not local_complete:
         try:
             materialize_templates(temporary, project_name, settings)
+            copy_launch_environment(root, temporary)
             for current_step in steps:
                 if current_step["name"] == "github-auth-status":
                     continue

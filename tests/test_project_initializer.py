@@ -54,6 +54,11 @@ class ProjectInitializerTests(unittest.TestCase):
     def test_creates_templates_runs_commands_in_order_and_renames_atomically(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            launch_env = root / ".env"
+            launch_env.write_text(
+                "CURSOR_API_KEY=cursor-secret\nSUPABASE_URL=https://shared.supabase.co\n",
+                encoding="utf-8",
+            )
             calls = []
 
             def fake_run(command, cwd, capture_output, text, shell):
@@ -80,6 +85,10 @@ class ProjectInitializerTests(unittest.TestCase):
             self.assertEqual(result["status"], "success")
             self.assertTrue((destination / "AGENTS.md").is_file())
             self.assertTrue((destination / ".agents" / "profiles" / "coding.md").is_file())
+            self.assertEqual(
+                (destination / ".env").read_bytes(),
+                launch_env.read_bytes(),
+            )
             self.assertEqual((destination / "README.md").read_text().splitlines()[0],
                              "# example-project")
             daedalus = destination / ".daedalus"
