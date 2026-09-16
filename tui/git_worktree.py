@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 import subprocess
+from typing import Callable
 import uuid
 
 from .project_config import ProjectWorktreeSettings
@@ -19,6 +20,14 @@ DAEDALUS_RUNTIME_ARTIFACTS: tuple[str, ...] = (
     ".daedalus-debug.log",
     ".daedalus-memory.json",
 )
+
+#: Message used when Daedalus commits the operator's pending changes instead of
+#: refusing to start a task on a dirty operating branch.
+DIRTY_PRIMARY_COMMIT_MESSAGE = "Daedalus: commit pending changes before starting a task"
+
+#: Callback used to report auto-commit and auto-push progress, as
+#: ``(message, kind)``, so the orchestrator can surface it in the task panel.
+NoticeCallback = Callable[[str, str], None]
 
 
 class GitWorktreeError(RuntimeError):
@@ -104,11 +113,21 @@ class GitWorktreeManager:
         primary_branch: str = "main",
         root_name: str = ".daedalus-worktrees",
         runtime_artifacts: Sequence[str] = DAEDALUS_RUNTIME_ARTIFACTS,
+        autocommit_primary: bool = True,
+        autocommit_message: str = DIRTY_PRIMARY_COMMIT_MESSAGE,
+        autocommit_push: bool = True,
+        remote: str = "origin",
+        on_notice: NoticeCallback | None = None,
     ):
         self.repository = repository.resolve()
         self.primary_branch = primary_branch
         self.root_name = root_name
         self.runtime_artifacts = tuple(name for name in runtime_artifacts if name)
+        self.autocommit_primary = autocommit_primary
+        self.autocommit_message = autocommit_message
+        self.autocommit_push = autocommit_push
+        self.remote = remote
+        self.on_notice = on_notice
 
     def create(self, task_id: str) -> WorktreeContext:
         self._validate_primary()
@@ -311,7 +330,9 @@ class GitWorktreeManager:
 
         The operator does not need that branch checked out. Task worktrees are
         always created from the target branch tip. When it *is* checked out, the
-        working tree must be clean so promotion and graph commits stay coherent.
+        working tree must be clean so promotion and graph commits stay coherent;
+        pending operator changes are committed (and pushed) rather than refused,
+        so a dirty checkout no longer blocks a task from starting.
         """
         verify = subprocess.run(
             ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{self.primary_branch}"],
@@ -326,14 +347,71 @@ class GitWorktreeManager:
         if not self.is_primary_checked_out():
             return
         dirty = self.dirty_paths(self.repository)
-        if dirty:
-            listed = ", ".join(dirty[:5])
-            if len(dirty) > 5:
-                listed += f", and {len(dirty) - 5} more"
-            raise GitWorktreeError(
-                "Primary worktree must be clean before starting or promoting an agent. "
-                f"Uncommitted changes: {listed}."
+        if not dirty:
+            return
+        if self.autocommit_primary:
+            self.commit_and_push_primary(dirty)
+            return
+        listed = ", ".join(dirty[:5])
+        if len(dirty) > 5:
+            listed += f", and {len(dirty) - 5} more"
+        raise GitWorktreeError(
+            "Primary worktree must be clean before starting or promoting an agent. "
+            f"Uncommitted changes: {listed}."
+        )
+
+    def commit_and_push_primary(self, dirty: list[str] | None = None) -> bool:
+        """Commit the operator's pending primary-worktree changes and publish them.
+
+        A dirty operating branch used to abort the task before any agent ran.
+        Committing first keeps every later step coherent: the task worktree is
+        branched from a tip that already contains the operator's work, and
+        promotion can still fast-forward the checked-out branch.
+        """
+        dirty = self.dirty_paths(self.repository) if dirty is None else dirty
+        if not dirty:
+            return False
+        # Stage the real changes only. A blanket `git add -A` would also start
+        # tracking Daedalus' own runtime files, which the TUI rewrites on every
+        # launch. Anything the operator already staged is committed regardless,
+        # because the commit takes the whole index.
+        self.run_git(["add", "-A", "--", *dirty], self.repository)
+        if not self.git_output(["diff", "--cached", "--name-only"], self.repository):
+            return False
+        self.run_git(["commit", "-m", self.autocommit_message], self.repository)
+        self.notify(
+            f"Committed {len(dirty)} pending change(s) on {self.primary_branch} before starting."
+        )
+        self.push_primary()
+        return True
+
+    def push_primary(self) -> bool:
+        """Publish the operating branch, treating a failed push as non-fatal.
+
+        The point of the auto-commit is to let the task run. An unreachable or
+        unauthenticated remote is reported and the work stays committed locally
+        rather than turning into the start-up error this replaced.
+        """
+        if not self.autocommit_push:
+            return False
+        if not remote_exists(self.repository, self.remote):
+            self.notify(
+                f"No {self.remote!r} remote configured; kept the commit local.", "warning"
             )
+            return False
+        try:
+            push_branch(self.repository, self.primary_branch, self.remote)
+        except GitWorktreeError as error:
+            self.notify(
+                f"Could not push {self.primary_branch} to {self.remote}: {error}", "warning"
+            )
+            return False
+        self.notify(f"Pushed {self.primary_branch} to {self.remote}.")
+        return True
+
+    def notify(self, message: str, kind: str = "status") -> None:
+        if self.on_notice is not None:
+            self.on_notice(message, kind)
 
     def _validate_primary(self) -> None:
         """Compatibility alias for callers that used the original private helper."""

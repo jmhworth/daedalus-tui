@@ -25,6 +25,13 @@ from .debug_log import LOGGER, scrub_credentials
 
 DEFAULT_INTERVAL_SECONDS = 60
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 20
+DEFAULT_SESSION_SCAN_LIMIT = 12
+DEFAULT_SESSION_TAIL_BYTES = 262_144
+DEFAULT_BAR_WIDTH = 12
+
+# Codex window keys in display order, with the label used when a payload omits
+# ``window_minutes`` (newer Codex builds send the windows without it).
+_CODEX_WINDOW_KEYS = (("primary", "session"), ("secondary", "weekly"))
 
 
 @dataclass(frozen=True)
@@ -42,12 +49,31 @@ class UsageSettings:
     command_timeout_seconds: float = DEFAULT_COMMAND_TIMEOUT_SECONDS
     codex_sessions_dir: str = "~/.codex/sessions"
     claude_stats_file: str = "~/.claude/stats-cache.json"
+    # A freshly started Codex session has no rate-limit payload until its first
+    # turn finishes, so reading only the newest file reports "no usage data"
+    # while a slightly older session holds the current numbers. Scan back
+    # through this many session logs before giving up.
+    session_scan_limit: int = DEFAULT_SESSION_SCAN_LIMIT
+    # Session logs grow without bound; only their tail can hold the newest
+    # rate-limit payload, so never read more than this many trailing bytes.
+    session_tail_bytes: int = DEFAULT_SESSION_TAIL_BYTES
+    # Cells used by each percentage bar in the usage panel.
+    bar_width: int = DEFAULT_BAR_WIDTH
     providers: dict[str, UsageProviderSettings] = field(
         default_factory=lambda: {
             "claude": UsageProviderSettings("Claude"),
             "codex": UsageProviderSettings("Codex"),
         }
     )
+
+
+@dataclass(frozen=True)
+class UsageWindow:
+    """One rate-limit window with a percentage the usage panel can draw."""
+
+    label: str
+    used_percent: float
+    reset_text: str = ""
 
 
 @dataclass(frozen=True)
@@ -61,6 +87,7 @@ class ProviderUsage:
     ok: bool = True
     checked_at: float = 0.0
     source: str = ""
+    windows: tuple[UsageWindow, ...] = ()
 
 
 def _format_tokens(value: int) -> str:
@@ -71,13 +98,36 @@ def _format_tokens(value: int) -> str:
     return str(value)
 
 
-def _format_reset(resets_at: object, now: float) -> str:
-    if not isinstance(resets_at, (int, float)) or isinstance(resets_at, bool):
+def _number(value: object) -> float | None:
+    """Return ``value`` as a float, rejecting booleans and non-numbers."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _window_reset_seconds(window: dict, now: float) -> float | None:
+    """Return seconds until a window resets from either Codex spelling.
+
+    Codex reports ``resets_in_seconds`` (a duration); older payloads carried
+    ``resets_at`` (an absolute epoch). Reading only one of them silently drops
+    the reset time from the panel, so both are accepted.
+    """
+    relative = _number(window.get("resets_in_seconds"))
+    if relative is not None:
+        return relative
+    absolute = _number(window.get("resets_at"))
+    if absolute is None:
+        return None
+    return absolute - now
+
+
+def _format_duration(remaining: float | None) -> str:
+    if remaining is None:
         return ""
-    remaining = int(resets_at - now)
-    if remaining <= 0:
+    total = int(remaining)
+    if total <= 0:
         return "resets now"
-    hours, minutes = divmod(remaining // 60, 60)
+    hours, minutes = divmod(total // 60, 60)
     if hours >= 24:
         days, hours = divmod(hours, 24)
         return f"resets in {days}d {hours}h"
@@ -86,9 +136,47 @@ def _format_reset(resets_at: object, now: float) -> str:
     return f"resets in {minutes}m"
 
 
-def _window_label(window_minutes: object) -> str:
+def _format_reset(window: dict, now: float) -> str:
+    return _format_duration(_window_reset_seconds(window, now))
+
+
+def format_bar(percent: float, width: int = DEFAULT_BAR_WIDTH) -> str:
+    """Draw a fixed-width progress bar for a 0-100 percentage.
+
+    The bar is plain block text so it renders on a ``Static`` with Textual
+    markup disabled, and it never exceeds ``width`` cells, so the usage panel
+    cannot widen the task sidebar.
+    """
+    width = max(1, int(width))
+    ratio = min(1.0, max(0.0, percent / 100.0))
+    filled = int(round(ratio * width))
+    # Any non-zero usage should be visible, and anything short of the limit
+    # should still show headroom.
+    if percent > 0 and filled == 0:
+        filled = 1
+    if ratio < 1.0 and filled == width:
+        filled = width - 1
+    return "█" * filled + "░" * (width - filled)
+
+
+def _format_age(seconds: float) -> str:
+    """Describe how old a reading is, so stale numbers are visible as stale."""
+    total = int(max(0.0, seconds))
+    if total < 90:
+        return "just now"
+    minutes = total // 60
+    if minutes < 60:
+        return f"{minutes}m ago"
+    hours, minutes = divmod(minutes, 60)
+    if hours < 24:
+        return f"{hours}h {minutes:02d}m ago"
+    days, hours = divmod(hours, 24)
+    return f"{days}d {hours}h ago"
+
+
+def _window_label(window_minutes: object, fallback: str = "window") -> str:
     if not isinstance(window_minutes, (int, float)) or isinstance(window_minutes, bool):
-        return "window"
+        return fallback
     minutes = int(window_minutes)
     if minutes % 10080 == 0:
         weeks = minutes // 10080
@@ -155,70 +243,115 @@ class UsageMonitor:
         return path.expanduser()
 
     def read_codex(self, label: str, now: float) -> ProviderUsage:
-        """Read the newest ``rate_limits`` payload from Codex session logs."""
+        """Read the newest usable ``rate_limits`` payload from Codex session logs.
+
+        Codex only writes rate limits once a turn completes, so the most
+        recently touched session log is frequently a just-started session with
+        no usage in it at all. Scanning back through the newest few logs until
+        a payload with real percentages appears keeps the panel showing the
+        operator's actual limits instead of "no usage data yet".
+        """
         sessions_dir = self._expand(self.settings.codex_sessions_dir)
         source = str(sessions_dir)
-        newest: tuple[float, Path] | None = None
         try:
+            candidates: list[tuple[float, Path]] = []
             for path in sessions_dir.rglob("*.jsonl"):
                 try:
-                    modified = path.stat().st_mtime
+                    candidates.append((path.stat().st_mtime, path))
                 except OSError:
                     continue
-                if newest is None or modified > newest[0]:
-                    newest = (modified, path)
         except OSError as error:
             return ProviderUsage("codex", label, f"{label}: unavailable", f"{source}: {error}", False, now, source)
-        if newest is None:
+        if not candidates:
             return ProviderUsage("codex", label, f"{label}: no sessions yet", "", False, now, source)
-        rate_limits = self._last_codex_rate_limits(newest[1])
-        if rate_limits is None:
-            return ProviderUsage("codex", label, f"{label}: no usage data yet", str(newest[1]), False, now, source)
-        parts = []
-        details = []
-        for key in ("primary", "secondary"):
+
+        candidates.sort(key=lambda entry: entry[0], reverse=True)
+        scanned = candidates[: max(1, self.settings.session_scan_limit)]
+        found: tuple[dict, Path, float] | None = None
+        for modified, path in scanned:
+            rate_limits = self._last_codex_rate_limits(path)
+            if rate_limits is not None:
+                found = (rate_limits, path, modified)
+                break
+        if found is None:
+            return ProviderUsage(
+                "codex",
+                label,
+                f"{label}: no usage data yet",
+                f"no rate limits in the newest {len(scanned)} session logs under {source}",
+                False,
+                now,
+                source,
+            )
+
+        rate_limits, path, modified = found
+        windows: list[UsageWindow] = []
+        for key, fallback_label in _CODEX_WINDOW_KEYS:
             window = rate_limits.get(key)
             if not isinstance(window, dict):
                 continue
-            used = window.get("used_percent")
-            if isinstance(used, bool) or not isinstance(used, (int, float)):
+            used = _number(window.get("used_percent"))
+            if used is None:
                 continue
-            window_label = _window_label(window.get("window_minutes"))
-            parts.append(f"{window_label} {used:.0f}%")
-            reset = _format_reset(window.get("resets_at"), now)
-            if reset:
-                details.append(f"{window_label}: {used:.0f}% used, {reset}")
+            window_label = _window_label(window.get("window_minutes"), fallback_label)
+            windows.append(UsageWindow(window_label, used, _format_reset(window, now)))
+        if not windows:
+            return ProviderUsage("codex", label, f"{label}: no usage data yet", str(path), False, now, source)
+
         plan = rate_limits.get("plan_type")
         plan_text = f" ({plan})" if isinstance(plan, str) and plan else ""
-        if not parts:
-            return ProviderUsage("codex", label, f"{label}: no usage data yet", str(newest[1]), False, now, source)
-        return ProviderUsage(
-            "codex",
-            label,
-            f"{label} {' · '.join(parts)}{plan_text}",
-            "\n".join(details) + f"\nfrom {newest[1].name}",
-            True,
-            now,
-            source,
-        )
+        summary = f"{label} " + " · ".join(f"{window.label} {window.used_percent:.0f}%" for window in windows) + plan_text
+        details = [
+            f"{window.label}: {window.used_percent:.0f}% used" + (f", {window.reset_text}" if window.reset_text else "")
+            for window in windows
+        ]
+        # The reading is only as fresh as the turn that produced it; showing
+        # its age makes a stale number obvious instead of misleading.
+        age = _format_age(now - modified)
+        details.append(f"from {path.name} ({age})")
+        return ProviderUsage("codex", label, summary, "\n".join(details), True, now, source, tuple(windows))
 
-    @staticmethod
-    def _last_codex_rate_limits(path: Path) -> dict | None:
+    def _last_codex_rate_limits(self, path: Path) -> dict | None:
+        """Return the newest rate-limit payload in one session log, if any.
+
+        Only the file's tail is read: session logs grow without bound and the
+        newest payload is always at the end. A payload without a single usable
+        percentage is skipped so an empty trailing entry cannot mask the real
+        numbers written earlier in the same session.
+        """
         try:
-            with path.open("r", encoding="utf-8", errors="ignore") as handle:
-                lines = handle.readlines()
+            with path.open("rb") as handle:
+                handle.seek(0, os.SEEK_END)
+                size = handle.tell()
+                tail = max(0, self.settings.session_tail_bytes)
+                handle.seek(max(0, size - tail))
+                data = handle.read()
         except OSError:
             return None
+        lines = data.decode("utf-8", errors="ignore").splitlines()
         for line in reversed(lines):
             if "rate_limits" not in line:
                 continue
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
+                # A truncated first line from the tail read, or a partially
+                # flushed final line while Codex is still running.
                 continue
-            payload = event.get("payload", event) if isinstance(event, dict) else None
-            rate_limits = payload.get("rate_limits") if isinstance(payload, dict) else None
-            if isinstance(rate_limits, dict):
+            if not isinstance(event, dict):
+                continue
+            payload = event.get("payload")
+            payload = payload if isinstance(payload, dict) else event
+            rate_limits = payload.get("rate_limits")
+            if not isinstance(rate_limits, dict):
+                continue
+            if any(
+                isinstance(rate_limits.get(key), dict) and _number(rate_limits[key].get("used_percent")) is not None
+                for key, _fallback in _CODEX_WINDOW_KEYS
+            ):
+                if "plan_type" not in rate_limits and isinstance(payload.get("plan_type"), str):
+                    # Newer Codex builds carry the plan beside the windows.
+                    rate_limits = {**rate_limits, "plan_type": payload["plan_type"]}
                 return rate_limits
         return None
 
@@ -332,22 +465,49 @@ class UsageMonitor:
         return f"{label} {lines[0][:60]}", "\n".join(lines[:12])
 
 
-def format_usage_bar(readings: tuple[ProviderUsage, ...], now: float | None = None) -> str:
-    """Render the compact usage line shown at the bottom left of the UI."""
+def format_usage_bar(
+    readings: tuple[ProviderUsage, ...],
+    now: float | None = None,
+    *,
+    bar_width: int = DEFAULT_BAR_WIDTH,
+) -> str:
+    """Render the usage panel shown at the bottom left of the UI.
+
+    Each provider contributes its summary line, followed by one progress bar
+    per rate-limit window that reports a percentage. Providers without
+    percentages (Claude Code publishes token counts, not limits) keep their
+    summary line alone.
+    """
     if not readings:
         return "Usage: —"
-    now = time.time() if now is None else now
     checked = max((reading.checked_at for reading in readings), default=0.0)
     stamp = datetime.fromtimestamp(checked).strftime("%H:%M") if checked else "—"
-    return f"Usage ({stamp}): " + "   ".join(reading.summary for reading in readings)
+    lines = [f"Usage ({stamp})"]
+    label_width = max(
+        (len(window.label) for reading in readings for window in reading.windows),
+        default=0,
+    )
+    for reading in readings:
+        lines.append(reading.summary)
+        for window in reading.windows:
+            lines.append(
+                f"  {window.label:<{label_width}} {format_bar(window.used_percent, bar_width)} "
+                f"{window.used_percent:3.0f}%"
+            )
+    return "\n".join(lines)
 
 
 __all__ = [
+    "DEFAULT_BAR_WIDTH",
     "DEFAULT_COMMAND_TIMEOUT_SECONDS",
     "DEFAULT_INTERVAL_SECONDS",
+    "DEFAULT_SESSION_SCAN_LIMIT",
+    "DEFAULT_SESSION_TAIL_BYTES",
     "ProviderUsage",
     "UsageMonitor",
     "UsageProviderSettings",
     "UsageSettings",
+    "UsageWindow",
+    "format_bar",
     "format_usage_bar",
 ]

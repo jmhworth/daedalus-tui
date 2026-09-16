@@ -7,6 +7,7 @@ from pathlib import Path
 import tomllib
 
 from .agent_runner import ProviderAuthPolicy
+from .git_worktree import DIRTY_PRIMARY_COMMIT_MESSAGE
 from .local_storage import GENERATED_DIRECTORY_NAMES, tui_project_root
 from .orchestrator import OrchestrationSettings
 from .usage_monitor import UsageProviderSettings, UsageSettings
@@ -180,6 +181,9 @@ class PromptingSettings:
     viewer_minimum_width: int = 40
     main_minimum_width: int = 80
     viewer_render_debounce_ms: int = 150
+    viewer_hard_line_breaks: bool = True
+    viewer_action_items_by_default: bool = True
+    viewer_action_item_limit: int = 6
     conversation_context_budget_chars: int = 24_000
     error_log_max_bytes: int = 2_000_000
     error_log_backup_count: int = 3
@@ -317,6 +321,13 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
     if interval < 1 or timeout <= 0:
         raise ValueError(f"{path} usage.interval_seconds and usage.command_timeout_seconds must be positive.")
     defaults = UsageSettings()
+    scan_limit = int(values.get("session_scan_limit", defaults.session_scan_limit))
+    tail_bytes = int(values.get("session_tail_bytes", defaults.session_tail_bytes))
+    bar_width = int(values.get("bar_width", defaults.bar_width))
+    if scan_limit < 1 or tail_bytes < 1 or bar_width < 1:
+        raise ValueError(
+            f"{path} usage.session_scan_limit, usage.session_tail_bytes, and usage.bar_width must be positive."
+        )
     providers: dict[str, UsageProviderSettings] = {}
     provider_tables = {
         name: table for name, table in values.items() if isinstance(table, dict)
@@ -333,6 +344,9 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
         command_timeout_seconds=timeout,
         codex_sessions_dir=str(values.get("codex_sessions_dir", defaults.codex_sessions_dir)),
         claude_stats_file=str(values.get("claude_stats_file", defaults.claude_stats_file)),
+        session_scan_limit=scan_limit,
+        session_tail_bytes=tail_bytes,
+        bar_width=bar_width,
         providers=providers,
     )
 
@@ -398,6 +412,15 @@ def load_orchestration_settings(parameter_path: Path | None = None) -> Orchestra
         firebase_executable=str(values.get("firebase_executable", "firebase")),
         shutdown_grace_seconds=shutdown_grace_seconds,
         debug_log_filename=str(values.get("debug_log_filename", ".daedalus-debug.log")),
+        dirty_primary_autocommit_enabled=bool(
+            values.get("dirty_primary_autocommit_enabled", True)
+        ),
+        dirty_primary_commit_message=str(
+            values.get("dirty_primary_commit_message", DIRTY_PRIMARY_COMMIT_MESSAGE)
+        ).strip()
+        or DIRTY_PRIMARY_COMMIT_MESSAGE,
+        dirty_primary_push_enabled=bool(values.get("dirty_primary_push_enabled", True)),
+        git_remote=str(values.get("git_remote", "origin")).strip() or "origin",
     )
 
 
@@ -443,6 +466,9 @@ def load_prompting_settings(parameter_path: Path | None = None) -> PromptingSett
         viewer_minimum_width=int(viewer.get("minimum_width", 40)),
         main_minimum_width=int(viewer.get("main_minimum_width", 80)),
         viewer_render_debounce_ms=int(viewer.get("render_debounce_ms", 150)),
+        viewer_hard_line_breaks=bool(viewer.get("hard_line_breaks", True)),
+        viewer_action_items_by_default=bool(viewer.get("action_items_by_default", True)),
+        viewer_action_item_limit=int(viewer.get("action_item_limit", 6)),
         conversation_context_budget_chars=int(conversation.get("context_budget_chars", 24_000)),
         error_log_max_bytes=int(errors.get("log_max_bytes", 2_000_000)),
         error_log_backup_count=int(errors.get("log_backup_count", 3)),
@@ -455,6 +481,7 @@ def load_prompting_settings(parameter_path: Path | None = None) -> PromptingSett
         for value in (
             settings.task_title_length,
             settings.viewer_minimum_width,
+            settings.viewer_action_item_limit,
             settings.main_minimum_width,
             settings.conversation_context_budget_chars,
             settings.error_log_max_bytes,

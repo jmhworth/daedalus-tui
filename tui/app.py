@@ -1159,6 +1159,9 @@ class DaedalusTuiApp(App[None]):
                 yield OutputViewer(
                     id="output-viewer",
                     render_debounce_ms=self.prompting.viewer_render_debounce_ms,
+                    hard_line_breaks=self.prompting.viewer_hard_line_breaks,
+                    show_action_items=self.prompting.viewer_action_items_by_default,
+                    action_item_limit=self.prompting.viewer_action_item_limit,
                 )
         yield Footer()
 
@@ -1358,7 +1361,7 @@ class DaedalusTuiApp(App[None]):
         if not nodes:
             return
         bar = nodes.first()
-        bar.update(format_usage_bar(readings))
+        bar.update(format_usage_bar(readings, bar_width=self.settings.usage.bar_width))
         bar.tooltip = "\n\n".join(
             f"{reading.label}: {reading.detail or reading.summary}" + (
                 "" if reading.ok else " (unavailable)"

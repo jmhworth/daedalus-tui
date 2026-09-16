@@ -30,9 +30,10 @@ python3 -m tui
 The launch directory is treated as a project workspace. The TUI discovers its
 immediate child directories; nested descendants are not traversed or listed.
 Folders with a `feature_files/` directory are listed first as Daedalus
-projects, and plain Git checkouts are listed after them marked
-`(unformatted)` so the TUI is not limited to projects you have already
-converted. Set `include_all_directories = true` in the `[projects]` table of
+projects, and plain Git checkouts are listed after them so the TUI is not
+limited to projects you have already converted. The selector shows each
+project's plain directory name. Set `include_all_directories = true` in the
+`[projects]` table of
 `parameter_files/daedalus-tui.toml` to list every child directory, or
 `include_git_repositories = false` to show Daedalus projects only. If no
 eligible child project exists, the launch directory remains available as a
@@ -43,9 +44,9 @@ switching the sidebar does not interrupt tasks running in another project.
 A project that lives somewhere else — created, cloned, or moved outside the
 launch root — is reachable through the project selector's trailing **Open
 directory…** entry. It asks for one path (absolute, `~`-relative, or relative
-to the launch root), then adds that directory to the selector marked
-`(external)` and switches onto it. Opened directories are remembered in
-`.daedalus-memory.json` and return on the next launch, so the selector only
+to the launch root), then adds that directory to the selector and switches
+onto it. Opened directories are remembered in `.daedalus-memory.json` and
+return on the next launch, so the selector only
 ever grows by the projects you actually open, and an opened directory that no
 longer exists is dropped and forgotten at startup.
 
@@ -124,9 +125,17 @@ the result, resolves integration
 failures with the selected agent, and fast-forwards that target branch after
 successful checks. The operator does not need the target branch checked out.
 Up to four prompts can run concurrently; integration and promotion remain
-serialized. Automated orchestration never pushes remotes; use the settings-bar
-Push control when you want to publish the selected operating branch to
-`origin`. Failed worktrees are preserved
+serialized. A dirty operating branch no longer stops a prompt: when the target
+branch is checked out with uncommitted work, orchestration commits those
+changes and pushes the branch to `origin` before creating the task worktree, so
+the task starts from what you actually have. A missing remote or a failed push
+is reported as a warning and the task still runs. Set
+`dirty_primary_autocommit_enabled = false` in the orchestration parameter file
+to get the old "primary worktree must be clean" error back, or
+`dirty_primary_push_enabled = false` to commit without publishing. Apart from
+that commit, automated orchestration does not push remotes; use the
+settings-bar Push control when you want to publish the selected operating
+branch to `origin`. Failed worktrees are preserved
 for inspection. After a successful promotion, the orchestrator refreshes and
 commits `graphify-out` onto the target branch when the target repository has
 graphify configured; graph refresh failures are reported as warnings and never
@@ -276,6 +285,20 @@ takes the right third of the whole usable width on a wide terminal (about 60
 of 180 columns), leaving two thirds for the task inbox and the composer. Its
 source selector offers the latest response, earlier responses, and the current
 plan text; **Raw** shows the exact Markdown source on a selectable surface.
+
+The response's action items head the viewer, above the rendered output: the
+unchecked task-list boxes it contains, the list items under a "Next steps" or
+"Follow-ups" heading, and any `TODO:`/`NEXT:`/`ACTION:` lines, with the run's
+identity on the same header line. Set `[viewer] action_items_by_default =
+false` in `parameter_files/daedalus-tui-prompting.toml` to hide that header,
+or `action_item_limit` to change how many items it lists.
+
+Every single newline inside a paragraph renders as a real line break, so a
+hard-wrapped response reads the way the agent wrote it instead of reflowing
+into one block. Fenced and indented code are untouched and **Raw** always
+shows the response byte-for-byte; set `[viewer] hard_line_breaks = false` for
+strict CommonMark paragraph joining.
+
 Live output re-renders with a short debounce, follows streaming only when you
 are already at the bottom, and the viewer never executes code blocks, opens
 links, or fetches images (activating a link shows its target in the status
@@ -290,11 +313,21 @@ The bottom-left usage bar refreshes every `[usage] interval_seconds` (default
 non-interactive `usage` subcommand (Claude Code waits for a terminal; Codex
 refuses without one), so by default the bar reads the same local data their
 own `/usage` and `/status` views show: Codex rate-limit windows (5-hour and
-weekly percentages with reset times) from its newest session log under
+weekly percentages with reset times) from its session logs under
 `~/.codex/sessions`, and today's token and message totals from Claude Code's
-`~/.claude/stats-cache.json`. Set `[usage.<provider>] command` to run any
-program instead; it runs with stdin closed and a timeout, and its JSON usage
-fields or first output line are shown. Hover the bar for details.
+`~/.claude/stats-cache.json`. Every window that reports a percentage is drawn
+as a progress bar under its provider's line; `[usage] bar_width` sets how many
+cells each bar uses. Set `[usage.<provider>] command` to run any program
+instead; it runs with stdin closed and a timeout, and its JSON usage fields or
+first output line are shown. Hover the bar for details, including how old the
+reading is.
+
+Codex only writes rate limits once a turn finishes, so its most recently
+touched session log is often a just-started session with no usage in it. The
+reader scans back through `[usage] session_scan_limit` logs (newest first)
+until it finds real percentages, reads only the last `session_tail_bytes` of
+each, and accepts both the `resets_in_seconds` and `resets_at` spellings of a
+window's reset time.
 
 Use the mode selector for Coding, Ask, or Plan, or press `Tab` on the main
 prompting screen to toggle between Coding and Plan. Ask runs are read-only and do

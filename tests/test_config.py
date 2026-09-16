@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from tui.config import LayoutSettings, load_coding_statistics_settings, load_orchestration_settings, load_tui_settings
+from tui.git_worktree import DIRTY_PRIMARY_COMMIT_MESSAGE
 
 
 class ConfigTests(unittest.TestCase):
@@ -153,6 +154,36 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(load_orchestration_settings(target_path).primary_branch, "develop")
             self.assertEqual(load_orchestration_settings(alias_path).primary_branch, "release")
 
+    def test_dirty_primary_autocommit_defaults_to_committing_and_pushing(self):
+        root = Path(__file__).resolve().parents[1]
+        orchestration = load_orchestration_settings(
+            root / "parameter_files" / "daedalus-tui-orchestration.toml"
+        )
+
+        self.assertTrue(orchestration.dirty_primary_autocommit_enabled)
+        self.assertTrue(orchestration.dirty_primary_push_enabled)
+        self.assertEqual(orchestration.git_remote, "origin")
+        self.assertTrue(orchestration.dirty_primary_commit_message)
+
+    def test_dirty_primary_autocommit_can_be_disabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "orchestration.toml"
+            path.write_text(
+                "dirty_primary_autocommit_enabled = false\n"
+                "dirty_primary_push_enabled = false\n"
+                'git_remote = "upstream"\n'
+                'dirty_primary_commit_message = "   "\n'
+                "verification_commands = []\n",
+                encoding="utf-8",
+            )
+            settings = load_orchestration_settings(path)
+
+            self.assertFalse(settings.dirty_primary_autocommit_enabled)
+            self.assertFalse(settings.dirty_primary_push_enabled)
+            self.assertEqual(settings.git_remote, "upstream")
+            # A blank message would make `git commit -m` fail; fall back instead.
+            self.assertEqual(settings.dirty_primary_commit_message, DIRTY_PRIMARY_COMMIT_MESSAGE)
+
     def test_loads_coding_statistics_forecast_settings(self):
         root = Path(__file__).resolve().parents[1]
         statistics = load_coding_statistics_settings(
@@ -219,6 +250,9 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         self.assertEqual(settings.task_title_length, 60)
         self.assertFalse(settings.viewer_visible_by_default)
         self.assertEqual((settings.viewer_minimum_width, settings.main_minimum_width), (40, 80))
+        self.assertTrue(settings.viewer_hard_line_breaks)
+        self.assertTrue(settings.viewer_action_items_by_default)
+        self.assertEqual(settings.viewer_action_item_limit, 6)
         self.assertEqual(settings.error_log_max_bytes, 2_000_000)
         self.assertEqual(settings.error_log_backup_count, 3)
 
@@ -256,3 +290,7 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         self.assertEqual(set(settings.usage.providers), {"claude", "codex"})
         self.assertEqual(settings.usage.providers["codex"].command, ())
         self.assertEqual(settings.usage.providers["claude"].label, "Claude")
+        # Scalar tuning keys must not be mistaken for provider tables.
+        self.assertEqual(settings.usage.session_scan_limit, 12)
+        self.assertEqual(settings.usage.session_tail_bytes, 262_144)
+        self.assertEqual(settings.usage.bar_width, 12)
