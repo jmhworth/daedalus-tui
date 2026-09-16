@@ -42,7 +42,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
-- **Keyboard-first actions**: Low-frequency actions stay out of the project toolbar and are available through `CapsLock+2` (new project), `CapsLock+3` (create topic), `CapsLock+4` (activate personal Supabase), and `Ctrl+T` (new task); `Ctrl+U` opens coding statistics, while `Ctrl+K` opens the shortcut reference and is the only global binding shown in the bottom footer.
+- **Keyboard-first actions**: Low-frequency actions stay out of the project toolbar and are available through `CapsLock+2` (new project), `CapsLock+3` (create topic), `Option+4` (activate personal Supabase), and `Ctrl+T` (new task); `Ctrl+U` opens coding statistics, while `Ctrl+K` opens the shortcut reference and is the only global binding shown in the bottom footer.
 - **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a three-column settings grid above the output and composer, giving the transcript and prompt larger starting heights while retaining independent scrolling inside each widget.
 
 ## Relevant Files
@@ -171,3 +171,4 @@ HACKING
 - 2026-09-15: Added selectable GPT-6 Astra support and mapped the new Max reasoning effort to Codex CLI's `max` value while preserving the Luna default.
 - 2026-09-15: Rebound the project, topic, and personal-Supabase actions from F2/F3/F4 to the Caps Lock function layer as CapsLock+2/CapsLock+3/CapsLock+4.
 - 2026-09-15: Updated the remaining personal-Supabase activation test to press CapsLock+4 after the function-key rebind.
+- 2026-09-15: Rebound personal-Supabase activation from CapsLock+4 to Option+4 because the Caps Lock number-row chord is not usable in the target terminal setup.

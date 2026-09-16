@@ -9,7 +9,7 @@ The TUI can initialize a new Daedalus-compatible project under the launch root b
 - **`.daedalus` scaffold**: New projects receive a TOML `.daedalus` with an empty `[worktree]` table (`install_command`, `readonly_paths`) so orchestration provisioning is ready to configure.
 - **Recoverable requests**: A `.git/daedalus-initialization-request-id` marker lets retries recognize initializer-owned projects without overwriting unrelated directories.
 - **Local by default**: Graphify install and Git init/commit always run; GitHub creation is optional and private.
-- **Personal Supabase**: Not part of New Project. After init, operators activate personal Supabase on existing Daedalus-format projects via `CapsLock+4` (see personal-supabase feature).
+- **Personal Supabase**: Not part of New Project. After init, operators activate personal Supabase on existing Daedalus-format projects via `Option+4` (see personal-supabase feature).
 - **Discovery refresh**: After success, the TUI rediscovers `feature_files` projects and switches to the new project.
 
 ## Relevant Files

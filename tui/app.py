@@ -142,16 +142,23 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+P", "Pause task", "pause_task"),
     ("Ctrl+R", "Resume task", "resume_task"),
     ("Ctrl+X", "Cancel task", "cancel_task"),
-    # The keyboard's function modifier is remapped to Caps Lock, so the
-    # number-row combinations replace the unavailable F2/F3/F4 keys.
+    # The keyboard's function modifier is remapped to Caps Lock for the
+    # project and topic actions; Textual receives macOS Option as ``alt``.
     ("CapsLock+2", "New project", "show_new_project"),
     ("CapsLock+3", "Create topic", "show_create_topic"),
-    ("CapsLock+4", "Activate personal Supabase", "register_personal_supabase"),
+    ("Option+4", "Activate personal Supabase", "register_personal_supabase"),
     ("Ctrl+T", "New task", "new_task"),
     ("Ctrl+Q", "Quit", "quit"),
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
     ("Ctrl+U", "Show coding statistics", "show_statistics"),
 )
+
+
+def _shortcut_binding_key(shortcut: str) -> str:
+    """Return Textual's event name for a user-facing shortcut label."""
+    if shortcut.startswith("Option+"):
+        return "alt+" + shortcut.removeprefix("Option+").lower()
+    return shortcut.lower()
 
 
 class _LegacyCompatibleBinding(Binding):
@@ -975,7 +982,7 @@ class DaedalusTuiApp(App[None]):
     ALLOW_SELECT = True
     BINDINGS = [
         _LegacyCompatibleBinding(
-            shortcut.lower(),
+            _shortcut_binding_key(shortcut),
             action,
             description,
             show=shortcut == "Ctrl+K",
@@ -1712,7 +1719,7 @@ class DaedalusTuiApp(App[None]):
             reason = result.blocked_reason or "blocked"
             self._set_error(detail)
             self._set_status(
-                f"Activate blocked ({reason}) for schema {result.schema!r}; retry with CapsLock+4"
+                f"Activate blocked ({reason}) for schema {result.schema!r}; retry with Option+4"
             )
             self.call_after_refresh(
                 self._finish_personal_supabase_progress,

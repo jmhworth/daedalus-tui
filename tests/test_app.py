@@ -239,7 +239,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 coordinator=FakeCoordinator(),
             )
             async with app.run_test() as pilot:
-                await pilot.press("capslock+4")
+                await pilot.press("alt+4")
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
                 self.assertFalse((project / "supabase" / "config.toml").exists())
@@ -339,7 +339,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             )
             app._supabase_bootstrap_started = True
             async with app.run_test() as pilot:
-                await pilot.press("capslock+4")
+                await pilot.press("alt+4")
                 await pilot.pause()
 
                 self.assertIsInstance(app.screen, PersonalSupabaseActivationProgressScreen)
@@ -1140,7 +1140,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Ctrl+U", shortcut_text)
             self.assertIn("CapsLock+2", shortcut_text)
             self.assertIn("CapsLock+3", shortcut_text)
-            self.assertIn("CapsLock+4", shortcut_text)
+            self.assertIn("Option+4", shortcut_text)
             self.assertIn("gg / G", shortcut_text)
 
             await pilot.press("escape")
