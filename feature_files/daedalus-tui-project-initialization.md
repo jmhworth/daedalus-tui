@@ -4,12 +4,12 @@
 The TUI can initialize a new Daedalus-compatible project under the launch root by materializing bundled templates (AGENTS.md, agent profiles, feature/parameter/topic directories, README, gitignore, and `.daedalus`), installing Graphify hooks, creating the initial Git commit, and optionally creating a private GitHub repository.
 
 ## Key Points
-- **Launch-root destination**: The `F2` shortcut opens a modal where the user supplies only a project slug and optional GitHub opt-in; the destination is always a direct child of the TUI launch root.
+- **Launch-root destination**: The `CapsLock+2` shortcut opens a modal where the user supplies only a project slug and optional GitHub opt-in; the destination is always a direct child of the TUI launch root.
 - **Template copy**: Initializer-owned files under `tui/templates/project-initializer/` are copied into an atomic temporary sibling, then renamed into place.
 - **`.daedalus` scaffold**: New projects receive a TOML `.daedalus` with an empty `[worktree]` table (`install_command`, `readonly_paths`) so orchestration provisioning is ready to configure.
 - **Recoverable requests**: A `.git/daedalus-initialization-request-id` marker lets retries recognize initializer-owned projects without overwriting unrelated directories.
 - **Local by default**: Graphify install and Git init/commit always run; GitHub creation is optional and private.
-- **Personal Supabase**: Not part of New Project. After init, operators activate personal Supabase on existing Daedalus-format projects via `F4` (see personal-supabase feature).
+- **Personal Supabase**: Not part of New Project. After init, operators activate personal Supabase on existing Daedalus-format projects via `CapsLock+4` (see personal-supabase feature).
 - **Discovery refresh**: After success, the TUI rediscovers `feature_files` projects and switches to the new project.
 
 ## Relevant Files
