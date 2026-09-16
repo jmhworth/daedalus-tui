@@ -1052,6 +1052,7 @@ class DaedalusTuiApp(App[None]):
         self.runner = runner or AgentRunner(
             auth_policy=self.settings.auth.runner_policy(),
             claude_permission_mode=self.settings.claude.permission_mode,
+            claude_allowed_tools=self.settings.claude.allowed_tools,
         )
         try:
             self._opened_directories = list(self.memory.get_opened_project_directories())

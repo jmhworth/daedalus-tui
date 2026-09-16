@@ -68,9 +68,15 @@ Cursor CLI (`agent`). Each provider's models and effort levels live in
 `parameter_files/daedalus-tui.toml`; Claude Code has its own effort scale that
 adds `max`, and Cursor is a provider-only choice with model and reasoning
 disabled. Claude Code runs with `--permission-mode acceptEdits`, so it edits
-files without prompting while orchestration still runs verification itself. Set
-`[claude] permission_mode = "bypassPermissions"` if you want it to run commands
-too; that grants autonomy comparable to Codex but without Codex's sandbox.
+files without prompting while orchestration still runs verification itself.
+Because `claude --print` is non-interactive, nobody can answer a permission
+prompt: any Bash command that is not pre-approved is denied. The TUI therefore
+passes `--allowedTools` with `[claude] allowed_tools` from
+`parameter_files/daedalus-tui.toml` (test runners, `npm run`, read-only `git`)
+plus the project's discovered verification commands, so agents can run the
+same checks orchestration will. Widen that list for other commands, or set
+`[claude] permission_mode = "bypassPermissions"` to let it run anything; that
+grants autonomy comparable to Codex but without Codex's sandbox.
 
 By default the TUI runs agents on your **signed-in account** rather than an API
 key, so work bills your plan. In this mode it removes each provider's API-key

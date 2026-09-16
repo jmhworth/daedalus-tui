@@ -6,7 +6,7 @@ from unittest.mock import Mock, call, patch
 from tui.agent_runner import AgentResult
 from tui.git_worktree import GitWorktreeError, WorktreeContext
 from tui.graphify import GraphifyResult
-from tui.orchestrator import LocalOrchestrator, OrchestrationSettings
+from tui.orchestrator import BUNDLED_PROFILE_ROOT, LocalOrchestrator, OrchestrationSettings
 from tui.firebase import DeployResult, FirebaseStatus
 from tui.supabase_migrations import PushResult
 from tui.verification import VerificationResult
@@ -43,7 +43,8 @@ class OrchestratorTests(unittest.TestCase):
         manager.reset_task_to_base.assert_called_once_with(context)
         self.assertIn("PLANNING_PROFILE_FROM_WORKTREE", runner.run.call_args.args[0].prompt)
 
-    def test_missing_profile_is_reported_without_changing_plan_lifecycle(self):
+    def test_missing_profile_falls_back_to_the_bundled_profile(self):
+        """Projects opened by path have no .agents/; Daedalus' own profile still applies."""
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
             runner = Mock()
@@ -64,8 +65,75 @@ class OrchestratorTests(unittest.TestCase):
 
         self.assertTrue(result.succeeded)
         self.assertTrue(result.awaiting_plan)
-        self.assertTrue(any(phase == "profile" and channel == "error" for phase, _, channel in events))
+        profile_events = [(message, channel) for phase, message, channel in events if phase == "profile"]
+        self.assertEqual([channel for _, channel in profile_events], ["status"])
+        self.assertIn("bundled plan profile", profile_events[0][0])
+        bundled = (BUNDLED_PROFILE_ROOT / "planning.md").read_text(encoding="utf-8")
+        self.assertIn(bundled.strip(), runner.run.call_args.args[0].prompt)
         self.assertNotIn(".agents/profiles", runner.run.call_args.args[0].prompt)
+
+    def test_missing_profile_is_reported_when_no_bundled_fallback_exists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "plan")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda phase, message, channel: events.append((phase, message, channel)),
+            )
+
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager), patch(
+                "tui.orchestrator.BUNDLED_PROFILE_ROOT", repository / "no-bundled-profiles"
+            ):
+                result = orchestrator.run("Make a plan", "codex", "luna", "high", mode="plan")
+
+        self.assertTrue(result.succeeded)
+        self.assertTrue(result.awaiting_plan)
+        self.assertTrue(any(phase == "profile" and channel == "error" for phase, _, channel in events))
+        self.assertNotIn("BEGIN_DAEDALUS_PROFILE", runner.run.call_args.args[0].prompt)
+
+    def test_agent_requests_allowlist_the_discovered_verification_commands(self):
+        """Claude runs non-interactively, so its own checks must be pre-approved."""
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            worktree = repository / "worktree"
+            (worktree / "tests").mkdir(parents=True)
+            (worktree / "package.json").write_text('{"scripts": {"test": "vitest run"}}', encoding="utf-8")
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", worktree)
+            manager = Mock()
+            orchestrator = LocalOrchestrator(repository, runner, OrchestrationSettings(), lambda *_: None)
+
+            with patch("tui.orchestrator.discover_commands", return_value=[
+                ["npm", "test"],
+                ["/opt/venv/bin/python3", "-m", "pytest"],
+            ]):
+                orchestrator.run_agent(manager, context, ("claude", "claude-opus-5", "high"), "Do it")
+
+        request = runner.run.call_args.args[0]
+        self.assertEqual(
+            request.allowed_tools,
+            ("Bash(npm test:*)", "Bash(/opt/venv/bin/python3 -m pytest:*)", "Bash(python3 -m pytest:*)"),
+        )
+
+    def test_agent_requests_skip_discovery_for_a_missing_worktree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "missing")
+            orchestrator = LocalOrchestrator(repository, runner, OrchestrationSettings(), lambda *_: None)
+
+            orchestrator.run_agent(Mock(), context, ("claude", "claude-opus-5", "high"), "Do it")
+
+        self.assertEqual(runner.run.call_args.args[0].allowed_tools, ())
 
     def test_planning_followup_uses_the_planning_profile_through_task_wrapper(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -17,6 +17,21 @@ AUTH_MODES = frozenset({"account", "api-key"})
 CLAUDE_PERMISSION_MODES = frozenset(
     {"acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"}
 )
+CLAUDE_DEFAULT_ALLOWED_TOOLS: tuple[str, ...] = (
+    "Bash(npm test:*)",
+    "Bash(npm run:*)",
+    "Bash(npx vitest:*)",
+    "Bash(npx tsc:*)",
+    "Bash(npx eslint:*)",
+    "Bash(pytest:*)",
+    "Bash(python -m pytest:*)",
+    "Bash(python3 -m pytest:*)",
+    "Bash(git status:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git show:*)",
+    "Bash(ls:*)",
+)
 
 PARAMETER_DIRECTORY = "parameter_files"
 TUI_PARAMETER_FILE = "daedalus-tui.toml"
@@ -36,6 +51,10 @@ class ClaudeSettings:
     """Non-interactive execution settings for the Claude Code provider."""
 
     permission_mode: str = "acceptEdits"
+    # Bash rules Claude may run without a prompt. `claude --print` has nobody
+    # to answer a permission prompt, so anything outside this list (plus the
+    # verification commands orchestration adds per task) is denied outright.
+    allowed_tools: tuple[str, ...] = CLAUDE_DEFAULT_ALLOWED_TOOLS
 
 
 @dataclass(frozen=True)
@@ -252,7 +271,16 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
         raise ValueError(f"{path} lists the claude provider but defines no claude_models.")
 
     claude_values = values.get("claude", {})
-    claude = ClaudeSettings(permission_mode=str(claude_values.get("permission_mode", "acceptEdits")))
+    if not isinstance(claude_values, dict):
+        raise ValueError(f"{path} claude must be a table.")
+    claude = ClaudeSettings(
+        permission_mode=str(claude_values.get("permission_mode", "acceptEdits")),
+        allowed_tools=(
+            _string_tuple(claude_values["allowed_tools"], path, "claude.allowed_tools")
+            if "allowed_tools" in claude_values
+            else CLAUDE_DEFAULT_ALLOWED_TOOLS
+        ),
+    )
     if claude.permission_mode not in CLAUDE_PERMISSION_MODES:
         raise ValueError(
             f"{path} claude.permission_mode must be one of {sorted(CLAUDE_PERMISSION_MODES)}."

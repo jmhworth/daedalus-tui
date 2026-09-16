@@ -1,4 +1,5 @@
 from dataclasses import replace
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -48,6 +49,22 @@ class ConfigTests(unittest.TestCase):
         # Claude Code exposes an effort level Codex has no equivalent for.
         self.assertIn("max", [item.value for item in settings.claude_reasoning])
         self.assertEqual(settings.claude.permission_mode, "acceptEdits")
+        # Non-interactive Claude runs need the project checks pre-approved.
+        self.assertIn("Bash(npm test:*)", settings.claude.allowed_tools)
+        self.assertIn("Bash(python3 -m pytest:*)", settings.claude.allowed_tools)
+
+    def test_claude_allowed_tools_must_be_a_string_array(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "parameter_files" / "daedalus-tui.toml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "daedalus-tui.toml"
+            path.write_text(
+                re.sub(r"allowed_tools = \[.*?\]", 'allowed_tools = "Bash(*)"', source, count=1, flags=re.S),
+                encoding="utf-8",
+            )
+            with self.assertRaises(ValueError) as raised:
+                load_tui_settings(path)
+        self.assertIn("claude.allowed_tools", str(raised.exception))
 
     def test_provider_cascade_falls_back_to_a_legal_model_and_effort(self):
         root = Path(__file__).resolve().parents[1]

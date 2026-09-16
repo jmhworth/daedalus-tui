@@ -245,6 +245,34 @@ class AgentRunnerTests(unittest.TestCase):
             ],
         )
 
+    def test_claude_command_allowlists_configured_and_per_run_tools(self):
+        """`claude --print` cannot prompt, so verification commands must be pre-approved."""
+        runner = AgentRunner(claude_allowed_tools=("Bash(git status:*)", "Bash(npm test:*)"))
+        request = AgentRequest(
+            "Inspect this project",
+            Path("/workspace/project"),
+            "claude",
+            "claude-opus-5",
+            "high",
+            (Path("/workspace/project"),),
+            allowed_tools=("Bash(npm test:*)", "Bash(python3 -m pytest:*)"),
+        )
+        command = runner.command_for(request)
+
+        start = command.index("--allowedTools")
+        self.assertEqual(
+            command[start + 1 : start + 4],
+            ["Bash(git status:*)", "Bash(npm test:*)", "Bash(python3 -m pytest:*)"],
+        )
+        # --allowedTools is variadic: a single-argument option must follow it
+        # so the trailing prompt is never absorbed into the list.
+        self.assertEqual(command[start + 4], "--model")
+        self.assertEqual(command[-1], "Inspect this project")
+
+    def test_claude_command_omits_allowlist_when_nothing_is_allowed(self):
+        command = AgentRunner().command_for(self.request("claude", "claude-opus-5", "high"))
+        self.assertNotIn("--allowedTools", command)
+
     def test_claude_command_keeps_the_prompt_after_a_single_argument_option(self):
         """--add-dir is variadic, so the prompt must never follow it directly."""
         request = AgentRequest(

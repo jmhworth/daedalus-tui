@@ -46,6 +46,32 @@ PROFILE_FILENAMES = {
     "plan": "planning.md",
     "integrating": "integrating.md",
 }
+#: Profiles shipped with Daedalus, used when a target project has no
+#: ``.agents/profiles`` of its own (projects opened by path rather than
+#: initialized by Daedalus).
+BUNDLED_PROFILE_ROOT = (
+    Path(__file__).resolve().parent / "templates" / "project-initializer" / ".agents" / "profiles"
+)
+
+
+def verification_tool_rules(commands: list[list[str]]) -> tuple[str, ...]:
+    """Claude Code permission rules that let an agent run the project's own checks.
+
+    ``python_executable()`` resolves interpreters to absolute paths, but an
+    agent types ``python3 -m pytest``; allow both spellings so either works.
+    """
+    rules: list[str] = []
+    for command in commands:
+        if not command:
+            continue
+        spellings = [list(command)]
+        if Path(command[0]).is_absolute():
+            spellings.append([Path(command[0]).name, *command[1:]])
+        for spelling in spellings:
+            rule = f"Bash({' '.join(spelling)}:*)"
+            if rule not in rules:
+                rules.append(rule)
+    return tuple(rules)
 
 
 @dataclass(frozen=True)
@@ -336,6 +362,7 @@ class LocalOrchestrator:
             environment_files=(self.repository / ".env",),
             control=control,
             timeout_seconds=self.settings.agent_timeout_seconds,
+            allowed_tools=self.verification_tool_rules_for(context.path),
         )
         result = self.runner.run(
             request,
@@ -348,6 +375,13 @@ class LocalOrchestrator:
         if result.stopped_reason:
             raise AgentStopped(result.stopped_reason)
         return result
+
+    def verification_tool_rules_for(self, worktree: Path) -> tuple[str, ...]:
+        """Permission rules for the checks orchestration will run in this worktree."""
+        configured = [list(command) for command in self.settings.verification_commands]
+        if not configured and not worktree.is_dir():
+            return ()
+        return verification_tool_rules(discover_commands(worktree, configured))
 
     def verify_with_repairs(
         self,
@@ -632,13 +666,30 @@ class LocalOrchestrator:
         if filename is None:
             return None
         profile_path = worktree / ".agents" / "profiles" / filename
+        if profile_path.is_file():
+            try:
+                return profile_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError) as error:
+                message = f"Could not load {route} profile from {profile_path}: {error}"
+                LOGGER.warning(message)
+                self.emit("profile", message, "error")
+                return None
+        bundled_path = BUNDLED_PROFILE_ROOT / filename
         try:
-            return profile_path.read_text(encoding="utf-8")
+            text = bundled_path.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as error:
-            message = f"Could not load {route} profile from {profile_path}: {error}"
+            message = (
+                f"Could not load {route} profile from {profile_path}, and the bundled "
+                f"fallback {bundled_path} is unavailable: {error}"
+            )
             LOGGER.warning(message)
             self.emit("profile", message, "error")
             return None
+        self.emit(
+            "profile",
+            f"No {route} profile at {profile_path}; using Daedalus' bundled {route} profile.",
+        )
+        return text
 
     def load_topic(self, worktree: Path, topic_slug: str | None) -> str | None:
         """Load a tagged topic from the task worktree immediately before a prompt."""

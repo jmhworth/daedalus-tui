@@ -61,6 +61,15 @@ value = "cursor"
 # command execution, without Codex's workspace sandbox.
 [claude]
 permission_mode = "acceptEdits"
+# Bash commands Claude Code may run without a prompt under acceptEdits. Claude
+# runs non-interactively (`claude --print`), so nobody can approve a prompt:
+# anything not listed here, and not one of the project's verification commands
+# (which orchestration adds automatically per task), is denied outright.
+allowed_tools = [
+  "Bash(npm test:*)", "Bash(npm run:*)", "Bash(npx vitest:*)", "Bash(npx tsc:*)", "Bash(npx eslint:*)",
+  "Bash(pytest:*)", "Bash(python -m pytest:*)", "Bash(python3 -m pytest:*)",
+  "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(ls:*)",
+]
 
 # Provider sign-in. In `account` mode the TUI removes each provider's API-key
 # variables from the agent subprocess environment so the CLI falls back to the

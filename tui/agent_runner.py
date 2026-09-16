@@ -11,6 +11,7 @@ import signal
 import subprocess
 from threading import Event, Lock, Thread
 import time
+from collections.abc import Sequence
 from typing import Callable, Literal
 
 from .debug_log import LOGGER, log_exception
@@ -96,6 +97,9 @@ class AgentRequest:
     environment_files: tuple[Path, ...] = field(default_factory=tuple)
     control: "AgentControl | None" = None
     timeout_seconds: float | None = None
+    # Extra Claude Code permission rules for this run, such as the project's
+    # verification commands; merged with the runner's configured allowlist.
+    allowed_tools: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass
@@ -158,9 +162,11 @@ class AgentRunner:
         self,
         auth_policy: ProviderAuthPolicy | None = None,
         claude_permission_mode: str = "acceptEdits",
+        claude_allowed_tools: Sequence[str] = (),
     ):
         self.auth_policy = auth_policy or ProviderAuthPolicy()
         self.claude_permission_mode = claude_permission_mode
+        self.claude_allowed_tools = tuple(claude_allowed_tools)
 
     def command_for(self, request: AgentRequest) -> list[str]:
         if request.provider == "codex":
@@ -195,6 +201,11 @@ class AgentRunner:
             for directory in request.writable_directories:
                 if directory != request.directory:
                     command.extend(["--add-dir", str(directory)])
+            # --allowedTools is variadic too, so it must also be followed by a
+            # single-argument option before the prompt.
+            allowed_tools = self.allowed_tools_for(request)
+            if allowed_tools:
+                command.extend(["--allowedTools", *allowed_tools])
             command.extend(["--model", request.model])
             effort = REASONING_MAP.get(request.reasoning, request.reasoning)
             if effort:
@@ -214,6 +225,14 @@ class AgentRunner:
             ]
 
         raise ValueError(f"Unsupported agent provider: {request.provider}")
+
+    def allowed_tools_for(self, request: AgentRequest) -> tuple[str, ...]:
+        """Merge the configured Claude allowlist with per-run rules, in order, without duplicates."""
+        merged: list[str] = []
+        for rule in (*self.claude_allowed_tools, *request.allowed_tools):
+            if rule and rule not in merged:
+                merged.append(rule)
+        return tuple(merged)
 
     def run(self, request: AgentRequest, on_output: OutputCallback) -> AgentResult:
         executable, name = PROVIDER_EXECUTABLES.get(request.provider, ("agent", "Cursor CLI"))

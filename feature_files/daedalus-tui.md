@@ -96,6 +96,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-16: Added `[claude] allowed_tools` so the agent runner passes `--allowedTools` to `claude --print`, letting Claude agents run test commands that acceptEdits alone auto-denies.
 - 2026-09-16: Added Vim-style `dd` deletion for inactive tasks selected in the cross-project sidebar, including coordinator cleanup and durable snapshot removal.
 - 2026-09-16: Dropped the `(external)` and `(unformatted)` markers from project selector labels so every option shows the plain directory name; the flags still order discovery and drive behavior.
 - 2026-09-15: Reworked prompting around conversations: composer drafts, verbatim archives, `Ctrl+C`/Cancel interruption that restores the prompt, follow-up turns, generated titles with an All tasks filter, the right-third Markdown viewer, `errors/` diagnostics, completed Vim clipboard commands, and a usage bar (details in `daedalus-tui-prompting.md`).
