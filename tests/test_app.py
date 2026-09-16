@@ -339,7 +339,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             )
             app._supabase_bootstrap_started = True
             async with app.run_test() as pilot:
-                await pilot.press("f4")
+                await pilot.press("capslock+4")
                 await pilot.pause()
 
                 self.assertIsInstance(app.screen, PersonalSupabaseActivationProgressScreen)

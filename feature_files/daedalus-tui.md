@@ -170,3 +170,4 @@ HACKING
 - 2026-09-14: Replaced terminal-ambiguous Ctrl+Shift letter bindings with reliable F2/F3/F4 shortcuts and covered the New Project modal path.
 - 2026-09-15: Added selectable GPT-6 Astra support and mapped the new Max reasoning effort to Codex CLI's `max` value while preserving the Luna default.
 - 2026-09-15: Rebound the project, topic, and personal-Supabase actions from F2/F3/F4 to the Caps Lock function layer as CapsLock+2/CapsLock+3/CapsLock+4.
+- 2026-09-15: Updated the remaining personal-Supabase activation test to press CapsLock+4 after the function-key rebind.
