@@ -142,13 +142,15 @@ to get the old "primary worktree must be clean" error back, or
 that commit, automated orchestration does not push remotes; use the
 settings-bar Push control when you want to publish the selected operating
 branch to `origin`. Failed worktrees are preserved
-for inspection. A successful Push reports the branch and commit in the status
-line and records the full SHA in the launch-root `.daedalus-memory.json`; open
-the **Push log** settings action or press `Ctrl+H` to browse those records.
-After a successful promotion, the orchestrator refreshes and
-commits `graphify-out` onto the target branch when the target repository has
-graphify configured; graph refresh failures are reported as warnings and never
-trigger resolver attempts.
+for inspection. Task-owned commits use the task's readable title (derived from
+the requested goal), adding a short repair, resolver, or graphify-stage suffix
+when applicable, so the Git history describes the work that completed. A
+successful Push reports the branch and commit in the status line and records
+the full SHA in the launch-root `.daedalus-memory.json`; open the **Push log**
+settings action or press `Ctrl+H` to browse those records. After a successful
+promotion, the orchestrator refreshes and commits `graphify-out` onto the
+target branch when the target repository has graphify configured; graph
+refresh failures are reported as warnings and never trigger resolver attempts.
 
 Target projects may add an optional `.daedalus` TOML file to prepare each task
 worktree before the agent starts. The `[worktree]` table accepts one argv-style

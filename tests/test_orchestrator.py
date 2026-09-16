@@ -6,13 +6,28 @@ from unittest.mock import Mock, call, patch
 from tui.agent_runner import AgentResult
 from tui.git_worktree import GitWorktreeError, WorktreeContext
 from tui.graphify import GraphifyResult
-from tui.orchestrator import BUNDLED_PROFILE_ROOT, LocalOrchestrator, OrchestrationSettings
+from tui.orchestrator import (
+    BUNDLED_PROFILE_ROOT,
+    LocalOrchestrator,
+    OrchestrationSettings,
+    task_commit_subject,
+)
 from tui.firebase import DeployResult, FirebaseStatus
 from tui.supabase_migrations import PushResult
 from tui.verification import VerificationResult
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_task_commit_subject_uses_the_task_goal_and_formats_the_title(self):
+        self.assertEqual(
+            task_commit_subject("ignored generated implementation prompt", "task-1", "Fix login validation"),
+            "Daedalus: Fix login validation",
+        )
+        self.assertEqual(
+            task_commit_subject("# Add the account settings screen\nDetailed requirements follow.", "task-1"),
+            "Daedalus: Add the account settings screen",
+        )
+
     def test_plan_waits_for_questions_and_preserves_worktree(self):
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
@@ -227,7 +242,7 @@ class OrchestratorTests(unittest.TestCase):
                 orchestrator.refresh_graphify(manager, "task-1")
 
         manager.commit_graphify_changes.assert_called_once_with(
-            "Daedalus graphify update after task task-1",
+            "Daedalus: Task 1 (graphify update)",
             repository.resolve(),
         )
         manager.discard_graphify_changes.assert_not_called()
@@ -268,6 +283,11 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(result.succeeded)
         self.assertTrue(any(phase == "resolving" for phase, _, _ in events))
         self.assertGreaterEqual(runner.run.call_count, 2)
+        manager.commit_changes.assert_any_call(context.path, "Daedalus: Build it")
+        manager.commit_changes.assert_any_call(
+            context.path,
+            "Daedalus: Build it (integration resolver 1)",
+        )
         integrate.assert_called_once()
         manager.stage_changes.assert_called_once_with(context.path)
         stage_call = call.stage_changes(context.path)
@@ -352,6 +372,11 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(any(phase == "repairing" for phase, _, _ in events))
         self.assertIn("CODING_PROFILE_FOR_INITIAL_AND_REPAIR", runner.run.call_args_list[0].args[0].prompt)
         self.assertIn("CODING_PROFILE_FOR_REPAIR", runner.run.call_args_list[1].args[0].prompt)
+        manager.commit_changes.assert_any_call(context.path, "Daedalus: Build it")
+        manager.commit_changes.assert_any_call(
+            context.path,
+            "Daedalus: Build it (verification repair 1)",
+        )
 
     def test_exhausted_verification_logs_each_failure_reason(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -671,7 +696,10 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(any(phase == "repairing" for phase, _, _ in events))
         self.assertIn("Migration push failure", runner.run.call_args_list[1].args[0].prompt)
         self.assertIn("CODING_PROFILE_FOR_MIGRATION_REPAIR", runner.run.call_args_list[1].args[0].prompt)
-        manager.commit_changes.assert_any_call(context.path, "Daedalus migration repair 1")
+        manager.commit_changes.assert_any_call(
+            context.path,
+            "Daedalus: Build it (Supabase migration repair 1)",
+        )
 
     def test_exhausted_migration_push_logs_each_failure(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -874,7 +902,10 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIn("Repair the failing Firebase deploy", repair_prompt)
         self.assertIn("firestore.rules line 4", repair_prompt)
         self.assertIn("CODING_PROFILE_FOR_FIREBASE_REPAIR", repair_prompt)
-        manager.commit_changes.assert_any_call(context.path, "Daedalus Firebase repair 1")
+        manager.commit_changes.assert_any_call(
+            context.path,
+            "Daedalus: Build it (Firebase repair 1)",
+        )
 
     def test_exhausted_firebase_deploy_fails_with_each_reason(self):
         with tempfile.TemporaryDirectory() as directory:
