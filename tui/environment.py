@@ -85,6 +85,7 @@ def synchronize_env_file(
     *,
     project_values: dict[str, str] | None = None,
     required_keys: tuple[str, ...] = (),
+    resolved_values: dict[str, str] | None = None,
 ) -> EnvironmentSyncResult:
     """Synchronize selected values from a canonical env file into a target.
 
@@ -92,10 +93,17 @@ def synchronize_env_file(
     written. Existing target values that disagree with the canonical source are
     conflicts, while blank values are safely filled. All validation happens before
     an atomic replacement, so a failure cannot leave a partially updated target.
+
+    ``resolved_values`` overlays preferred/derived keys (for example publishable
+    aliases or a project ref inferred from ``SUPABASE_URL``) onto the file map
+    before required-key checks and shared-key copies.
     """
     source = source_path.expanduser().resolve()
     target = target_path.expanduser().resolve()
-    values = read_env_file(source)
+    values = dict(read_env_file(source))
+    for key, value in (resolved_values or {}).items():
+        if value is not None and str(value).strip():
+            values[key] = str(value).strip()
     required = tuple(dict.fromkeys(required_keys))
     missing = tuple(key for key in required if not values.get(key, "").strip())
     if missing:

@@ -17,6 +17,7 @@ from .project_config import load_project_worktree_settings
 from .personal_supabase import (
     is_personal_supabase_registered,
     load_personal_supabase_settings,
+    resolve_project_ref_from_environment,
     temporary_supabase_cli_config,
 )
 from .prompts import (
@@ -398,8 +399,10 @@ class LocalOrchestrator:
         limit = self.settings.task_verification_attempt_limit
         extra_environment = (self.environment_path,) if self.environment_path is not None else ()
         environment = cursor_environment(context.path, (self.repository / ".env", *extra_environment))
-        project_ref_key = str(load_personal_supabase_settings()["env_project_ref_key"])
-        project_ref = environment.get(project_ref_key, "").strip()
+        project_ref = resolve_project_ref_from_environment(
+            environment,
+            load_personal_supabase_settings(),
+        )
         personal_registered = is_personal_supabase_registered(context.path)
         while True:
             if not migrations_pending(context.path, context.base_commit):

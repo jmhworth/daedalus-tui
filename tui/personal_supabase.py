@@ -124,10 +124,141 @@ def personal_supabase_environment_settings(settings: dict | None = None) -> tupl
     return canonical, required
 
 
+def personal_supabase_managed_env_keys(settings: dict | None = None) -> set[str]:
+    """Return every env key this feature may write or clean up (preferred + aliases)."""
+    values = settings or load_personal_supabase_settings()
+    keys = {
+        str(values["env_schema_key"]),
+        str(values["env_url_key"]),
+        str(values["env_project_ref_key"]),
+        str(values["env_publishable_key"]),
+        str(values["env_secret_key"]),
+        str(values["env_db_url_key"]),
+        str(values["env_access_token_key"]),
+        *(str(key) for key in values.get("env_publishable_key_aliases", [])),
+        *(str(key) for key in values.get("env_secret_key_aliases", [])),
+        *(str(key) for key in values["canonical_env_keys"]),
+    }
+    return keys
+
+
 def load_personal_supabase_settings() -> dict:
     """Load tunables for schema registration from the paired parameter file."""
     with PARAMETER_PATH.open("rb") as source:
         return tomllib.load(source)
+
+
+def project_ref_from_supabase_url(url: str) -> str | None:
+    """Derive the project ref from a standard ``https://<ref>.supabase.co`` URL."""
+    parsed = urlparse(str(url).strip())
+    host = (parsed.hostname or "").lower()
+    suffix = ".supabase.co"
+    if not host.endswith(suffix):
+        return None
+    ref = host[: -len(suffix)]
+    if not ref or "." in ref or not re.fullmatch(r"[a-z0-9_-]+", ref):
+        return None
+    return ref
+
+
+def resolve_project_ref_from_environment(
+    values: dict[str, str],
+    settings: dict | None = None,
+) -> str:
+    """Return an explicit or URL-derived project ref (empty when neither is usable)."""
+    config = settings or load_personal_supabase_settings()
+    explicit = values.get(str(config["env_project_ref_key"]), "").strip()
+    if explicit:
+        return explicit
+    url = values.get(str(config["env_url_key"]), "").strip()
+    return project_ref_from_supabase_url(url) or ""
+
+
+def resolve_personal_supabase_environment(
+    values: dict[str, str],
+    settings: dict | None = None,
+    *,
+    require_database_access: bool = True,
+) -> tuple[dict[str, str] | None, str | None]:
+    """Normalize launch-root env into preferred keys, accepting aliases.
+
+    Returns ``(overlay, None)`` on success. The overlay always uses preferred
+    names (``SUPABASE_PUBLISHABLE_KEY``, ``SUPABASE_SECRET_KEY``, derived
+    ``SUPABASE_PROJECT_REF`` when possible). Legacy anon/service_role and
+    ``SUPABASE_PRIVATE_KEY`` remain accepted as inputs.
+    """
+    config = settings or load_personal_supabase_settings()
+    url_key = str(config["env_url_key"])
+    publishable_key = str(config["env_publishable_key"])
+    secret_key = str(config["env_secret_key"])
+    project_ref_key = str(config["env_project_ref_key"])
+    db_url_key = str(config["env_db_url_key"])
+    access_token_key = str(config["env_access_token_key"])
+
+    url = values.get(url_key, "").strip()
+    if not url:
+        return None, f"Launch environment is missing required Supabase setting(s): {url_key}."
+
+    publishable_candidates = [publishable_key, *(str(k) for k in config.get("env_publishable_key_aliases", []))]
+    secret_candidates = [secret_key, *(str(k) for k in config.get("env_secret_key_aliases", []))]
+    _, publishable = _first_filled_env_value(values, publishable_candidates)
+    _, secret = _first_filled_env_value(values, secret_candidates)
+    missing: list[str] = []
+    if not publishable:
+        missing.append(_key_or_aliases_label(publishable_candidates))
+    if not secret:
+        missing.append(_key_or_aliases_label(secret_candidates))
+    if missing:
+        return None, (
+            "Launch environment is missing required Supabase setting(s): "
+            + ", ".join(missing)
+            + "."
+        )
+
+    project_ref = resolve_project_ref_from_environment(values, config)
+    if not project_ref:
+        return None, (
+            "Launch environment needs a Supabase project ref: set "
+            f"{project_ref_key}, or use a {url_key} of the form "
+            "https://<project-ref>.supabase.co."
+        )
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", project_ref):
+        return None, "Launch environment has a malformed Supabase project ref."
+
+    db_url = values.get(db_url_key, "").strip()
+    access_token = values.get(access_token_key, "").strip()
+    if require_database_access and not db_url and not access_token:
+        return None, (
+            "Launch environment must define one database access setting: "
+            f"{db_url_key} or {access_token_key}. "
+            "API keys alone cannot run migration pushes."
+        )
+
+    overlay = {
+        url_key: url,
+        publishable_key: publishable,
+        secret_key: secret,
+        project_ref_key: project_ref,
+    }
+    if db_url:
+        overlay[db_url_key] = db_url
+    if access_token:
+        overlay[access_token_key] = access_token
+    return overlay, None
+
+
+def _first_filled_env_value(values: dict[str, str], keys: list[str]) -> tuple[str, str]:
+    for key in keys:
+        value = values.get(key, "").strip()
+        if value:
+            return key, value
+    return "", ""
+
+
+def _key_or_aliases_label(keys: list[str]) -> str:
+    if len(keys) == 1:
+        return keys[0]
+    return f"{keys[0]} (or {' / '.join(keys[1:])})"
 
 
 def schema_from_project_root(project_root: Path, maximum_length: int | None = None) -> str:
@@ -280,10 +411,7 @@ def _remove_personal_supabase_env_values(path: Path, settings: dict) -> bool:
     """Remove synchronized Supabase assignments while preserving other env values."""
     if not path.is_file():
         return False
-    keys = {
-        str(settings["env_schema_key"]),
-        *(str(key) for key in settings["canonical_env_keys"]),
-    }
+    keys = personal_supabase_managed_env_keys(settings)
     text = path.read_text(encoding="utf-8")
     updated = _without_personal_supabase_env_values(text, keys)
     if updated == text:
@@ -298,11 +426,7 @@ def _remove_personal_supabase_env_values(path: Path, settings: dict) -> bool:
 def _without_personal_supabase_env_values(text: str, keys: set[str] | None = None) -> str:
     """Return env text without the configured Supabase assignments."""
     if keys is None:
-        settings = load_personal_supabase_settings()
-        keys = {
-            str(settings["env_schema_key"]),
-            *(str(key) for key in settings["canonical_env_keys"]),
-        }
+        keys = personal_supabase_managed_env_keys()
     lines = text.splitlines(keepends=True)
     assignment = re.compile(r"^\s*(?:export\s+)?(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*=")
     return "".join(
@@ -418,28 +542,20 @@ def bootstrap_personal_supabase(
 
     canonical, required = personal_supabase_environment_settings(settings)
     source_values = read_env_file(source)
-    project_ref = source_values.get(str(settings["env_project_ref_key"]), "").strip()
-    if project_ref and not re.fullmatch(r"[A-Za-z0-9_-]+", project_ref):
+    resolved, resolve_error = resolve_personal_supabase_environment(
+        source_values,
+        settings,
+        require_database_access=require_database_access,
+    )
+    if resolve_error or resolved is None:
         return PersonalSupabaseBootstrapResult(
             "failed",
             root,
             schema=schema,
-            message="Launch environment has a malformed Supabase project ref.",
+            message=resolve_error or "Launch environment could not be resolved.",
             environment=source_values,
         )
-    access_keys = (str(settings["env_db_url_key"]), str(settings["env_access_token_key"]))
-    if require_database_access and not any(source_values.get(key, "").strip() for key in access_keys):
-        return PersonalSupabaseBootstrapResult(
-            "failed",
-            root,
-            schema=schema,
-            message=(
-                "Launch environment must define one database access setting: "
-                + " or ".join(access_keys)
-                + "."
-            ),
-            environment=source_values,
-        )
+    project_ref = resolved.get(str(settings["env_project_ref_key"]), "").strip()
     scaffold_error = _validate_supabase_scaffold(root, schema, settings, project_ref)
     if scaffold_error:
         return PersonalSupabaseBootstrapResult("failed", root, schema=schema, message=scaffold_error)
@@ -449,6 +565,7 @@ def bootstrap_personal_supabase(
         canonical,
         project_values={str(settings["env_schema_key"]): schema},
         required_keys=required,
+        resolved_values=resolved,
     )
     if not sync.succeeded:
         return PersonalSupabaseBootstrapResult(
@@ -821,24 +938,20 @@ def preflight_personal_supabase(
     )
     source = launch_root.expanduser().resolve() / ".env"
     values = read_env_file(source)
-    _, required = personal_supabase_environment_settings(settings)
-    missing = [key for key in required if not values.get(key, "").strip()]
-    if missing:
-        return PreflightResult(False, f"Launch environment missing required keys: {', '.join(missing)}.")
-    project_ref = values.get(str(settings["env_project_ref_key"]), "").strip()
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", project_ref):
-        return PreflightResult(False, "Launch environment has a malformed Supabase project ref.")
-    access_token = values.get(str(settings["env_access_token_key"]), "").strip()
-    db_url = values.get(str(settings["env_db_url_key"]), "").strip()
-    if not access_token and not db_url:
-        return PreflightResult(
-            False,
-            "Launch environment must define SUPABASE_ACCESS_TOKEN or SUPABASE_DB_URL.",
-        )
+    resolved, resolve_error = resolve_personal_supabase_environment(
+        values,
+        settings,
+        require_database_access=True,
+    )
+    if resolve_error or resolved is None:
+        return PreflightResult(False, resolve_error or "Launch environment could not be resolved.")
+    project_ref = resolved[str(settings["env_project_ref_key"])]
+    access_token = resolved.get(str(settings["env_access_token_key"]), "").strip()
+    db_url = resolved.get(str(settings["env_db_url_key"]), "").strip()
     if find_executable(executable) is None:
         return PreflightResult(False, f"{executable} is not available on PATH.")
 
-    env = {**os.environ, **values}
+    env = {**os.environ, **values, **resolved}
     if access_token:
         try:
             process = run_process(
@@ -856,7 +969,7 @@ def preflight_personal_supabase(
             part.strip() for part in (process.stdout, process.stderr) if part and part.strip()
         )
         if process.returncode != 0:
-            redacted = redact_environment_values(output, values) or "Supabase projects list failed."
+            redacted = redact_environment_values(output, env) or "Supabase projects list failed."
             return PreflightResult(False, redacted, method="access_token")
         if project_ref not in output:
             return PreflightResult(
@@ -1137,8 +1250,11 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "shared personal Supabase database. Do **not** use the default `public` schema "
         "for application tables or migrations.\n\n"
         f"- Read the schema name from `{env_key}` in the project `.env` (expected value: `{schema}`).\n"
-        "- The launch-root `.env` is the canonical shared source for the project ref, URL, keys, "
-        "and database access settings; Daedalus synchronizes the ignored project `.env` at launch.\n"
+        "- The launch-root `.env` is the canonical shared source for "
+        "`SUPABASE_URL`, publishable/secret API keys (legacy anon/service_role aliases "
+        "still work), and one database access setting (`SUPABASE_DB_URL` or "
+        "`SUPABASE_ACCESS_TOKEN`); the project ref is optional when the URL is "
+        "`https://<ref>.supabase.co`. Daedalus synchronizes the ignored project `.env` at launch.\n"
         f"- Qualify SQL, migrations, RLS policies, and client/API configuration for `{schema}`.\n"
         "- Never assume PostgREST or Supabase clients default to `public` for this app.\n"
         "- Auth is shared across apps on this Supabase project; reuse the existing auth setup.\n"
@@ -1324,7 +1440,8 @@ def _ensure_supabase_scaffold(root: Path, schema: str, settings: dict) -> None:
         config_path.write_text(
             (
                 "# Scaffolded by Daedalus personal Supabase registration.\n"
-                "# Daedalus supplies the launch-root SUPABASE_PROJECT_REF temporarily at launch.\n"
+                "# Daedalus supplies the launch-root project ref temporarily at Activate/push "
+                "(from SUPABASE_PROJECT_REF or derived from SUPABASE_URL).\n"
                 "# Phase 1 writes files only; Activate / orchestration owns `supabase db push`.\n"
                 f'project_id = "{placeholder}"\n'
                 "\n"
@@ -1419,15 +1536,23 @@ def _shared_env_example_block(settings: dict, keys: list[str] | None = None) -> 
     selected = tuple(keys or (str(key) for key in settings["canonical_env_keys"]))
     lines = [
         "# Shared personal Supabase project. Values are owned by the Daedalus launch-root `.env`.",
+        "# Prefer SUPABASE_PUBLISHABLE_KEY + SUPABASE_SECRET_KEY (anon/service_role and",
+        "# SUPABASE_PRIVATE_KEY remain accepted aliases). Project ref is optional when",
+        "# SUPABASE_URL is https://<project-ref>.supabase.co.",
         "# Do not add credentials here; Daedalus synchronizes this ignored file at launch.",
     ]
     database_keys = {
         str(settings["env_db_url_key"]),
         str(settings["env_access_token_key"]),
     }
+    project_ref_key = str(settings["env_project_ref_key"])
     for key in selected:
+        if key == project_ref_key:
+            lines.append("# Optional when SUPABASE_URL is https://<project-ref>.supabase.co:")
         if key in database_keys and not any(line.startswith("# Database access") for line in lines):
-            lines.append("# Database access (set at least one in the launch-root `.env`):")
+            lines.append(
+                "# Database access for Activate / migration push (set at least one in launch-root `.env`):"
+            )
         lines.append(f"{key}=")
     return "\n".join(lines) + "\n"
 

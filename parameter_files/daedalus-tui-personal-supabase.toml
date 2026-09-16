@@ -3,25 +3,29 @@
 snippet_version = 1
 maximum_schema_name_length = 100
 env_schema_key = "SUPABASE_SCHEMA"
-env_project_ref_key = "SUPABASE_PROJECT_REF"
 env_url_key = "SUPABASE_URL"
-env_anon_key = "SUPABASE_ANON_KEY"
-env_service_role_key = "SUPABASE_SERVICE_ROLE_KEY"
+env_project_ref_key = "SUPABASE_PROJECT_REF"
+# Preferred API keys (Supabase publishable + secret). Legacy and "private" aliases still resolve.
+env_publishable_key = "SUPABASE_PUBLISHABLE_KEY"
+env_secret_key = "SUPABASE_SECRET_KEY"
+env_publishable_key_aliases = ["SUPABASE_ANON_KEY"]
+env_secret_key_aliases = ["SUPABASE_PRIVATE_KEY", "SUPABASE_SERVICE_ROLE_KEY"]
 env_db_url_key = "SUPABASE_DB_URL"
 env_access_token_key = "SUPABASE_ACCESS_TOKEN"
+# Keys written into ignored project .env files (preferred names only).
 canonical_env_keys = [
-  "SUPABASE_PROJECT_REF",
   "SUPABASE_URL",
-  "SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SECRET_KEY",
+  "SUPABASE_PROJECT_REF",
   "SUPABASE_DB_URL",
   "SUPABASE_ACCESS_TOKEN",
 ]
+# Conceptually required after alias resolution (project ref may be derived from URL).
 required_env_keys = [
-  "SUPABASE_PROJECT_REF",
   "SUPABASE_URL",
-  "SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SECRET_KEY",
 ]
 migration_filename = "20260101000000_create_personal_schema.sql"
 profile_section_heading = "## Personal Supabase Schema"

@@ -55,6 +55,7 @@ from .personal_supabase import (
     load_personal_supabase_settings,
     load_personal_supabase_status,
     remove_personal_supabase,
+    resolve_project_ref_from_environment,
     schema_from_project_root,
     temporary_supabase_cli_config,
 )
@@ -1357,10 +1358,10 @@ class DaedalusTuiApp(App[None]):
                                 project_path,
                                 (project_path / ".env", self.launch_root / ".env"),
                             )
-                            project_ref_key = str(
-                                load_personal_supabase_settings()["env_project_ref_key"]
+                            project_ref = resolve_project_ref_from_environment(
+                                runtime_environment,
+                                load_personal_supabase_settings(),
                             )
-                            project_ref = runtime_environment.get(project_ref_key, "").strip()
                             with temporary_supabase_cli_config(project_path, project_ref):
                                 pushed = push_migrations(
                                     project_path,

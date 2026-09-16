@@ -15,8 +15,11 @@ from tui.personal_supabase import (
     load_personal_supabase_status,
     preflight_personal_supabase,
     profile_guidance_section,
+    project_ref_from_supabase_url,
     remove_personal_supabase,
     register_personal_supabase,
+    resolve_personal_supabase_environment,
+    resolve_project_ref_from_environment,
     schema_from_project_root,
     temporary_supabase_cli_config,
 )
@@ -56,13 +59,19 @@ class PersonalSupabaseTests(unittest.TestCase):
         self._git(project, "add", ".")
         self._git(project, "commit", "-m", "initial")
 
-    def _write_launch_env(self, launch: Path, *, token: bool = False) -> None:
-        lines = [
-            "SUPABASE_PROJECT_REF=shared-ref",
-            "SUPABASE_URL=https://example.test",
-            "SUPABASE_ANON_KEY=anon-key",
-            "SUPABASE_SERVICE_ROLE_KEY=service-key",
-        ]
+    def _write_launch_env(self, launch: Path, *, token: bool = False, legacy_keys: bool = False) -> None:
+        if legacy_keys:
+            lines = [
+                "SUPABASE_URL=https://shared-ref.supabase.co",
+                "SUPABASE_ANON_KEY=anon-key",
+                "SUPABASE_SERVICE_ROLE_KEY=service-key",
+            ]
+        else:
+            lines = [
+                "SUPABASE_URL=https://shared-ref.supabase.co",
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key",
+                "SUPABASE_SECRET_KEY=secret-key",
+            ]
         if token:
             lines.append("SUPABASE_ACCESS_TOKEN=access-token")
         else:
@@ -95,8 +104,8 @@ class PersonalSupabaseTests(unittest.TestCase):
 
             env_text = (project / ".env.example").read_text(encoding="utf-8")
             self.assertIn("SUPABASE_URL=", env_text)
-            self.assertIn("SUPABASE_ANON_KEY=", env_text)
-            self.assertIn("SUPABASE_SERVICE_ROLE_KEY=", env_text)
+            self.assertIn("SUPABASE_PUBLISHABLE_KEY=", env_text)
+            self.assertIn("SUPABASE_SECRET_KEY=", env_text)
             self.assertIn("SUPABASE_SCHEMA=example-project", env_text)
             self.assertIn("allow-list", env_text.lower())
             self.assertNotRegex(env_text, r"(?i)(eyJ|sk-|service_role\.[A-Za-z0-9])")
@@ -218,6 +227,8 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(result.project_ref, "shared-ref")
             project_env = (project / ".env").read_text(encoding="utf-8")
             self.assertIn("SUPABASE_PROJECT_REF=shared-ref", project_env)
+            self.assertIn("SUPABASE_PUBLISHABLE_KEY=publishable-key", project_env)
+            self.assertIn("SUPABASE_SECRET_KEY=secret-key", project_env)
             self.assertIn("SUPABASE_SCHEMA=demo-app", project_env)
             with temporary_supabase_cli_config(project, "shared-ref"):
                 self.assertIn('project_id = "shared-ref"', config.read_text(encoding="utf-8"))
@@ -245,10 +256,9 @@ class PersonalSupabaseTests(unittest.TestCase):
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
             (launch / ".env").write_text(
-                "SUPABASE_PROJECT_REF=shared-ref\n"
-                "SUPABASE_URL=https://example.test\n"
-                "SUPABASE_ANON_KEY=anon-key\n"
-                "SUPABASE_SERVICE_ROLE_KEY=service-key\n",
+                "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                "SUPABASE_SECRET_KEY=secret-key\n",
                 encoding="utf-8",
             )
 
@@ -261,6 +271,61 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(result.status, "success")
             self.assertIn("SUPABASE_PROJECT_REF=shared-ref", (project / ".env").read_text(encoding="utf-8"))
 
+    def test_launch_bootstrap_accepts_legacy_and_private_key_aliases(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            launch = root / "launch"
+            self._seed_project(launch, "demo-app")
+            project = launch / "demo-app"
+            register_personal_supabase(project, schema="demo-app")
+            self._write_launch_env(launch, legacy_keys=True)
+
+            result = bootstrap_personal_supabase(project, launch)
+
+            self.assertEqual(result.status, "success")
+            project_env = (project / ".env").read_text(encoding="utf-8")
+            self.assertIn("SUPABASE_PUBLISHABLE_KEY=anon-key", project_env)
+            self.assertIn("SUPABASE_SECRET_KEY=service-key", project_env)
+
+            (launch / ".env").write_text(
+                "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                "SUPABASE_PRIVATE_KEY=private-key\n"
+                "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
+                encoding="utf-8",
+            )
+            (project / ".env").unlink()
+            private = bootstrap_personal_supabase(project, launch)
+            self.assertEqual(private.status, "success")
+            self.assertIn(
+                "SUPABASE_SECRET_KEY=private-key",
+                (project / ".env").read_text(encoding="utf-8"),
+            )
+
+    def test_resolve_helpers_derive_project_ref_from_url(self):
+        self.assertEqual(
+            project_ref_from_supabase_url("https://abc123.supabase.co"),
+            "abc123",
+        )
+        self.assertIsNone(project_ref_from_supabase_url("https://example.test"))
+        overlay, error = resolve_personal_supabase_environment(
+            {
+                "SUPABASE_URL": "https://abc123.supabase.co",
+                "SUPABASE_PUBLISHABLE_KEY": "pub",
+                "SUPABASE_SECRET_KEY": "sec",
+                "SUPABASE_DB_URL": "postgres://db",
+            }
+        )
+        self.assertIsNone(error)
+        assert overlay is not None
+        self.assertEqual(overlay["SUPABASE_PROJECT_REF"], "abc123")
+        self.assertEqual(
+            resolve_project_ref_from_environment(
+                {"SUPABASE_URL": "https://abc123.supabase.co"}
+            ),
+            "abc123",
+        )
+
     def test_launch_bootstrap_rejects_project_env_conflict_atomically(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -270,7 +335,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             register_personal_supabase(project, schema="demo-app")
             self._write_launch_env(launch)
             project_env = project / ".env"
-            project_env.write_text("# preserve\nSUPABASE_URL=https://other.test\n", encoding="utf-8")
+            project_env.write_text("# preserve\nSUPABASE_URL=https://other.supabase.co\n", encoding="utf-8")
             before = project_env.read_text(encoding="utf-8")
 
             result = bootstrap_personal_supabase(project, launch)

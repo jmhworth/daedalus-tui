@@ -84,6 +84,22 @@ class EnvironmentTests(unittest.TestCase):
             self.assertTrue(result.succeeded)
             self.assertEqual(read_env_file(target)["SUPABASE_PROJECT_REF"], "file-ref")
 
+    def test_resolved_values_overlay_satisfies_required_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "launch.env"
+            target = root / "project.env"
+            source.write_text("SUPABASE_ANON_KEY=anon-from-alias\n", encoding="utf-8")
+            result = synchronize_env_file(
+                source,
+                target,
+                ("SUPABASE_PUBLISHABLE_KEY",),
+                required_keys=("SUPABASE_PUBLISHABLE_KEY",),
+                resolved_values={"SUPABASE_PUBLISHABLE_KEY": "anon-from-alias"},
+            )
+            self.assertTrue(result.succeeded)
+            self.assertEqual(read_env_file(target)["SUPABASE_PUBLISHABLE_KEY"], "anon-from-alias")
+
 
 if __name__ == "__main__":
     unittest.main()
