@@ -2,9 +2,7 @@
 
 Planning date: September 16, 2026. This document describes the work needed to
 add **Orchestrate Mode** to the Daedalus TUI. It does not implement anything.
-All implementation work lands on the Git branch `orchestration`; select that
-branch in the TUI's Branch Select before submitting the sections below so each
-section's worktree is based on it and promotes back into it.
+
 
 The sections are written so several agents can work on them at the same time.
 Section 0 is the shared contract every other section must follow. Sections 1
