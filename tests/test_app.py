@@ -310,7 +310,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     await pilot.pause()
 
                 activate.assert_called_once()
-                self.assertEqual(activate.call_args.args[2], "main")
+                self.assertEqual(activate.call_args.args[1], "main")
                 self.assertIsInstance(app.screen, PersonalSupabaseActivationProgressScreen)
                 self.assertIn(
                     "Activated personal Supabase schema",

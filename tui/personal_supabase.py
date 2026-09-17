@@ -920,7 +920,15 @@ def commit_personal_supabase_scaffold(
     dirty = _git_porcelain_paths(root)
     if dirty is None:
         return GitScaffoldCommitResult(False, "Could not read Git status for Activate.")
-    unrelated = sorted(path for path in dirty if not _path_allowed_for_scaffold(path, allowed))
+    # The project-local .env is operator-managed and intentionally remains
+    # outside the software-owned commit boundary. It may be untracked in a
+    # freshly initialized project, so do not mistake it for unrelated dirt.
+    operator_managed = {".env"}
+    unrelated = sorted(
+        path
+        for path in dirty
+        if path not in operator_managed and not _path_allowed_for_scaffold(path, allowed)
+    )
     if unrelated:
         preview = ", ".join(unrelated[:5])
         suffix = "…" if len(unrelated) > 5 else ""

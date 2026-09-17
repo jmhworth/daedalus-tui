@@ -90,6 +90,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-16: Activation now tolerates the operator-managed project `.env` during its narrow scaffold Git gate without staging it, and the UI test follows the project-local activation call signature.
 - 2026-09-16: Wizard Continue now probes the active project's `.env` via a child-process exit code (never loads secrets in the TUI), shows the absolute path being checked, and no longer depends on the launch-root `.env`.
 - 2026-09-16: Removed the unused `synchronize_env_file` credential-copy helper; project `.env` remains operator-managed with the Register setup wizard as the only guidance path.
 - 2026-09-16: Replaced automatic project `.env` sync with a Register setup wizard that scaffolds files, instructs manual project env setup, and blocks Continue until credentials are detected.
