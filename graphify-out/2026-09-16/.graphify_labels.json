@@ -78,11 +78,9 @@
   "76": "bootstrap_personal_supabase",
   "77": "update_repository",
   "78": "load_project_worktree_settings",
-  "79": ".edit_paste_before",
   "80": ".edit_paste_after",
   "81": ".enter_insert_mode",
   "82": ".nav_word_end",
-  "83": "ProjectInitializerScreen",
   "84": ".edit_paste_before",
   "85": ".__init__",
   "86": "._on_topic_created"
