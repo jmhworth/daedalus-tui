@@ -209,8 +209,10 @@ class PersonalSupabaseTests(unittest.TestCase):
         self.assertIn("public", section)
         self.assertIn("supabase db push", section)
         self.assertIn("Activate", section)
+        self.assertIn("never writes credentials", section)
+        self.assertNotIn("synchronizes the ignored project", section)
 
-    def test_launch_bootstrap_syncs_root_env_and_restores_placeholder_config(self):
+    def test_launch_bootstrap_validates_root_env_without_writing_project_env(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             launch = root / "launch"
@@ -225,11 +227,12 @@ class PersonalSupabaseTests(unittest.TestCase):
             result = bootstrap_personal_supabase(project, launch)
             self.assertEqual(result.status, "success")
             self.assertEqual(result.project_ref, "shared-ref")
-            project_env = (project / ".env").read_text(encoding="utf-8")
-            self.assertIn("SUPABASE_PROJECT_REF=shared-ref", project_env)
-            self.assertIn("SUPABASE_PUBLISHABLE_KEY=publishable-key", project_env)
-            self.assertIn("SUPABASE_SECRET_KEY=secret-key", project_env)
-            self.assertIn("SUPABASE_SCHEMA=demo-app", project_env)
+            self.assertFalse((project / ".env").exists())
+            self.assertIsNotNone(result.environment)
+            assert result.environment is not None
+            self.assertEqual(result.environment["SUPABASE_PROJECT_REF"], "shared-ref")
+            self.assertEqual(result.environment["SUPABASE_PUBLISHABLE_KEY"], "publishable-key")
+            self.assertEqual(result.environment["SUPABASE_SECRET_KEY"], "secret-key")
             with temporary_supabase_cli_config(project, "shared-ref"):
                 self.assertIn('project_id = "shared-ref"', config.read_text(encoding="utf-8"))
             self.assertEqual(config.read_text(encoding="utf-8"), original)
@@ -255,7 +258,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertIn("database access", result.message)
             self.assertFalse((project / ".env").exists())
 
-    def test_disabled_push_bootstrap_syncs_without_database_access(self):
+    def test_disabled_push_bootstrap_validates_without_database_access(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             launch = root / "launch"
@@ -276,7 +279,9 @@ class PersonalSupabaseTests(unittest.TestCase):
             )
 
             self.assertEqual(result.status, "success")
-            self.assertIn("SUPABASE_PROJECT_REF=shared-ref", (project / ".env").read_text(encoding="utf-8"))
+            self.assertFalse((project / ".env").exists())
+            assert result.environment is not None
+            self.assertEqual(result.environment["SUPABASE_PROJECT_REF"], "shared-ref")
 
     def test_launch_bootstrap_accepts_legacy_and_private_key_aliases(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -290,9 +295,10 @@ class PersonalSupabaseTests(unittest.TestCase):
             result = bootstrap_personal_supabase(project, launch)
 
             self.assertEqual(result.status, "success")
-            project_env = (project / ".env").read_text(encoding="utf-8")
-            self.assertIn("SUPABASE_PUBLISHABLE_KEY=anon-key", project_env)
-            self.assertIn("SUPABASE_SECRET_KEY=service-key", project_env)
+            self.assertFalse((project / ".env").exists())
+            assert result.environment is not None
+            self.assertEqual(result.environment["SUPABASE_PUBLISHABLE_KEY"], "anon-key")
+            self.assertEqual(result.environment["SUPABASE_SECRET_KEY"], "service-key")
 
             (launch / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
@@ -301,13 +307,10 @@ class PersonalSupabaseTests(unittest.TestCase):
                 "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
                 encoding="utf-8",
             )
-            (project / ".env").unlink()
             private = bootstrap_personal_supabase(project, launch)
             self.assertEqual(private.status, "success")
-            self.assertIn(
-                "SUPABASE_SECRET_KEY=private-key",
-                (project / ".env").read_text(encoding="utf-8"),
-            )
+            assert private.environment is not None
+            self.assertEqual(private.environment["SUPABASE_SECRET_KEY"], "private-key")
 
     def test_resolve_helpers_derive_project_ref_from_url(self):
         self.assertEqual(
@@ -332,24 +335,6 @@ class PersonalSupabaseTests(unittest.TestCase):
             ),
             "abc123",
         )
-
-    def test_launch_bootstrap_rejects_project_env_conflict_atomically(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            launch = root / "launch"
-            self._seed_project(launch, "demo-app")
-            project = launch / "demo-app"
-            register_personal_supabase(project, schema="demo-app")
-            self._write_launch_env(launch)
-            project_env = project / ".env"
-            project_env.write_text("# preserve\nSUPABASE_URL=https://other.supabase.co\n", encoding="utf-8")
-            before = project_env.read_text(encoding="utf-8")
-
-            result = bootstrap_personal_supabase(project, launch)
-
-            self.assertEqual(result.status, "failed")
-            self.assertIn("conflicting", result.message)
-            self.assertEqual(project_env.read_text(encoding="utf-8"), before)
 
     def test_wrong_branch_blocks_activate_without_checkout(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -497,7 +482,7 @@ class PersonalSupabaseTests(unittest.TestCase):
                     "Scaffolding project files",
                     "Validating scaffold",
                     "Committing scaffold changes",
-                    "Synchronizing environment",
+                    "Validating environment",
                     "Checking Supabase connection",
                     "Pushing migrations",
                     "Complete",

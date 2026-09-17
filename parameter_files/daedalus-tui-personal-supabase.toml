@@ -12,7 +12,7 @@ env_publishable_key_aliases = ["SUPABASE_ANON_KEY"]
 env_secret_key_aliases = ["SUPABASE_PRIVATE_KEY", "SUPABASE_SERVICE_ROLE_KEY"]
 env_db_url_key = "SUPABASE_DB_URL"
 env_access_token_key = "SUPABASE_ACCESS_TOKEN"
-# Keys written into ignored project .env files (preferred names only).
+# Keys operators must set in the launch-root .env (preferred names; aliases still resolve).
 canonical_env_keys = [
   "SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
@@ -34,6 +34,12 @@ confirmation_title = "Activate personal Supabase?"
 confirmation_warning = "This scaffolds a project schema (if needed) and then activates it for the Daedalus ecosystem: a local software-owned commit on the selected operating branch, live Supabase connectivity preflight, and orchestration-owned migration push. Remote Git publish is not part of Activate. Only continue if this project should join your internal Supabase ecosystem."
 confirmation_name_prompt = "Type this project name exactly to confirm:"
 confirmation_button_label = "Activate"
+wizard_title = "Personal Supabase setup"
+wizard_scaffold_done = "Scaffold files are in place for schema {schema}."
+wizard_env_instructions = "Next, edit the Daedalus launch-root .env and set:\n\n  SUPABASE_URL=...\n  SUPABASE_PUBLISHABLE_KEY=...\n  SUPABASE_SECRET_KEY=...\n  SUPABASE_DB_URL=...   # or SUPABASE_ACCESS_TOKEN=...\n\nProject ref is optional when the URL is https://<ref>.supabase.co.\nDaedalus never writes these values into project .env files.\n\nWhen the values are saved, continue."
+wizard_env_missing = "Environment variables still not detected."
+wizard_continue_label = "Continue"
+wizard_cancel_label = "Cancel"
 activate_commit_message = "Add personal Supabase schema scaffold."
 activate_status_commit_message = "Mark personal Supabase schema activated."
 preflight_timeout_seconds = 15
@@ -43,7 +49,7 @@ activation_progress_stages = [
   "Scaffold project files",
   "Validate scaffold",
   "Commit scaffold changes",
-  "Synchronize environment",
+  "Validate environment",
   "Check Supabase connection",
   "Push migrations",
 ]

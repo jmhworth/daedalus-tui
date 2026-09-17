@@ -7,7 +7,8 @@ humans and agents can develop against a dedicated schema. Phase 2 (Activate)
 is software-owned Daedalus ecosystem readiness: commit the scaffold onto the
 already-checked-out operating branch, live-preflight Supabase connectivity, and
 orchestration-owned `supabase db push`. File scaffolding alone is not
-ecosystem-ready.
+ecosystem-ready. Operators set launch-root credentials manually via a setup
+wizard; Daedalus never writes project `.env` files.
 
 ## Key Points
 - **Shared database, per-project schema**: Schema identity is always the validated
@@ -25,24 +26,29 @@ ecosystem-ready.
   `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
   claim ecosystem readiness.
-- **Phase 2 — Activate**: The Command Menu (`Ctrl+K`) opens the action. After name confirmation, it runs
-  scaffold (when unregistered) then Activate when gates pass: require HEAD already
-  on the selected operating/target branch (no checkout/switch), refuse unrelated
-  dirty files, software-owned local commit of known scaffold paths + marker, launch-root
-  env sync, access-method-aware live preflight, then `db push`. Remote Git publish
-  remains the optional operator Push action in the Command Menu.
+- **Setup wizard**: After name confirmation, Register opens a setup wizard that
+  scaffolds files, then instructs the operator to set launch-root `.env` values.
+  Continue re-reads that file; missing credentials keep the wizard open with an
+  "Environment variables still not detected" correction. Daedalus does not write
+  `.env` files.
+- **Phase 2 — Activate**: After the wizard succeeds, the software runs Activate when
+  gates pass: require HEAD already on the selected operating/target branch (no
+  checkout/switch), refuse unrelated dirty files, software-owned local commit of
+  known scaffold paths + marker, launch-root env validation (read-only),
+  access-method-aware live preflight, then `db push`. Remote Git publish remains
+  the optional operator Push action in the Command Menu.
 - **Existing projects only**: Personal Supabase is post-init for projects already
   in the Daedalus format. New Project has no personal-Supabase opt-in.
 - **Retry**: Scaffolded or Activate-blocked projects reuse the Command Menu (`Ctrl+K`) with the
-  same name confirmation; skip re-scaffold when registered, validate completeness,
-  and re-run Phase 2. Incomplete scaffolds fail closed.
+  same name confirmation and setup wizard; skip re-scaffold when registered, validate
+  completeness, and re-run Phase 2. Incomplete scaffolds fail closed.
 - **Local cleanup**: The Command Menu also offers an exact-name-confirmed debug
   cleanup that removes the local `supabase/` directory and generated integration
   content while preserving unrelated `.daedalus`, profile, and environment values;
   it never changes the remote database.
 - **Status model**: Distinguish unregistered, scaffolded (`registered`, not
   `activated`), activated, and blocked reasons (`last_activate_status` /
-  redacted error class—no credentials). Launch env-syncs all registered projects;
+  redacted error class—no credentials). Launch validates all registered projects;
   launch `db push` runs only for activated projects when `supabase_db_push_enabled`.
 - **Supabase connected**: Launch-root required API settings + one DB access method
   (`SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`), `supabase` on PATH, and a
@@ -52,7 +58,9 @@ ecosystem-ready.
 - **Agent teaching**: Idempotently appends a Personal Supabase Schema section to
   `.agents/profiles/coding.md` and `architecture.md` (no Cursor skill file).
 - **Canonical environment**: The launch-root `.env` owns shared connection values;
-  each ignored project `.env` receives preferred keys plus `SUPABASE_SCHEMA`.
+  orchestration reads that file (and process overrides) for CLI work. Project
+  `.env.example` documents placeholders; Daedalus never syncs credentials into
+  ignored project `.env` files.
 - **Manual API exposure**: Operators must allow-list the schema in Supabase Dashboard
   Data API / PostgREST settings after the migration is applied remotely.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
@@ -60,19 +68,22 @@ ecosystem-ready.
 
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
-  gate/commit, live preflight, Activate orchestration, canonical environment
-  bootstrap, and temporary CLI configuration.
-- `tui/environment.py`: Comment-preserving atomic `.env` synchronization and runtime loading.
-- `tui/app.py`: Command Menu, confirmation modal, activation progress modal, and scaffold+Activate / retry worker.
+  gate/commit, live preflight, Activate orchestration, launch-root env validation,
+  and temporary CLI configuration.
+- `tui/environment.py`: Comment-preserving `.env` reading/loading helpers (no
+  personal-Supabase credential writes).
+- `tui/app.py`: Command Menu, confirmation modal, setup wizard, activation progress
+  modal, and scaffold+Activate / retry worker.
 - `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
-- `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation copy,
-  activate commit message, and preflight timeout.
+- `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation and
+  wizard copy, activate commit message, and preflight timeout.
 - `tests/test_personal_supabase.py`, `tests/test_app.py`: Coverage.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-16: Replaced automatic project `.env` sync with a Register setup wizard that scaffolds files, instructs manual launch-root env setup, and blocks Continue until credentials are detected.
 - 2026-09-16: Aligned the missing-credentials bootstrap test with simplified API keys so it asserts the database-access failure without writing a project `.env`.
 - 2026-09-16: Simplified launch-root Supabase env to URL + publishable/secret keys (with anon/service_role/private aliases), auto-derived project ref from `*.supabase.co` URLs, and clarified that DB URL or access token remains required only for migration push.
 - 2026-09-16: Repaired local cleanup so generated `.env.example` files are fully removed when empty and TUI callbacks preserve operator-supplied project paths across symlinked temporary directories.

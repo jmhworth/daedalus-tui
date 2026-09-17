@@ -421,6 +421,10 @@ PersonalSupabaseConfirmationScreen {
     align: center middle;
 }
 
+PersonalSupabaseSetupWizardScreen {
+    align: center middle;
+}
+
 PersonalSupabaseActivationProgressScreen {
     align: center middle;
 }
@@ -576,6 +580,43 @@ TopicViewerScreen {
 
 #confirm-personal-supabase-button,
 #cancel-personal-supabase-button {
+    width: 20;
+    margin-right: 1;
+}
+
+#personal-supabase-wizard-dialog {
+    width: 78;
+    height: auto;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#personal-supabase-wizard-title {
+    color: $text-accent;
+    text-style: bold;
+    height: 2;
+}
+
+#personal-supabase-wizard-scaffold,
+#personal-supabase-wizard-instructions,
+#personal-supabase-wizard-status {
+    color: $text-muted;
+    height: auto;
+    margin-bottom: 1;
+}
+
+#personal-supabase-wizard-scaffold {
+    color: $text;
+}
+
+#personal-supabase-wizard-actions {
+    height: 3;
+    align: left middle;
+}
+
+#continue-personal-supabase-wizard-button,
+#cancel-personal-supabase-wizard-button {
     width: 20;
     margin-right: 1;
 }

@@ -25,7 +25,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Profile prompt boundary**: The orchestrator reloads the selected repository profile from the active task worktree and embeds it inline before each task, repair, follow-up planning, or resolver prompt; agents apply supplied profile content directly without reopening the file, while the mode and orchestration constraints that follow remain authoritative.
 - **Topic prompt boundary**: When a task carries a topic slug, the orchestrator reloads that topic markdown from the task worktree and embeds it with mode-specific instructions before task, repair, and resolver prompts; missing topics emit a non-fatal diagnostic and omit the embed.
 - **Graph refresh boundary**: Graphify runs only after successful primary promotion, and a failed refresh is cleaned up and reported without starting a resolver.
-- **Local-only boundary**: No persistence or daemon communications. The launch-root `.env` is the canonical shared Supabase environment and is threaded into task agents and CLI pushes; project `.env` files are ignored synchronized copies. Orchestration may push Supabase migrations via the CLI; agents still do not own DB push. Automated orchestration never pushes Git remotes; an explicit operator Push in the TUI may publish the selected operating branch.
+- **Local-only boundary**: No persistence or daemon communications. The launch-root `.env` is the canonical shared Supabase environment and is threaded into task agents and CLI pushes; Daedalus does not write project `.env` credential copies. Orchestration may push Supabase migrations via the CLI; agents still do not own DB push. Automated orchestration never pushes Git remotes; an explicit operator Push in the TUI may publish the selected operating branch.
 - **Project discovery boundary**: The TUI discovers only immediate launch-root child directories containing `feature_files`; nested paths are excluded, with the launch root used only when no eligible child exists.
 - **Project-scoped execution**: The TUI creates one coordinator per discovered `feature_files` project, so task numbering, worktrees, branches, and integration gates stay scoped to the selected repository.
 - **Shutdown diagnostics**: A rotating project-local debug log records agent process IDs, task transitions, Textual exceptions, worker shutdown, and on-demand all-thread stack dumps.
@@ -39,13 +39,14 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - `tui/topics.py`: Topic discovery and embed helpers used at prompt-build time.
 - `tui/verification.py`: Configured and convention-based verification execution.
 - `tui/supabase_migrations.py`: Pending migration detection and non-interactive `supabase db push`.
-- `tui/environment.py`, `tui/personal_supabase.py`: Canonical environment loading, safe synchronization, and temporary project-ref preparation used by launch and task pushes.
+- `tui/environment.py`, `tui/personal_supabase.py`: Canonical launch-root environment loading/validation and temporary project-ref preparation used by launch and task pushes.
 - `parameter_files/daedalus-tui-orchestration.toml`: Default target branch seed, worktree, verification, migration push, and retry settings.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-16: Noted that personal Supabase no longer syncs credentials into project `.env` files; launch-root validation remains read-only.
 - 2026-09-14: Documented activated-only launch migration push while env-sync still covers all registered personal Supabase projects.
 - 2026-09-13: Threaded the launch-root shared environment through task orchestration and serialized launch/task Supabase pushes per project while preserving task verify→push semantics.
 - 2026-09-13: Noted that personal shared-Supabase schema registration scaffolds migrations only; orchestration remains the sole `supabase db push` owner.

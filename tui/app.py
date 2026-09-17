@@ -54,10 +54,12 @@ from .personal_supabase import (
     is_personal_supabase_activated,
     load_personal_supabase_settings,
     load_personal_supabase_status,
+    register_personal_supabase,
     remove_personal_supabase,
     resolve_project_ref_from_environment,
     schema_from_project_root,
     temporary_supabase_cli_config,
+    validate_launch_personal_supabase_environment,
 )
 from .projects import DaedalusProject, discover_projects, is_direct_child_project
 from .plan import (
@@ -508,6 +510,97 @@ class PersonalSupabaseConfirmationScreen(ModalScreen[bool]):
         self.dismiss(True)
 
 
+class PersonalSupabaseSetupWizardScreen(ModalScreen[bool]):
+    """Guide scaffold completion and manual launch-root env setup before Activate."""
+
+    BINDINGS = [
+        ("escape", "cancel_wizard", "Cancel"),
+    ]
+
+    def __init__(self, project_path: Path, schema: str, launch_root: Path) -> None:
+        super().__init__()
+        self.project_path = project_path
+        self.schema = schema
+        self.launch_root = launch_root
+        self.settings = load_personal_supabase_settings()
+        self._scaffold_ready = False
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="personal-supabase-wizard-dialog"):
+            yield Static(
+                str(self.settings["wizard_title"]),
+                id="personal-supabase-wizard-title",
+            )
+            yield Static(
+                "Preparing scaffold…",
+                id="personal-supabase-wizard-scaffold",
+                markup=False,
+            )
+            yield Static(
+                "",
+                id="personal-supabase-wizard-instructions",
+                markup=False,
+            )
+            yield Static("", id="personal-supabase-wizard-status", markup=False)
+            with Horizontal(id="personal-supabase-wizard-actions"):
+                yield Button(
+                    str(self.settings["wizard_continue_label"]),
+                    id="continue-personal-supabase-wizard-button",
+                    variant="primary",
+                    disabled=True,
+                )
+                yield Button(
+                    str(self.settings["wizard_cancel_label"]),
+                    id="cancel-personal-supabase-wizard-button",
+                )
+
+    def on_mount(self) -> None:
+        result = register_personal_supabase(self.project_path, schema=self.schema)
+        scaffold = self.query_one("#personal-supabase-wizard-scaffold", Static)
+        instructions = self.query_one("#personal-supabase-wizard-instructions", Static)
+        status = self.query_one("#personal-supabase-wizard-status", Static)
+        continue_button = self.query_one("#continue-personal-supabase-wizard-button", Button)
+        if result.status != "success":
+            scaffold.update(result.message or "Scaffold failed.")
+            status.update(result.message or "Scaffold failed.")
+            continue_button.disabled = True
+            self._scaffold_ready = False
+            return
+        self._scaffold_ready = True
+        scaffold.update(
+            str(self.settings["wizard_scaffold_done"]).format(schema=self.schema)
+        )
+        instructions.update(str(self.settings["wizard_env_instructions"]))
+        status.update("")
+        continue_button.disabled = False
+        continue_button.focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel-personal-supabase-wizard-button":
+            self.dismiss(False)
+        elif event.button.id == "continue-personal-supabase-wizard-button":
+            self._continue()
+
+    def action_cancel_wizard(self) -> None:
+        self.dismiss(False)
+
+    def _continue(self) -> None:
+        if not self._scaffold_ready:
+            return
+        status = self.query_one("#personal-supabase-wizard-status", Static)
+        _environment, error = validate_launch_personal_supabase_environment(
+            self.launch_root,
+            require_database_access=True,
+            settings=self.settings,
+        )
+        if error:
+            missing_prefix = str(self.settings["wizard_env_missing"])
+            status.update(f"{missing_prefix} {error}")
+            return
+        status.update("")
+        self.dismiss(True)
+
+
 class PersonalSupabaseRemovalConfirmationScreen(ModalScreen[bool]):
     """Require an exact project-name confirmation before local cleanup."""
 
@@ -593,7 +686,7 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
         "Using existing scaffold": 0,
         "Validating scaffold": 1,
         "Committing scaffold changes": 2,
-        "Synchronizing environment": 3,
+        "Validating environment": 3,
         "Checking Supabase connection": 4,
         "Pushing migrations": 5,
     }
@@ -1422,7 +1515,7 @@ class DaedalusTuiApp(App[None]):
             self._set_status(f"Supabase bootstrap incomplete ({len(failures)} project(s))")
             return
         if registered:
-            action = "environments synchronized"
+            action = "launch environment validated"
             if self.orchestration_settings.supabase_db_push_enabled:
                 action = "bootstrap complete"
             self._set_status(f"Supabase {action} ({len(registered)} project(s))")
@@ -1828,13 +1921,46 @@ class DaedalusTuiApp(App[None]):
         if not confirmed:
             self._set_status("Personal Supabase Activate cancelled")
             return
+        # Screen.dismiss invokes this callback before it pops the confirmation
+        # screen. Defer the push so the setup wizard remains on top.
+        self.call_after_refresh(
+            self._open_personal_supabase_setup_wizard,
+            project_path,
+            schema,
+        )
+
+    def _open_personal_supabase_setup_wizard(
+        self,
+        project_path: Path,
+        schema: str,
+    ) -> None:
+        """Scaffold files, then guide manual launch-root env setup before Activate."""
+        self._set_status("Personal Supabase setup…")
+        self.push_screen(
+            PersonalSupabaseSetupWizardScreen(project_path, schema, self.launch_root),
+            lambda ready: self._on_personal_supabase_wizard_finished(
+                ready,
+                project_path,
+                schema,
+            ),
+        )
+
+    def _on_personal_supabase_wizard_finished(
+        self,
+        ready: bool,
+        project_path: Path,
+        schema: str,
+    ) -> None:
+        if not ready:
+            self._set_status("Personal Supabase setup cancelled")
+            return
         operating_branch = self._selected_operating_branch()
         if not operating_branch:
             self._set_error("Select an operating/target branch before Activate.")
             self._set_status("Personal Supabase Activate blocked")
             return
-        # Screen.dismiss invokes this callback before it pops the confirmation
-        # screen. Defer the push so the progress screen remains on top.
+        # Screen.dismiss invokes this callback before it pops the wizard.
+        # Defer the push so the progress screen remains on top.
         self.call_after_refresh(
             self._start_personal_supabase_activate,
             project_path,

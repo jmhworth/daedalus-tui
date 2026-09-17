@@ -21,6 +21,7 @@ from tui.app import (
     PersonalSupabaseConfirmationScreen,
     PersonalSupabaseActivationProgressScreen,
     PersonalSupabaseRemovalConfirmationScreen,
+    PersonalSupabaseSetupWizardScreen,
     ProjectInitializerScreen,
     TopicViewerScreen,
 )
@@ -237,9 +238,16 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 "[worktree]\ninstall_command = []\nreadonly_paths = []\n",
                 encoding="utf-8",
             )
+            (root / ".env").write_text(
+                "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                "SUPABASE_SECRET_KEY=secret-key\n"
+                "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
+                encoding="utf-8",
+            )
             app = DaedalusTuiApp(
                 runner=FakeRunner(),
-                directory=project,
+                directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
             )
@@ -290,6 +298,16 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 ), patch.object(app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)):
                     await app.screen.dismiss(True)
                     await pilot.pause()
+                    self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
+                    self.assertTrue((project / "supabase" / "config.toml").exists())
+                    self.assertFalse((project / ".env").exists())
+                    continue_button = app.screen.query_one(
+                        "#continue-personal-supabase-wizard-button",
+                        Button,
+                    )
+                    self.assertFalse(continue_button.disabled)
+                    await app.screen.dismiss(True)
+                    await pilot.pause()
 
                 activate.assert_called_once()
                 self.assertEqual(activate.call_args.args[2], "main")
@@ -307,6 +325,63 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     "Activated Supabase schema",
                     str(app.query_one("#status", Static).render()),
                 )
+
+    async def test_supabase_setup_wizard_blocks_when_env_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "demo-app"
+            (project / ".agents" / "profiles").mkdir(parents=True)
+            (project / "feature_files").mkdir()
+            (project / ".agents" / "profiles" / "coding.md").write_text("# Coding\n", encoding="utf-8")
+            (project / ".agents" / "profiles" / "architecture.md").write_text(
+                "# Architecture\n",
+                encoding="utf-8",
+            )
+            (project / ".daedalus").write_text(
+                "[worktree]\ninstall_command = []\nreadonly_paths = []\n",
+                encoding="utf-8",
+            )
+            app = DaedalusTuiApp(
+                runner=FakeRunner(),
+                directory=project,
+                settings=settings(),
+                coordinator=FakeCoordinator(),
+            )
+            async with app.run_test() as pilot:
+                outcomes: list[bool] = []
+                app.push_screen(
+                    PersonalSupabaseSetupWizardScreen(project, "demo-app", root),
+                    outcomes.append,
+                )
+                await pilot.pause()
+                self.assertTrue((project / "supabase" / "config.toml").exists())
+                self.assertFalse((project / ".env").exists())
+                status = app.screen.query_one("#personal-supabase-wizard-status", Static)
+                continue_button = app.screen.query_one(
+                    "#continue-personal-supabase-wizard-button",
+                    Button,
+                )
+                continue_button.press()
+                await pilot.pause()
+                self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
+                self.assertEqual(outcomes, [])
+                self.assertIn(
+                    "Environment variables still not detected",
+                    str(status.render()),
+                )
+                self.assertIn("SUPABASE_URL", str(status.render()))
+
+                (root / ".env").write_text(
+                    "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                    "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                    "SUPABASE_SECRET_KEY=secret-key\n"
+                    "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
+                    encoding="utf-8",
+                )
+                continue_button.press()
+                await pilot.pause()
+                self.assertEqual(outcomes, [True])
+                self.assertNotIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
 
     async def test_command_menu_remove_supabase_requires_confirmation(self):
         with tempfile.TemporaryDirectory() as directory:

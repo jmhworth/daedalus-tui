@@ -14,7 +14,7 @@ import subprocess
 import tomllib
 from collections.abc import Callable, Iterator
 
-from .environment import read_env_file, redact_environment_values, synchronize_env_file
+from .environment import read_env_file, redact_environment_values
 from .project_config import DAEDALUS_CONFIG_FILENAME
 from .supabase_migrations import push_migrations
 
@@ -125,7 +125,7 @@ def personal_supabase_environment_settings(settings: dict | None = None) -> tupl
 
 
 def personal_supabase_managed_env_keys(settings: dict | None = None) -> set[str]:
-    """Return every env key this feature may write or clean up (preferred + aliases)."""
+    """Return every env key this feature may clean up (preferred + aliases)."""
     values = settings or load_personal_supabase_settings()
     keys = {
         str(values["env_schema_key"]),
@@ -510,20 +510,44 @@ def load_personal_supabase_status(project_root: Path) -> PersonalSupabaseStatus:
     )
 
 
+def validate_launch_personal_supabase_environment(
+    launch_root: Path,
+    *,
+    require_database_access: bool = True,
+    settings: dict | None = None,
+) -> tuple[dict[str, str] | None, str | None]:
+    """Read and resolve the launch-root ``.env`` without writing any files.
+
+    Returns ``(environment, None)`` on success. The environment merges file
+    values with preferred/derived keys for CLI use. On failure returns
+    ``(file_values_or_None, error)``.
+    """
+    config = settings or load_personal_supabase_settings()
+    source = launch_root.expanduser().resolve() / ".env"
+    source_values = read_env_file(source)
+    resolved, resolve_error = resolve_personal_supabase_environment(
+        source_values,
+        config,
+        require_database_access=require_database_access,
+    )
+    if resolve_error or resolved is None:
+        return source_values, resolve_error or "Launch environment could not be resolved."
+    return {**source_values, **resolved}, None
+
+
 def bootstrap_personal_supabase(
     project_root: Path,
     launch_root: Path,
     *,
     require_database_access: bool = True,
 ) -> PersonalSupabaseBootstrapResult:
-    """Validate registration and synchronize the launch-root shared environment.
+    """Validate registration and the launch-root shared environment.
 
-    This helper performs no remote operation. It only prepares ignored local
-    files and validates that the tracked Supabase scaffold can be used by the
-    orchestration-owned CLI push.
+    This helper performs no remote operation and never writes ``.env`` files.
+    It only confirms the tracked Supabase scaffold and that launch-root
+    credentials can be used by the orchestration-owned CLI push.
     """
     root = project_root.expanduser().resolve()
-    source = launch_root.expanduser().resolve() / ".env"
     settings = load_personal_supabase_settings()
     try:
         status = load_personal_supabase_status(root)
@@ -540,44 +564,30 @@ def bootstrap_personal_supabase(
     if schema != status.schema:
         return PersonalSupabaseBootstrapResult("failed", root, schema=schema, message="Registered schema marker is not canonical.")
 
-    canonical, required = personal_supabase_environment_settings(settings)
-    source_values = read_env_file(source)
-    resolved, resolve_error = resolve_personal_supabase_environment(
-        source_values,
-        settings,
+    environment, resolve_error = validate_launch_personal_supabase_environment(
+        launch_root,
         require_database_access=require_database_access,
+        settings=settings,
     )
-    if resolve_error or resolved is None:
+    if resolve_error or environment is None:
         return PersonalSupabaseBootstrapResult(
             "failed",
             root,
             schema=schema,
             message=resolve_error or "Launch environment could not be resolved.",
-            environment=source_values,
+            environment=environment,
         )
-    project_ref = resolved.get(str(settings["env_project_ref_key"]), "").strip()
+    project_ref = environment.get(str(settings["env_project_ref_key"]), "").strip()
     scaffold_error = _validate_supabase_scaffold(root, schema, settings, project_ref)
     if scaffold_error:
         return PersonalSupabaseBootstrapResult("failed", root, schema=schema, message=scaffold_error)
-    sync = synchronize_env_file(
-        source,
-        root / ".env",
-        canonical,
-        project_values={str(settings["env_schema_key"]): schema},
-        required_keys=required,
-        resolved_values=resolved,
-    )
-    if not sync.succeeded:
-        return PersonalSupabaseBootstrapResult(
-            "failed", root, schema=schema, message=sync.message, environment=sync.values
-        )
     return PersonalSupabaseBootstrapResult(
         "success",
         root,
         schema=schema,
         project_ref=project_ref,
-        message="Supabase environment synchronized.",
-        environment=sync.values,
+        message="Launch Supabase environment validated.",
+        environment=environment,
     )
 
 
@@ -1108,10 +1118,10 @@ def activate_personal_supabase(
             blocked_reason=ACTIVATE_STATUS_BLOCKED_GIT,
         )
 
-    report_progress("Synchronizing environment")
+    report_progress("Validating environment")
     prepared = bootstrap_personal_supabase(root, launch, require_database_access=True)
     if prepared.status != "success":
-        message = prepared.message or "Environment synchronization failed."
+        message = prepared.message or "Launch environment validation failed."
         _write_registration_marker(
             root,
             schema_name,
@@ -1249,12 +1259,14 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         f"This project uses a dedicated Postgres schema `{schema}` on the operator's "
         "shared personal Supabase database. Do **not** use the default `public` schema "
         "for application tables or migrations.\n\n"
-        f"- Read the schema name from `{env_key}` in the project `.env` (expected value: `{schema}`).\n"
+        f"- Schema name is `{schema}` (see `{env_key}` in `.env.example` and the "
+        "`[personal_supabase]` marker in `.daedalus`).\n"
         "- The launch-root `.env` is the canonical shared source for "
         "`SUPABASE_URL`, publishable/secret API keys (legacy anon/service_role aliases "
         "still work), and one database access setting (`SUPABASE_DB_URL` or "
         "`SUPABASE_ACCESS_TOKEN`); the project ref is optional when the URL is "
-        "`https://<ref>.supabase.co`. Daedalus synchronizes the ignored project `.env` at launch.\n"
+        "`https://<ref>.supabase.co`. Operators set those values manually; Daedalus "
+        "never writes credentials into project `.env` files.\n"
         f"- Qualify SQL, migrations, RLS policies, and client/API configuration for `{schema}`.\n"
         "- Never assume PostgREST or Supabase clients default to `public` for this app.\n"
         "- Auth is shared across apps on this Supabase project; reuse the existing auth setup.\n"
@@ -1539,7 +1551,7 @@ def _shared_env_example_block(settings: dict, keys: list[str] | None = None) -> 
         "# Prefer SUPABASE_PUBLISHABLE_KEY + SUPABASE_SECRET_KEY (anon/service_role and",
         "# SUPABASE_PRIVATE_KEY remain accepted aliases). Project ref is optional when",
         "# SUPABASE_URL is https://<project-ref>.supabase.co.",
-        "# Do not add credentials here; Daedalus synchronizes this ignored file at launch.",
+        "# Do not put real credentials here; set them in the Daedalus launch-root `.env`.",
     ]
     database_keys = {
         str(settings["env_db_url_key"]),
