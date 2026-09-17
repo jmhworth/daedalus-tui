@@ -87,11 +87,6 @@
   "85": ".__init__",
   "86": "._on_topic_created",
   "87": "CandidateFeatureGroup",
-  "88": "._render_line_strip",
   "89": "PersonalSupabaseSetupWizardScreen",
-  "90": "list_local_branches",
-  "91": "_literal_select_options",
-  "92": ".remove_cancelled",
-  "93": ".reset_task_to_base",
-  "94": ".cursor_shape"
+  "92": ".remove_cancelled"
 }

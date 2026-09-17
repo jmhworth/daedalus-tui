@@ -82,11 +82,5 @@
   "80": ".edit_paste_after",
   "81": ".enter_insert_mode",
   "82": ".nav_word_end",
-  "83": "push_branch",
-  "84": ".edit_paste_before",
-  "85": ".__init__",
-  "86": "._on_topic_created",
-  "87": "CandidateFeatureGroup",
-  "89": "PersonalSupabaseSetupWizardScreen",
-  "92": ".remove_cancelled"
+  "89": "PersonalSupabaseSetupWizardScreen"
 }
