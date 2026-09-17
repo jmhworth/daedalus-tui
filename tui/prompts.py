@@ -284,6 +284,187 @@ def build_resolver_prompt(
     )
 
 
+ORCHESTRATE_BOUNDARY = (
+    "Work only in this Git worktree. "
+    "Do not run git add, git commit, git merge, git push, or switch branches. "
+    "Do not run graphify, `graphify update`, or any graph refresh. "
+    "Do not run `supabase db push`, `firebase deploy`, or other database push "
+    "and remote deploy commands. "
+    "The orchestration layer owns all file staging, commits, merges, graph refreshes, "
+    "migration pushes, and cleanup."
+)
+
+PLANNER_PAYLOAD_INSTRUCTIONS = (
+    "Return exactly one payload between BEGIN_DAEDALUS_ORCHESTRATION and "
+    "END_DAEDALUS_ORCHESTRATION, with no prose outside it. The payload must be JSON with this "
+    "shape: {\"summary\": \"one paragraph describing the approach\", \"tasks\": ["
+    "{\"id\": \"t1\", \"title\": \"short imperative title\", "
+    "\"goal\": \"what done looks like, in two to five sentences\", "
+    "\"checklist\": [\"verifiable item\", \"verifiable item\"], "
+    "\"file_scope\": [\"tui/foo.py\", \"tests/test_foo.py\"], "
+    "\"read_first\": [\"tui/bar.py:120-180\"], "
+    "\"interfaces\": \"signatures or contracts this task must expose or consume\", "
+    "\"verify\": \"pytest tests/test_foo.py\", \"depends_on\": []}], \"done\": false}. "
+    "Every task needs a unique id, at least one checklist item, and a non-empty file_scope. "
+    "depends_on may only name ids in the same payload and must not form a cycle. Two tasks with "
+    "no dependency between them run at the same time, so they must not share any path in "
+    "file_scope. Set done=true with an empty tasks array to declare the session finished."
+)
+
+WORKER_REPORT_INSTRUCTIONS = (
+    "Finish your response with exactly one payload between BEGIN_DAEDALUS_WORKER_REPORT and "
+    "END_DAEDALUS_WORKER_REPORT. The payload must be JSON with this shape: "
+    "{\"task\": \"t2\", \"status\": \"done\", \"checklist\": [true, true, false], "
+    "\"files_changed\": [\"tui/bar.py\"], "
+    "\"errors\": \"empty string, or what blocked the unfinished items\", "
+    "\"notes\": \"anything the planner must know: interface changes, follow-ups\"}. "
+    "status is one of done, partial, or blocked, and the checklist array has one boolean per "
+    "checklist item of the card, in order. A missing or malformed report is recorded as partial."
+)
+
+
+def build_planner_prompt(
+    user_prompt: str,
+    role_rules: str | None = None,
+    profile_text: str | None = None,
+    topic_text: str | None = None,
+    max_workers: int = 3,
+    verification_hint: str = "",
+) -> str:
+    """Build the first planner turn: decompose one operator prompt into cards.
+
+    The planner reads the repository and answers with JSON; it never edits
+    files, so this prompt carries the read-only boundary Plan mode uses.
+    """
+    hint = (
+        f"\n\nThe project's verification command is: {verification_hint.strip()}"
+        if verification_hint.strip()
+        else ""
+    )
+    return (
+        "TASK_MODE: orchestrate-plan\n\n"
+        f"{user_prompt.strip()}\n\n"
+        f"{_embedded_profile(profile_text)}"
+        f"{_embedded_topic(topic_text, 'plan')}"
+        f"{_embedded_role_rules(role_rules, 'Planner')}"
+        "Decompose the request above into small, self-contained tasks. Each task is handed to a "
+        "separate worker agent that sees only its own card: the goal, checklist, file scope, "
+        "read_first list, interfaces, and verify command you write. A worker that has to explore "
+        "the repository to understand its card costs the tokens this mode exists to save, so make "
+        "every card startable from read_first alone.\n\n"
+        f"At most {max(1, int(max_workers))} workers run at a time, and tasks with no dependency "
+        "between them are dispatched together; size and order the waves accordingly. A task that "
+        "declares depends_on is dispatched only after those tasks are promoted, so its worktree "
+        f"already contains their changes.{hint}\n\n"
+        f"{PLANNER_PAYLOAD_INSTRUCTIONS}\n\n"
+        "Inspect the repository as read-only context. Do not modify files or create generated "
+        f"artifacts. {ORCHESTRATE_BOUNDARY}"
+    )
+
+
+def build_planner_round_prompt(
+    user_prompt: str,
+    summary: str,
+    digest: str,
+    role_rules: str | None = None,
+    profile_text: str | None = None,
+    round_number: int = 2,
+    round_limit: int = 6,
+) -> str:
+    """Build a later planner turn from a bounded status digest, not transcripts."""
+    return (
+        "TASK_MODE: orchestrate-plan\n\n"
+        f"{user_prompt.strip()}\n\n"
+        f"{_embedded_profile(profile_text)}"
+        f"{_embedded_role_rules(role_rules, 'Planner')}"
+        f"Planner round {round_number} of {round_limit}.\n\n"
+        f"Your current plan summary:\n{summary.strip() or '(none recorded)'}\n\n"
+        f"Status of the tasks you dispatched:\n{digest.strip()}\n\n"
+        "Decide what happens next. You may add tasks, re-issue a failed task under a new id with "
+        "a revised card (set \"reissues\" to the failed id), or finish the session. Re-issue only "
+        "when a different card would succeed; a task that is failing for a reason no card can fix "
+        "should be abandoned and explained in summary. Send done=true with an empty tasks array "
+        "once the request is satisfied. Include only tasks that still need to run — tasks already "
+        "promoted must not be repeated.\n\n"
+        f"{PLANNER_PAYLOAD_INSTRUCTIONS}\n\n"
+        "Inspect the repository as read-only context. Do not modify files or create generated "
+        f"artifacts. {ORCHESTRATE_BOUNDARY}"
+    )
+
+
+def build_worker_prompt(
+    card_markdown: str,
+    role_rules: str | None = None,
+    profile_text: str | None = None,
+    verify_command: str = "",
+) -> str:
+    """Build a worker turn from one task card and nothing else.
+
+    This builder deliberately has no parameter for the operator's prompt, the
+    other cards, the planner's reasoning, or conversation history: context is
+    minimized by construction rather than by asking an agent to ignore what it
+    was sent. Do not add one.
+    """
+    verify = verify_command.strip()
+    verify_line = (
+        f"Run this verification before reporting: {verify}\n\n" if verify else ""
+    )
+    return (
+        "TASK_MODE: coding\n\n"
+        f"{_embedded_profile(profile_text)}"
+        f"{_embedded_role_rules(role_rules, 'Worker')}"
+        "You are a worker agent. Complete exactly the task card below and nothing else. The same "
+        "card is written to `.daedalus-orchestration/task.md` in this worktree; tick its checklist "
+        "items there (`- [x]`) as you finish them and leave unfinished items unticked.\n\n"
+        "BEGIN_DAEDALUS_TASK_CARD\n"
+        f"{card_markdown.strip()}\n"
+        "END_DAEDALUS_TASK_CARD\n\n"
+        f"{verify_line}"
+        f"Make the requested file changes and leave them in the worktree. {ORCHESTRATE_BOUNDARY}\n\n"
+        f"{WORKER_REPORT_INSTRUCTIONS}"
+    )
+
+
+def bounded_digest(text: str, limit: int) -> str:
+    """Bound planner-facing text to its character budget, marking the omission."""
+    return _bounded(text, max(1, int(limit)))
+
+
+def role_block(role_rules: str | None, heading: str) -> str:
+    """Return one ``## <heading>`` block of the bundled role rules."""
+    if not role_rules:
+        return ""
+    lines = role_rules.splitlines()
+    collected: list[str] = []
+    inside = False
+    for line in lines:
+        if line.startswith("## "):
+            if inside:
+                break
+            inside = line[3:].strip().lower() == heading.strip().lower()
+            if inside:
+                collected.append(line)
+            continue
+        if inside:
+            collected.append(line)
+    return "\n".join(collected).strip()
+
+
+def _embedded_role_rules(role_rules: str | None, role: str) -> str:
+    """Embed the shared rules plus one role's block, and nothing else."""
+    blocks = [block for block in (role_block(role_rules, "Shared"), role_block(role_rules, role)) if block]
+    if not blocks:
+        return ""
+    body = "\n\n".join(blocks)
+    return (
+        "BEGIN_DAEDALUS_ROLE_RULES\n"
+        "These rules govern your role in this orchestration session and are already supplied "
+        "inline; do not go looking for them on disk.\n"
+        f"{body}\n"
+        "END_DAEDALUS_ROLE_RULES\n\n"
+    )
+
+
 def _embedded_profile(profile_text: str | None) -> str:
     if profile_text is None:
         return ""

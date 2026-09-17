@@ -186,3 +186,131 @@ class ConversationPromptTests(unittest.TestCase):
         prompt = build_conversation_prompt([ConversationEntry("user", "only goal")], "only goal")
         self.assertNotIn("Conversation so far", prompt)
         self.assertIn("only goal", prompt)
+
+
+OPERATOR_PROMPT = "OPERATOR_PROMPT_SENTINEL: rewrite the whole settings bar."
+
+
+class OrchestratePromptTests(unittest.TestCase):
+    """Orchestrate Mode prompts: one role block each, and one card per worker."""
+
+    def card(self) -> str:
+        from tui.orchestrate_protocol import PlannerTask, load_card_template, render_task_card
+
+        task = PlannerTask(
+            "t2",
+            "Add bar parsing",
+            "Parse the bar payload and return a typed record.",
+            ("parse_bar returns a BarRecord", "tests cover a malformed payload"),
+            ("tui/bar.py", "tests/test_bar.py"),
+            ("tui/foo.py:120-180",),
+            "def parse_bar(text: str) -> BarRecord",
+            "pytest tests/test_bar.py",
+        )
+        return render_task_card(task, load_card_template())
+
+    def test_planner_prompt_carries_the_payload_contract_and_worker_count(self):
+        from tui.orchestrate_protocol import load_role_rules
+        from tui.prompts import build_planner_prompt
+
+        prompt = build_planner_prompt(
+            OPERATOR_PROMPT,
+            role_rules=load_role_rules(),
+            profile_text="PLANNING_PROFILE_SENTINEL",
+            max_workers=4,
+            verification_hint="pytest",
+        )
+
+        self.assertTrue(prompt.startswith("TASK_MODE: orchestrate-plan"))
+        self.assertIn(OPERATOR_PROMPT, prompt)
+        self.assertIn("PLANNING_PROFILE_SENTINEL", prompt)
+        self.assertIn("BEGIN_DAEDALUS_ORCHESTRATION", prompt)
+        self.assertIn("END_DAEDALUS_ORCHESTRATION", prompt)
+        self.assertIn("At most 4 workers run at a time", prompt)
+        self.assertIn("pytest", prompt)
+        self.assertIn("Do not modify files", prompt)
+        # The planner gets its own block plus the shared rules, never the worker's.
+        self.assertIn("You own decomposition, ordering, and conflict resolution", prompt)
+        self.assertIn("Edit only inside your own Git worktree", prompt)
+        self.assertNotIn("Do exactly what the card says", prompt)
+
+    def test_planner_round_prompt_carries_the_digest_and_its_options(self):
+        from tui.orchestrate_protocol import load_role_rules
+        from tui.prompts import build_planner_round_prompt
+
+        digest = "t1  promoted   4/4 checklist\nt2  failed     1/3 checklist"
+        prompt = build_planner_round_prompt(
+            OPERATOR_PROMPT,
+            "Split the work in three.",
+            digest,
+            role_rules=load_role_rules(),
+            round_number=2,
+            round_limit=6,
+        )
+
+        self.assertIn("Planner round 2 of 6", prompt)
+        self.assertIn(digest, prompt)
+        self.assertIn("Split the work in three.", prompt)
+        self.assertIn("reissues", prompt)
+        self.assertIn("done=true", prompt)
+
+    def test_worker_prompt_contains_only_the_card(self):
+        from tui.orchestrate_protocol import load_role_rules
+        from tui.prompts import build_worker_prompt
+
+        prompt = build_worker_prompt(
+            self.card(),
+            role_rules=load_role_rules(),
+            profile_text="CODING_PROFILE_SENTINEL",
+            verify_command="pytest tests/test_bar.py",
+        )
+
+        self.assertTrue(prompt.startswith("TASK_MODE: coding"))
+        self.assertIn("Add bar parsing", prompt)
+        self.assertIn("- [ ] parse_bar returns a BarRecord", prompt)
+        self.assertIn("CODING_PROFILE_SENTINEL", prompt)
+        self.assertIn("BEGIN_DAEDALUS_WORKER_REPORT", prompt)
+        self.assertIn(".daedalus-orchestration/task.md", prompt)
+        self.assertIn("Do not run git add", prompt)
+        # The worker sees its own role rules, not the planner's.
+        self.assertIn("Do exactly what the card says", prompt)
+        self.assertNotIn("You own decomposition", prompt)
+        # Context minimization: the operator's prompt never reaches a worker.
+        self.assertNotIn(OPERATOR_PROMPT, prompt)
+
+    def test_worker_prompt_cannot_be_given_the_operator_prompt(self):
+        """Minimization is structural: there is no parameter to pass it through."""
+        import inspect
+
+        from tui.prompts import build_worker_prompt
+
+        parameters = set(inspect.signature(build_worker_prompt).parameters)
+        self.assertEqual(parameters, {"card_markdown", "role_rules", "profile_text", "verify_command"})
+
+    def test_worker_prompt_fits_the_card_budget(self):
+        from tui.config import load_orchestrate_settings
+        from tui.orchestrate_protocol import load_role_rules
+        from tui.prompts import build_worker_prompt
+
+        settings = load_orchestrate_settings()
+        prompt = build_worker_prompt(self.card(), role_rules=load_role_rules())
+
+        self.assertLessEqual(len(prompt), settings.worker_card_budget_chars)
+
+    def test_role_block_extracts_exactly_one_section(self):
+        from tui.prompts import role_block
+
+        rules = "# Title\n\n## Shared\nshared line\n\n## Planner\nplanner line\n\n## Worker\nworker line\n"
+
+        self.assertEqual(role_block(rules, "Shared"), "## Shared\nshared line")
+        self.assertEqual(role_block(rules, "Worker"), "## Worker\nworker line")
+        self.assertEqual(role_block(rules, "Missing"), "")
+        self.assertEqual(role_block(None, "Shared"), "")
+
+    def test_bounded_digest_marks_the_omission(self):
+        from tui.prompts import bounded_digest
+
+        digest = bounded_digest("x" * 5000, 500)
+
+        self.assertLessEqual(len(digest), 500)
+        self.assertIn("truncated to fit the context budget", digest)

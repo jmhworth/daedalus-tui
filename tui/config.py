@@ -36,6 +36,7 @@ CLAUDE_DEFAULT_ALLOWED_TOOLS: tuple[str, ...] = (
 PARAMETER_DIRECTORY = "parameter_files"
 TUI_PARAMETER_FILE = "daedalus-tui.toml"
 ORCHESTRATION_PARAMETER_FILE = "daedalus-tui-orchestration.toml"
+ORCHESTRATE_MODE_PARAMETER_FILE = "daedalus-tui-orchestrate-mode.toml"
 CODING_STATISTICS_PARAMETER_FILE = "daedalus-tui-coding-statistics.toml"
 PROMPTING_PARAMETER_FILE = "daedalus-tui-prompting.toml"
 
@@ -208,6 +209,46 @@ class PromptingSettings:
     error_log_max_bytes: int = 2_000_000
     error_log_backup_count: int = 3
     run_log_max_bytes: int = 1_000_000
+
+
+@dataclass(frozen=True)
+class OrchestrateSettings:
+    """Roles, caps, context budgets, and view sizes for Orchestrate Mode.
+
+    The defaults mirror ``parameter_files/daedalus-tui-orchestrate-mode.toml``
+    so a missing key falls back to the documented value instead of failing the
+    session. The character budgets are the mechanism that keeps a worker's
+    context small, so they are settings rather than constants.
+    """
+
+    planner_provider: str = "claude"
+    planner_model: str = "claude-fable-5-1"
+    planner_reasoning: str = "high"
+    worker_provider: str = "claude"
+    worker_model: str = "claude-opus-5"
+    worker_reasoning: str = "high"
+    default_max_workers: int = 3
+    max_workers_limit: int = 8
+    planner_round_limit: int = 6
+    task_reissue_limit: int = 2
+    planner_digest_budget_chars: int = 12_000
+    worker_report_budget_chars: int = 4_000
+    worker_card_budget_chars: int = 6_000
+    session_dirname: str = "orchestrate"
+    card_filename: str = "task.md"
+    runtime_artifact_dirname: str = ".daedalus-orchestration"
+    board_title_width: int = 28
+    planner_log_lines: int = 400
+
+    @property
+    def planner_selection(self) -> tuple[str, str, str]:
+        """Return the planner's ``(provider, model, reasoning)`` selection."""
+        return (self.planner_provider, self.planner_model, self.planner_reasoning)
+
+    @property
+    def worker_selection(self) -> tuple[str, str, str]:
+        """Return the worker's ``(provider, model, reasoning)`` selection."""
+        return (self.worker_provider, self.worker_model, self.worker_reasoning)
 
 
 @dataclass(frozen=True)
@@ -470,6 +511,99 @@ def load_orchestration_settings(parameter_path: Path | None = None) -> Orchestra
         dirty_primary_push_enabled=bool(values.get("dirty_primary_push_enabled", True)),
         git_remote=str(values.get("git_remote", "origin")).strip() or "origin",
     )
+
+
+def load_orchestrate_settings(
+    parameter_path: Path | None = None,
+    tui_settings: TuiSettings | None = None,
+) -> OrchestrateSettings:
+    """Load Orchestrate Mode roles, caps, budgets, and view sizes.
+
+    ``tui_settings`` supplies the model catalogue the role models are checked
+    against; it is loaded from the TUI parameter file when not given, so a
+    typo in a role model fails at load time rather than when the first agent
+    is launched.
+    """
+    path = parameter_path or (
+        Path(__file__).resolve().parents[1] / PARAMETER_DIRECTORY / ORCHESTRATE_MODE_PARAMETER_FILE
+    )
+    try:
+        with path.open("rb") as source:
+            values = tomllib.load(source)
+    except FileNotFoundError:
+        values = {}
+    roles = values.get("roles", {})
+    limits = values.get("limits", {})
+    files = values.get("files", {})
+    ui = values.get("ui", {})
+    for name, table in (("roles", roles), ("limits", limits), ("files", files), ("ui", ui)):
+        if not isinstance(table, dict):
+            raise ValueError(f"{path} {name} must be a table.")
+
+    defaults = OrchestrateSettings()
+    settings = OrchestrateSettings(
+        planner_provider=str(roles.get("planner_provider", defaults.planner_provider)),
+        planner_model=str(roles.get("planner_model", defaults.planner_model)),
+        planner_reasoning=str(roles.get("planner_reasoning", defaults.planner_reasoning)),
+        worker_provider=str(roles.get("worker_provider", defaults.worker_provider)),
+        worker_model=str(roles.get("worker_model", defaults.worker_model)),
+        worker_reasoning=str(roles.get("worker_reasoning", defaults.worker_reasoning)),
+        default_max_workers=int(limits.get("default_max_workers", defaults.default_max_workers)),
+        max_workers_limit=int(limits.get("max_workers_limit", defaults.max_workers_limit)),
+        planner_round_limit=int(limits.get("planner_round_limit", defaults.planner_round_limit)),
+        task_reissue_limit=int(limits.get("task_reissue_limit", defaults.task_reissue_limit)),
+        planner_digest_budget_chars=int(
+            limits.get("planner_digest_budget_chars", defaults.planner_digest_budget_chars)
+        ),
+        worker_report_budget_chars=int(
+            limits.get("worker_report_budget_chars", defaults.worker_report_budget_chars)
+        ),
+        worker_card_budget_chars=int(
+            limits.get("worker_card_budget_chars", defaults.worker_card_budget_chars)
+        ),
+        session_dirname=str(files.get("session_dirname", defaults.session_dirname)),
+        card_filename=str(files.get("card_filename", defaults.card_filename)),
+        runtime_artifact_dirname=str(
+            files.get("runtime_artifact_dirname", defaults.runtime_artifact_dirname)
+        ),
+        board_title_width=int(ui.get("board_title_width", defaults.board_title_width)),
+        planner_log_lines=int(ui.get("planner_log_lines", defaults.planner_log_lines)),
+    )
+
+    if any(
+        value < 1
+        for value in (
+            settings.default_max_workers,
+            settings.max_workers_limit,
+            settings.planner_round_limit,
+            settings.planner_digest_budget_chars,
+            settings.worker_report_budget_chars,
+            settings.worker_card_budget_chars,
+            settings.board_title_width,
+            settings.planner_log_lines,
+        )
+    ):
+        raise ValueError(f"{path} limits and ui values must be positive.")
+    # A card may legitimately be forbidden from re-issue, so zero is allowed.
+    if settings.task_reissue_limit < 0:
+        raise ValueError(f"{path} limits.task_reissue_limit must not be negative.")
+    if settings.default_max_workers > settings.max_workers_limit:
+        raise ValueError(
+            f"{path} limits.default_max_workers must not exceed limits.max_workers_limit."
+        )
+    if not all((settings.session_dirname, settings.card_filename, settings.runtime_artifact_dirname)):
+        raise ValueError(f"{path} files names must not be empty.")
+
+    catalogue = tui_settings or load_tui_settings()
+    for role, provider, model in (
+        ("planner", settings.planner_provider, settings.planner_model),
+        ("worker", settings.worker_provider, settings.worker_model),
+    ):
+        if provider != "claude":
+            continue
+        if not any(option.value == model for option in catalogue.claude_models):
+            raise ValueError(f"{path} roles.{role}_model {model!r} is not one of the claude_models.")
+    return settings
 
 
 def load_prompting_settings(parameter_path: Path | None = None) -> PromptingSettings:

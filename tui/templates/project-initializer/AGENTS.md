@@ -28,6 +28,15 @@ When a task is tagged with a topic, follow the topic markdown and any
 inline topic instructions supplied in the prompt (State Log as shared memory,
 immutable Topic Goal unless the user asks otherwise, minimal Topic Status).
 
+## Orchestrate Mode
+
+A task whose worktree contains `.daedalus-orchestration/task.md` is a worker
+task in an Orchestrate Mode session: a planner agent split one request into
+small cards and gave you one of them. The card is authoritative. Do exactly
+what it says, stay inside its file scope, tick its checklist items (`- [x]`) as
+you finish them, and return the required report payload. Daedalus embeds the
+full role rules in your prompt, so do not go looking for them.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

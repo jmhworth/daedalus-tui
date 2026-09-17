@@ -4,7 +4,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tui.config import LayoutSettings, load_coding_statistics_settings, load_orchestration_settings, load_tui_settings
+from tui.config import (
+    LayoutSettings,
+    load_coding_statistics_settings,
+    load_orchestrate_settings,
+    load_orchestration_settings,
+    load_tui_settings,
+)
 from tui.git_worktree import DIRTY_PRIMARY_COMMIT_MESSAGE
 
 
@@ -321,3 +327,74 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         # 0 means the Claude bars calibrate against the busiest recorded window.
         self.assertEqual(settings.usage.claude_five_hour_token_limit, 0)
         self.assertEqual(settings.usage.claude_weekly_token_limit, 0)
+
+
+class OrchestrateSettingsTests(unittest.TestCase):
+    def parameter_file(self, body: str) -> Path:
+        directory = tempfile.mkdtemp()
+        path = Path(directory) / "daedalus-tui-orchestrate-mode.toml"
+        path.write_text(body, encoding="utf-8")
+        return path
+
+    def test_loads_the_shipped_orchestrate_parameter_file(self):
+        root = Path(__file__).resolve().parents[1]
+        settings = load_orchestrate_settings(
+            root / "parameter_files" / "daedalus-tui-orchestrate-mode.toml"
+        )
+
+        self.assertEqual(settings.planner_selection, ("claude", "claude-fable-5-1", "high"))
+        self.assertEqual(settings.worker_selection, ("claude", "claude-opus-5", "high"))
+        self.assertEqual(settings.default_max_workers, 3)
+        self.assertEqual(settings.max_workers_limit, 8)
+        self.assertEqual(settings.planner_round_limit, 6)
+        self.assertEqual(settings.task_reissue_limit, 2)
+        self.assertEqual(settings.planner_digest_budget_chars, 12_000)
+        self.assertEqual(settings.worker_report_budget_chars, 4_000)
+        self.assertEqual(settings.worker_card_budget_chars, 6_000)
+        self.assertEqual(settings.session_dirname, "orchestrate")
+        self.assertEqual(settings.card_filename, "task.md")
+        self.assertEqual(settings.runtime_artifact_dirname, ".daedalus-orchestration")
+        self.assertEqual(settings.board_title_width, 28)
+        self.assertEqual(settings.planner_log_lines, 400)
+
+    def test_missing_file_falls_back_to_the_documented_defaults(self):
+        settings = load_orchestrate_settings(Path("/nonexistent/orchestrate.toml"))
+
+        self.assertEqual(settings.planner_model, "claude-fable-5-1")
+        self.assertEqual(settings.worker_model, "claude-opus-5")
+        self.assertEqual(settings.default_max_workers, 3)
+
+    def test_unknown_claude_model_is_rejected(self):
+        path = self.parameter_file('[roles]\nplanner_model = "claude-imaginary-9"\n')
+
+        with self.assertRaises(ValueError) as error:
+            load_orchestrate_settings(path)
+        self.assertIn("planner_model", str(error.exception))
+
+    def test_non_claude_provider_skips_the_claude_model_catalogue(self):
+        path = self.parameter_file(
+            '[roles]\nworker_provider = "codex"\nworker_model = "gpt-6-astra"\n'
+        )
+
+        settings = load_orchestrate_settings(path)
+
+        self.assertEqual(settings.worker_selection, ("codex", "gpt-6-astra", "high"))
+
+    def test_default_max_workers_may_not_exceed_the_limit(self):
+        path = self.parameter_file("[limits]\ndefault_max_workers = 9\nmax_workers_limit = 4\n")
+
+        with self.assertRaises(ValueError) as error:
+            load_orchestrate_settings(path)
+        self.assertIn("max_workers_limit", str(error.exception))
+
+    def test_non_positive_limits_are_rejected(self):
+        path = self.parameter_file("[limits]\nplanner_round_limit = 0\n")
+
+        with self.assertRaises(ValueError) as error:
+            load_orchestrate_settings(path)
+        self.assertIn("must be positive", str(error.exception))
+
+    def test_forbidding_reissues_is_allowed(self):
+        path = self.parameter_file("[limits]\ntask_reissue_limit = 0\n")
+
+        self.assertEqual(load_orchestrate_settings(path).task_reissue_limit, 0)

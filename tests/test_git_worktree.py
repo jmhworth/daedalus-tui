@@ -269,14 +269,57 @@ class GitWorktreeTests(unittest.TestCase):
                 ],
             )
 
-    def test_stage_changes_stages_the_entire_worktree(self):
+    def test_stage_changes_stages_the_worktree_without_runtime_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
-            manager = GitWorktreeManager(Path(directory) / "repo")
+            manager = GitWorktreeManager(Path(directory) / "repo", runtime_artifacts=(".daedalus-orchestration",))
             worktree = Path(directory) / "task"
             with patch.object(manager, "run_git") as run_git:
                 manager.stage_changes(worktree)
 
-            run_git.assert_called_once_with(["add", "-A"], worktree)
+            run_git.assert_called_once_with(
+                [
+                    "add",
+                    "-A",
+                    "--",
+                    ".",
+                    ":(exclude).daedalus-orchestration",
+                    ":(exclude,glob).daedalus-orchestration.[0-9]*",
+                ],
+                worktree,
+            )
+
+    def test_stage_changes_leaves_the_card_directory_untracked_in_a_real_repository(self):
+        """The pathspec exclusions are load-bearing, so check them against real git."""
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            (repository / "sub").mkdir(parents=True)
+            (repository / ".daedalus-orchestration").mkdir()
+            (repository / "sub" / "a.py").write_text("a\n", encoding="utf-8")
+            (repository / ".daedalus-orchestration" / "task.md").write_text("# t1\n", encoding="utf-8")
+            (repository / ".daedalus-debug.log.1").write_text("log\n", encoding="utf-8")
+            manager = GitWorktreeManager(repository)
+            manager.run_git(["init", "-q", "."], repository)
+
+            manager.stage_changes(repository)
+
+            staged = manager.git_output(["diff", "--cached", "--name-only"], repository).splitlines()
+            self.assertEqual(staged, ["sub/a.py"])
+
+    def test_orchestrate_card_directory_is_a_runtime_artifact(self):
+        """Orchestrate Mode's card directory must never be staged or committed."""
+        manager = GitWorktreeManager(Path("/repo"))
+        self.assertTrue(manager.is_runtime_artifact(".daedalus-orchestration"))
+        # `git status --porcelain` reports an untracked directory with a
+        # trailing slash and a tracked change inside it with the prefix.
+        self.assertTrue(manager.is_runtime_artifact(".daedalus-orchestration/"))
+        self.assertTrue(manager.is_runtime_artifact(".daedalus-orchestration/task.md"))
+        self.assertFalse(manager.is_runtime_artifact(".daedalus-orchestration-notes.md"))
+
+    def test_dirty_paths_ignores_the_orchestrate_card_directory(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        status = "?? .daedalus-orchestration/\n M tui/app.py\n"
+        with patch.object(manager, "run_git", return_value=status_process(status)):
+            self.assertEqual(manager.dirty_paths(Path("/repo")), ["tui/app.py"])
 
     @patch("tui.git_worktree.subprocess.run")
     def test_provision_runs_install_and_links_readonly_path(self, run):

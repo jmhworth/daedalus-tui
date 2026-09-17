@@ -42,6 +42,15 @@ Do not read unrelated profiles.
 - Optional topic umbrellas live in `topic_files/` (shared recurrent memory for
   related tasks); not every task needs a topic.
 
+## Orchestrate Mode
+
+A task whose worktree contains `.daedalus-orchestration/task.md` is a worker
+task in an Orchestrate Mode session. That card is authoritative: do exactly
+what it says, stay inside its file scope, tick its checklist items as you
+finish them, and return the required report payload. The full role rules are
+bundled at `tui/templates/orchestrate/AGENTS.md`; they are embedded inline in
+planner and worker prompts, so there is no need to open that file.
+
 ## graphify
 
 This project has a knowledge graph at `graphify-out/` with community structure

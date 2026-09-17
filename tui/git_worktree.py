@@ -19,6 +19,10 @@ from .project_config import ProjectWorktreeSettings
 DAEDALUS_RUNTIME_ARTIFACTS: tuple[str, ...] = (
     ".daedalus-debug.log",
     ".daedalus-memory.json",
+    # Orchestrate Mode writes the worker's task card into this directory before
+    # the agent runs and reads its ticked checklist back afterwards; it is
+    # Daedalus' own bookkeeping and must never reach a commit.
+    ".daedalus-orchestration",
 )
 
 #: Message used when Daedalus commits the operator's pending changes instead of
@@ -205,8 +209,20 @@ class GitWorktreeManager:
         return True
 
     def stage_changes(self, directory: Path) -> None:
-        """Stage the current worktree contents for orchestration checks or commit."""
-        self.run_git(["add", "-A"], directory)
+        """Stage the worktree contents except Daedalus' own runtime files.
+
+        Orchestrate Mode writes the worker's task card into
+        ``.daedalus-orchestration/`` inside the worktree and reads its ticked
+        checklist back after the agent finishes; a blanket ``git add -A`` would
+        commit that bookkeeping (and the debug log) into the task's branch.
+        """
+        excludes: list[str] = []
+        for artifact in self.runtime_artifacts:
+            # A pathspec naming a directory also covers everything inside it;
+            # the glob form catches rotated logs such as `.daedalus-debug.log.1`.
+            excludes.append(f":(exclude){artifact}")
+            excludes.append(f":(exclude,glob){artifact}.[0-9]*")
+        self.run_git(["add", "-A", "--", ".", *excludes], directory)
 
     def discard_graphify_changes(self, directory: Path) -> None:
         """Remove graphify output changes from an agent worktree.
@@ -312,11 +328,16 @@ class GitWorktreeManager:
         """Return whether a status entry is one of Daedalus' own runtime files.
 
         Rotated log backups (``.daedalus-debug.log.1``) count too, because the
-        rotating handler creates them without the project ever asking.
+        rotating handler creates them without the project ever asking. An
+        artifact that is a directory matches both spellings Git uses for it:
+        ``git status --porcelain`` reports an untracked directory with a
+        trailing slash, and its contents with the directory as a prefix.
         """
         entry = relative_path.strip()
         for artifact in self.runtime_artifacts:
-            if entry == artifact:
+            if entry == artifact or entry == f"{artifact}/":
+                return True
+            if entry.startswith(f"{artifact}/"):
                 return True
             if entry.startswith(f"{artifact}.") and entry[len(artifact) + 1 :].isdigit():
                 return True
