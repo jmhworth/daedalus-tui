@@ -19,6 +19,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
   branch and successful tasks promote into it; the operator does not need it
   checked out.
 - **Safe promotion**: The target branch tip must remain unchanged during integration; when it is checked out the working tree must stay clean for merge-based promotion, otherwise promotion fast-forwards the target ref in place; failed worktrees remain available for inspection.
+- **Dirty primary on send**: When starting or resuming a task with the target branch checked out, orchestration auto-commits dirty primary files before creating the worktree so send is not blocked; promotion still requires a clean primary because an auto-commit would advance the integration base.
 - **Concurrent integration**: Up to four task agents and their verification runs execute concurrently, then ready tasks pass through a first-ready serialized integration gate before promotion.
 - **Connectivity recovery**: Agent subprocesses have a bounded timeout, report actionable offline/service diagnostics, and failed requests can be retried without losing their task context.
 - **Agent Git boundary**: Task, repair, and resolver agents edit files only; the orchestration layer owns staging, commits, merges, migration pushes, and cleanup.
@@ -46,6 +47,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-09-16: Auto-commit dirty primary files on task start/resume so send is not blocked, while promotion still requires a clean primary.
 - 2026-09-14: Documented activated-only launch migration push while env-sync still covers all registered personal Supabase projects.
 - 2026-09-13: Threaded the launch-root shared environment through task orchestration and serialized launch/task Supabase pushes per project while preserving task verify→push semantics.
 - 2026-09-13: Noted that personal shared-Supabase schema registration scaffolds migrations only; orchestration remains the sole `supabase db push` owner.

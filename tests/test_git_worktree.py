@@ -37,7 +37,7 @@ class GitWorktreeTests(unittest.TestCase):
     def test_create_uses_primary_sha_and_task_branch(self):
         with tempfile.TemporaryDirectory() as directory:
             manager = GitWorktreeManager(Path(directory) / "repo")
-            with patch.object(manager, "_validate_primary"), patch.object(manager, "git_output", return_value="abc123"), patch.object(manager, "run_git") as run_git:
+            with patch.object(manager, "validate_primary", return_value=False), patch.object(manager, "git_output", return_value="abc123"), patch.object(manager, "run_git") as run_git:
                 context = manager.create("task-1")
 
             self.assertEqual(context.base_commit, "abc123")
@@ -53,6 +53,47 @@ class GitWorktreeTests(unittest.TestCase):
             run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
             with self.assertRaises(GitWorktreeError):
                 manager._validate_primary()
+
+    def test_primary_validation_auto_commits_dirty_repository_when_requested(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "is_primary_checked_out", return_value=True
+        ), patch.object(manager, "is_clean", side_effect=[False, True]), patch.object(
+            manager, "commit_changes", return_value=True
+        ) as commit_changes:
+            run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            committed = manager.validate_primary(auto_commit_dirty=True)
+
+        self.assertTrue(committed)
+        commit_changes.assert_called_once_with(
+            Path("/repo").resolve(),
+            "Daedalus: auto-commit dirty primary before starting agent",
+        )
+
+    def test_primary_validation_still_rejects_when_auto_commit_leaves_dirt(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "is_primary_checked_out", return_value=True
+        ), patch.object(manager, "is_clean", return_value=False), patch.object(
+            manager, "commit_changes", return_value=False
+        ):
+            run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            with self.assertRaisesRegex(GitWorktreeError, "must be clean"):
+                manager.validate_primary(auto_commit_dirty=True)
+
+    def test_create_auto_commits_dirty_primary_by_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager = GitWorktreeManager(Path(directory) / "repo")
+            with patch.object(
+                manager, "validate_primary", return_value=True
+            ) as validate_primary, patch.object(
+                manager, "git_output", return_value="abc123"
+            ), patch.object(manager, "run_git") as run_git:
+                context = manager.create("task-1")
+
+            validate_primary.assert_called_once_with(auto_commit_dirty=True)
+            self.assertEqual(context.base_commit, "abc123")
+            self.assertEqual(run_git.call_args.args[0][:4], ["worktree", "add", "-b", "agent/task-task-1"])
 
     def test_primary_validation_allows_other_checked_out_branch(self):
         manager = GitWorktreeManager(Path("/repo"), primary_branch="develop")

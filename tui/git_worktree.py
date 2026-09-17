@@ -92,8 +92,10 @@ class GitWorktreeManager:
         self.primary_branch = primary_branch
         self.root_name = root_name
 
-    def create(self, task_id: str) -> WorktreeContext:
-        self._validate_primary()
+    def create(self, task_id: str, *, validate: bool = True) -> WorktreeContext:
+        if validate:
+            # Auto-commit dirty primary files so send/start is not blocked.
+            self.validate_primary(auto_commit_dirty=True)
         base_commit = self.git_output(["rev-parse", self.primary_branch])
         branch_name = f"agent/task-{task_id}"
         path = self.repository.parent / self.root_name / self.repository.name / f"task-{task_id}"
@@ -258,12 +260,20 @@ class GitWorktreeManager:
     def is_primary_checked_out(self) -> bool:
         return self.git_output(["branch", "--show-current"]) == self.primary_branch
 
-    def validate_primary(self) -> None:
+    def validate_primary(self, *, auto_commit_dirty: bool = False) -> bool:
         """Ensure the configured target branch exists and is safe to integrate into.
 
         The operator does not need that branch checked out. Task worktrees are
         always created from the target branch tip. When it *is* checked out, the
         working tree must be clean so promotion and graph commits stay coherent.
+
+        When ``auto_commit_dirty`` is True (task start/resume), dirty primary
+        files are staged and committed so the operator does not have to commit
+        manually before sending. Promotion keeps ``auto_commit_dirty=False``
+        because a new primary commit would advance the tip past the captured
+        integration base.
+
+        Returns True when an auto-commit was created.
         """
         verify = subprocess.run(
             ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{self.primary_branch}"],
@@ -275,14 +285,22 @@ class GitWorktreeManager:
             raise GitWorktreeError(
                 f"Target branch {self.primary_branch!r} does not exist as a local branch."
             )
-        if self.is_primary_checked_out() and not self.is_clean(self.repository):
-            raise GitWorktreeError(
-                "Primary worktree must be clean before starting or promoting an agent."
+        if not (self.is_primary_checked_out() and not self.is_clean(self.repository)):
+            return False
+        if auto_commit_dirty:
+            committed = self.commit_changes(
+                self.repository,
+                "Daedalus: auto-commit dirty primary before starting agent",
             )
+            if self.is_clean(self.repository):
+                return committed
+        raise GitWorktreeError(
+            "Primary worktree must be clean before starting or promoting an agent."
+        )
 
-    def _validate_primary(self) -> None:
+    def _validate_primary(self, *, auto_commit_dirty: bool = False) -> bool:
         """Compatibility alias for callers that used the original private helper."""
-        self.validate_primary()
+        return self.validate_primary(auto_commit_dirty=auto_commit_dirty)
 
     def run_git(self, arguments: list[str], directory: Path | None = None) -> subprocess.CompletedProcess[str]:
         process = subprocess.run(
