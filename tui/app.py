@@ -1268,6 +1268,11 @@ class DaedalusTuiApp(App[None]):
         # Set when Textual unwinds from an unhandled exception, so the close
         # hook keeps the composer draft instead of clearing it.
         self._fatal_error = False
+        # Set once the close hook has settled the composer draft. Shutdown runs
+        # through several entry points that each flush the draft, and one of
+        # them follows the close hook, so without this the flush would write
+        # back the very prompt the close just cleared.
+        self._composer_draft_closed = False
         self._previous_asyncio_exception_handler = None
         self._rendered_plan_question_signature: tuple[object, ...] | None = None
         self._suppress_target_branch_change = False
@@ -2285,6 +2290,10 @@ class DaedalusTuiApp(App[None]):
 
     def _flush_draft(self, force: bool = False) -> bool:
         """Write the composer draft to disk; returns False when it could not be saved."""
+        if self._composer_draft_closed:
+            # The window has already closed the draft; its state on disk is
+            # final and a late shutdown flush must not resurrect it.
+            return True
         if self._draft_timer is not None:
             self._draft_timer.stop()
             self._draft_timer = None
@@ -2331,8 +2340,9 @@ class DaedalusTuiApp(App[None]):
         """
         if not self.prompting.clear_drafts_on_exit or self._fatal_error:
             self._flush_draft(force=True)
-            return
-        self._discard_draft()
+        else:
+            self._discard_draft()
+        self._composer_draft_closed = True
 
     def _discard_draft(self) -> None:
         """Delete the composer's saved draft without touching stashed drafts.

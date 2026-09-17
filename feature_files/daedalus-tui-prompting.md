@@ -46,7 +46,10 @@ provider usage every minute.
   one draft is removed -- prompts stashed by an interruption and prompts
   recovered from an archive stay reachable from Prompt history because they
   were set aside deliberately -- and a crash never reaches the close hook, so
-  its last autosave is still restored. Send validates emptiness with
+  its last autosave is still restored. The close hook is final: shutdown
+  reaches the draft through several entry points that each force a flush, and
+  one of them runs after the hook, so once the window has closed the draft no
+  later flush may write it back out. Send validates emptiness with
   `strip()` but archives the raw text, allocates the turn, persists it, and
   only then dispatches a run; a storage failure keeps the draft visible,
   reports the exact path, and launches nothing. Repeated Send events while a
@@ -264,6 +267,9 @@ provider usage every minute.
 HACKING
 
 ## State Log
+- 2026-09-16: Made the composer's close hook final, so the forced draft flush
+  that shutdown performs after it can no longer rewrite the prompt the close
+  just cleared.
 - 2026-09-16: Restored automatic clearing of the composer prompt when the
   Daedalus window is closed deliberately, behind `[drafts] clear_on_exit`, so a
   new session starts on an empty prompt while crash autosaves and stashed

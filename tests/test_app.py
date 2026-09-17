@@ -3104,6 +3104,20 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
         saved = app.prompt_store.load_draft(app._active_project_path, None)
         self.assertEqual(saved.text, "work in progress")
 
+    async def test_a_shutdown_flush_does_not_resurrect_the_cleared_prompt(self):
+        """Shutdown flushes the draft too, and one path runs after the close hook."""
+        prompting = prompting_settings()
+        app, _ = self.make_app(prompting)
+        async with app.run_test() as pilot:
+            app.query_one("#prompt-input", DaedalusVimTextArea).insert("cleared on close")
+            await pilot.pause()
+            app._close_composer_draft()
+            # Still running, so the composer is mounted and a forced flush
+            # would happily write the prompt back out again.
+            app._flush_draft(force=True)
+            self.assertIsNone(app.prompt_store.load_draft(app._active_project_path, None))
+        self.assertIsNone(app.prompt_store.load_draft(app._active_project_path, None))
+
     async def test_keeping_prompts_across_sessions_is_configurable(self):
         prompting = replace(prompting_settings(), clear_drafts_on_exit=False)
         app, _ = self.make_app(prompting)
