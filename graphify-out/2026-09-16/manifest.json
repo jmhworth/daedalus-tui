@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "tests/test_app.py": {
-    "mtime": 1789596766.1620023,
-    "ast_hash": "e98cc747b7466fa458f34938f8541b08",
+    "mtime": 1789605560.8964658,
+    "ast_hash": "22097e006452000ada98ee8088f297eb",
     "semantic_hash": ""
   },
   "tests/test_config.py": {
@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   "tests/test_git_worktree.py": {
-    "mtime": 1787707137.4454935,
-    "ast_hash": "d4edbbba2d7ad450f5e0e4d35357743b",
+    "mtime": 1789605012.525261,
+    "ast_hash": "aa7ded69ef4e955aa9a46ca19a23a94b",
     "semantic_hash": ""
   },
   "tests/test_graphify.py": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "tui/app.py": {
-    "mtime": 1789596766.1632512,
-    "ast_hash": "1db0a4038252759a1c0a562a1b29e337",
+    "mtime": 1789605560.9017363,
+    "ast_hash": "0498198a20774a80c0ae13507402fd1a",
     "semantic_hash": ""
   },
   "tui/clipboard.py": {
@@ -90,13 +90,13 @@
     "semantic_hash": ""
   },
   "tui/environment.py": {
-    "mtime": 1789595202.9228837,
-    "ast_hash": "379735b89317cc1a8a844a752e8b17b6",
+    "mtime": 1789605560.9036753,
+    "ast_hash": "c960b70d44d7a6ce460f401f1ea62939",
     "semantic_hash": ""
   },
   "tui/git_worktree.py": {
-    "mtime": 1787707137.4485133,
-    "ast_hash": "6829ea36f4a309d21a139e45d0a54947",
+    "mtime": 1789605012.5261652,
+    "ast_hash": "852effe358ee9d50ccb7488b04a25def",
     "semantic_hash": ""
   },
   "tui/graphify.py": {
@@ -105,8 +105,8 @@
     "semantic_hash": "e5c00634ce8bd1e0a3f5dc86854c8119"
   },
   "tui/orchestrator.py": {
-    "mtime": 1789595202.9234986,
-    "ast_hash": "c830cb9666d0404efc7b8d63b3f7a27e",
+    "mtime": 1789605012.5280468,
+    "ast_hash": "7cec5c1e5720ef4955138888734f6f5b",
     "semantic_hash": ""
   },
   "tui/projects.py": {
@@ -135,13 +135,13 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1789602744.5453186,
-    "ast_hash": "20f89e741db9631e3c41a45bf9ab9a99",
+    "mtime": 1789605560.8689337,
+    "ast_hash": "ebf9f58b7df30a6d6222d5d37fbfe722",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-orchestration.md": {
-    "mtime": 1789417485.0404737,
-    "ast_hash": "0ebdee19157e41ee4acab0f938e1f4a2",
+    "mtime": 1789605560.8693316,
+    "ast_hash": "70c0d2f5c743fcdd419382bddde2741d",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
@@ -280,13 +280,13 @@
     "semantic_hash": ""
   },
   "tui/templates/project-initializer/AGENTS.md": {
-    "mtime": 1789417485.0491984,
-    "ast_hash": "20e4581fe526e2abb38c5fc564c8637d",
+    "mtime": 1789605560.90597,
+    "ast_hash": "d45cf04bbb415401ad5578c931a2b5ae",
     "semantic_hash": ""
   },
   "tui/templates/project-initializer/README.md": {
-    "mtime": 1789602744.5477471,
-    "ast_hash": "82ab01968f6dcbe0ecaba35502beef28",
+    "mtime": 1789605560.9065623,
+    "ast_hash": "843c4e8838c4c00f5ebb231448184f99",
     "semantic_hash": ""
   },
   "tests/test_topics.py": {
@@ -440,23 +440,23 @@
     "semantic_hash": ""
   },
   "tests/test_personal_supabase.py": {
-    "mtime": 1789595202.9209266,
-    "ast_hash": "ffbd106d843e10978822d77076aaa53a",
+    "mtime": 1789605560.8988683,
+    "ast_hash": "f2358fc941451dba77782e0c8d6d270d",
     "semantic_hash": ""
   },
   "tui/personal_supabase.py": {
-    "mtime": 1789595202.9241035,
-    "ast_hash": "4f85ce0a03f036e0698bcb05de366aed",
+    "mtime": 1789605560.9045877,
+    "ast_hash": "dc99afaceaae1195e32d0dbae31aaec5",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-personal-supabase.md": {
-    "mtime": 1789595202.919327,
-    "ast_hash": "f2581d9abff80459c8f650cabaee523a",
+    "mtime": 1789605560.8704252,
+    "ast_hash": "37bdedb32a83962fded616d05f4d6c27",
     "semantic_hash": ""
   },
   "tests/test_environment.py": {
-    "mtime": 1789595202.9203503,
-    "ast_hash": "b36aca78b521abe55e769c647b5d813a",
+    "mtime": 1789605560.8975954,
+    "ast_hash": "6e9aa229978963a7a6f9465ae2e03e88",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-command-menu.md": {

@@ -78,10 +78,20 @@
   "76": "bootstrap_personal_supabase",
   "77": "update_repository",
   "78": "load_project_worktree_settings",
+  "79": "ProjectWorktreeSettings",
   "80": ".edit_paste_after",
   "81": ".enter_insert_mode",
   "82": ".nav_word_end",
+  "83": "push_branch",
   "84": ".edit_paste_before",
   "85": ".__init__",
-  "86": "._on_topic_created"
+  "86": "._on_topic_created",
+  "87": "CandidateFeatureGroup",
+  "88": "._render_line_strip",
+  "89": "PersonalSupabaseSetupWizardScreen",
+  "90": "list_local_branches",
+  "91": "_literal_select_options",
+  "92": ".remove_cancelled",
+  "93": ".reset_task_to_base",
+  "94": ".cursor_shape"
 }
