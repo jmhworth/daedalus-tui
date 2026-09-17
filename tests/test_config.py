@@ -265,6 +265,7 @@ class PromptingAndUsageSettingsTests(unittest.TestCase):
         settings = load_prompting_settings(root / "parameter_files" / "daedalus-tui-prompting.toml")
         self.assertEqual(settings.data_root, root)
         self.assertEqual(settings.draft_autosave_delay_ms, 300)
+        self.assertTrue(settings.clear_drafts_on_exit)
         self.assertEqual(settings.task_title_length, 60)
         self.assertFalse(settings.viewer_visible_by_default)
         self.assertEqual((settings.viewer_minimum_width, settings.main_minimum_width), (40, 80))

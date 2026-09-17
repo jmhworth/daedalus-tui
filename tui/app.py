@@ -163,7 +163,7 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+P", "Pause task", "pause_task"),
     ("Ctrl+R", "Resume task (Vim redo inside the prompt)", "resume_task"),
     ("Ctrl+N", "New project", "show_new_project"),
-    ("Ctrl+Q", "Quit (drafts are saved first)", "quit"),
+    ("Ctrl+Q", "Quit Daedalus", "quit"),
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
     ("Ctrl+T", "Show coding statistics and total Claude usage", "show_statistics"),
     ("Ctrl+H", "Show pushed commit history", "show_push_history"),
@@ -1265,6 +1265,9 @@ class DaedalusTuiApp(App[None]):
         self._shutdown_lock = threading.Lock()
         self._shutdown_started = False
         self._textual_unmounted = False
+        # Set when Textual unwinds from an unhandled exception, so the close
+        # hook keeps the composer draft instead of clearing it.
+        self._fatal_error = False
         self._previous_asyncio_exception_handler = None
         self._rendered_plan_question_signature: tuple[object, ...] | None = None
         self._suppress_target_branch_change = False
@@ -1483,8 +1486,9 @@ class DaedalusTuiApp(App[None]):
         self._apply_responsive_layout()
         self._apply_viewer_visibility()
         self._refresh_output_viewer(None)
-        # Restore the latest saved new-task draft so a crash or quit never
-        # loses what was being typed.
+        # Restore any draft still on disk. A deliberate close clears the
+        # composer's own draft (``[drafts] clear_on_exit``), so what is left to
+        # restore here is a crash's autosave or a deliberately stashed prompt.
         self._load_composer_for_selection(restore_status=False)
         if self._storage_error:
             self._set_error(f"Local prompt/error storage is unavailable: {self._storage_error}")
@@ -1584,7 +1588,7 @@ class DaedalusTuiApp(App[None]):
 
     def on_unmount(self) -> None:
         self._textual_unmounted = True
-        self._flush_draft(force=True)
+        self._close_composer_draft()
         _unregister_app_for_thread_exit(self)
         shutdown_complete = self._shutdown_coordinators("Textual app unmount")
         if shutdown_complete:
@@ -1695,6 +1699,7 @@ class DaedalusTuiApp(App[None]):
 
     def _handle_exception(self, error: Exception) -> None:
         """Persist Textual failures that would otherwise only flash on screen."""
+        self._fatal_error = True
         log_exception("Unhandled Textual application exception", error)
         debug_path = getattr(self, "debug_log_path", None)
         message = (
@@ -2313,6 +2318,38 @@ class DaedalusTuiApp(App[None]):
             self._set_status(f"Draft not saved: {error}")
             return False
         return True
+
+    def _close_composer_draft(self) -> None:
+        """Save or clear the composer draft as the Daedalus window closes.
+
+        With ``[drafts] clear_on_exit`` set, closing the window deliberately
+        clears the prompt the composer was holding, so the next launch starts
+        on an empty composer instead of last session's unsent text. Autosaves
+        still protect the draft for as long as the app runs, and a crash never
+        reaches this hook, so an unexpected exit still leaves the draft on disk
+        to be recovered.
+        """
+        if not self.prompting.clear_drafts_on_exit or self._fatal_error:
+            self._flush_draft(force=True)
+            return
+        self._discard_draft()
+
+    def _discard_draft(self) -> None:
+        """Delete the composer's saved draft without touching stashed drafts.
+
+        Only the draft the composer would reload on the next launch is removed.
+        Drafts stashed by an interruption and prompts recovered from an
+        archive stay reachable from Prompt history, because those were set
+        aside deliberately rather than left in the prompt box.
+        """
+        if self._draft_timer is not None:
+            self._draft_timer.stop()
+            self._draft_timer = None
+        self._draft_dirty = False
+        try:
+            self.prompt_store.delete_draft(self._composer_project, self._composer_task_id)
+        except (PromptStoreError, OSError) as error:
+            LOGGER.warning("Draft discard failed: %s", error)
 
     def _load_composer(
         self,

@@ -290,8 +290,17 @@ under Prompt history. Edit the restored prompt and Send to continue the same
 task, or press Resume to continue in the existing worktree unchanged. Pressing
 `Ctrl+C` repeatedly is harmless, with nothing running it leaves the draft
 alone, and on the main screen it never copies text or quits (use
-`Ctrl+Alt+S` to copy a selection and `Ctrl+Q` to quit; quitting saves drafts
-first). Modal dialogs keep their own Escape/Cancel behavior.
+`Ctrl+Alt+S` to copy a selection and `Ctrl+Q` to quit; closing the window
+clears the composer's unsent prompt). Modal dialogs keep their own
+Escape/Cancel behavior.
+
+Drafts autosave while Daedalus runs, but closing the window deliberately
+clears the prompt the composer was holding, so the next launch starts on an
+empty composer instead of a stale half-typed sentence. A crash never reaches
+that close hook, so its last autosave is still restored, and prompts stashed by
+an interruption stay under Prompt history. Set `[drafts] clear_on_exit = false`
+in `parameter_files/daedalus-tui-prompting.toml` to keep unsent prompts across
+sessions instead.
 
 ## Output viewer
 
@@ -356,6 +365,14 @@ reader scans back through `[usage] session_scan_limit` logs (newest first)
 until it finds real percentages, reads only the last `session_tail_bytes` of
 each, and accepts both the `resets_in_seconds` and `resets_at` spellings of a
 window's reset time.
+
+That payload is a snapshot of a turn that has since finished, so each window's
+reset time is counted from the moment Codex wrote it, not from the moment the
+bar is drawn. A window whose reset has already gone by reads as `0%`: the quota
+really did refill while Codex was idle, and repainting the last recorded
+percentage would keep claiming usage you got back hours or days ago. The
+tooltip names what the window held before it reset and how old the reading is,
+so the empty bar is never mistaken for missing data.
 
 ## Coding statistics
 

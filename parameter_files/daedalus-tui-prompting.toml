@@ -13,6 +13,12 @@ data_root = "."
 [drafts]
 # Milliseconds of typing silence before the composer draft is written to disk.
 autosave_delay_ms = 300
+# Clear the composer draft when the Daedalus window is closed deliberately, so
+# the next launch starts on an empty prompt instead of last session's unsent
+# text. Autosaves still protect the draft while the app runs, and a crash never
+# reaches the close hook, so an unexpected exit still leaves the draft to be
+# recovered. Set to false to keep unsent prompts across sessions.
+clear_on_exit = true
 
 [titles]
 # Maximum characters of the readable task title generated from the first

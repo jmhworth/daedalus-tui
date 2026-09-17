@@ -39,7 +39,14 @@ provider usage every minute.
 - **Composer behavior**: The composer is always an editable draft: the
   new-task draft (New Task) or the selected task's follow-up draft. Drafts
   autosave after the configured typing delay and flush before Send, Cancel,
-  task/project switches, New Task, and shutdown. Send validates emptiness with
+  task/project switches, and New Task. Closing the Daedalus window deliberately
+  clears the draft the composer was holding instead of saving it, so the next
+  launch starts on an empty prompt rather than last session's unsent text;
+  `[drafts] clear_on_exit = false` keeps the old carry-over behavior. Only that
+  one draft is removed -- prompts stashed by an interruption and prompts
+  recovered from an archive stay reachable from Prompt history because they
+  were set aside deliberately -- and a crash never reaches the close hook, so
+  its last autosave is still restored. Send validates emptiness with
   `strip()` but archives the raw text, allocates the turn, persists it, and
   only then dispatches a run; a storage failure keeps the draft visible,
   reports the exact path, and launches nothing. Repeated Send events while a
@@ -186,6 +193,18 @@ provider usage every minute.
   falls back to `session`/`weekly` labels when a window omits
   `window_minutes`, and reports the reading's age in the tooltip so a stale
   number is visible as stale rather than presented as current.
+- **Codex windows expire with their payload**: A session log holds a snapshot
+  of a turn that has since finished, so a window's reset time is anchored to
+  the moment Codex wrote it -- the event's own `timestamp`, or the session
+  log's modification time when a build omits it -- and never to the moment the
+  bar is drawn. Anchoring `resets_in_seconds` to the poll instead restarted the
+  countdown every minute, so a window was never seen to reset and the bar kept
+  redrawing the last recorded percentage: an idle 5-hour window showed 34% used
+  when the quota had long since refilled. A window whose reset has passed is
+  now reported at 0% with the percentage it held and the reading's age in the
+  tooltip, so an empty bar is not mistaken for missing data; a window that has
+  not reset keeps its recorded percentage with a countdown that actually
+  elapses.
 - **Claude rolling-window bars**: Claude Code publishes a rate-limit payload
   only on some builds, so the Claude row showed bare token counts beside
   Codex's bars. When no payload is present, the reader measures the same
@@ -237,7 +256,7 @@ provider usage every minute.
 - `tui/app.py`, `tui/app.tcss`: Composer drafts, interruption, follow-ups, viewer layout, history toggle, usage bar.
 - `tui/memory.py`, `tui/token_usage.py`: Conversation snapshot fields, UI
   preferences, prompt/attempt accounting, and shared push-history storage.
-- `parameter_files/daedalus-tui-prompting.toml`: Storage root, autosave delay, title length, viewer widths, line breaks, action-item header, context budget, error rotation.
+- `parameter_files/daedalus-tui-prompting.toml`: Storage root, autosave delay, clear-on-exit, title length, viewer widths, line breaks, action-item header, context budget, error rotation.
 - `parameter_files/daedalus-tui.toml`: `[usage]` cadence, per-provider sources, session scan depth and tail size, transcript and account scan windows, bar width, Claude rolling-window token budgets.
 - `tests/test_vim_text_area.py`, `tests/test_prompt_store.py`, `tests/test_debug_log.py`, `tests/test_output_viewer.py`, `tests/test_usage_monitor.py`, plus extended `tests/test_app.py`, `tests/test_task_coordinator.py`, `tests/test_orchestrator.py`, `tests/test_agent_runner.py`, `tests/test_prompts.py`, `tests/test_token_usage.py`, `tests/test_memory.py`, `tests/test_config.py`.
 
@@ -245,6 +264,15 @@ provider usage every minute.
 HACKING
 
 ## State Log
+- 2026-09-16: Restored automatic clearing of the composer prompt when the
+  Daedalus window is closed deliberately, behind `[drafts] clear_on_exit`, so a
+  new session starts on an empty prompt while crash autosaves and stashed
+  prompts stay recoverable.
+- 2026-09-16: Fixed the Codex 5-hour bar, which reported stale usage (34% while
+  the quota was untouched) because `resets_in_seconds` was measured from each
+  poll rather than from the moment Codex wrote the payload, so a window was
+  never observed to reset; reset times are now anchored to the payload's own
+  timestamp and an expired window reads 0%.
 - 2026-09-16: Added `UsageMonitor.read_claude_account_usage`, an account-wide Claude token total that scans `[usage] claude_account_scan_days` of transcripts through its own reader so the coding statistics screen can report total Claude usage without changing what the usage bar's recent window means.
 - 2026-09-16: Gave the Claude usage row progress bars of its own by bucketing
   transcript tokens in time and measuring rolling 5-hour and 7-day windows

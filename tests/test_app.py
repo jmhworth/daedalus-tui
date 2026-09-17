@@ -267,14 +267,15 @@ def prompting_settings():
 
 
 class TuiAppTests(unittest.IsolatedAsyncioTestCase):
-    def make_app(self):
+    def make_app(self, prompting: PromptingSettings | None = None):
+        """Build an app; pass ``prompting`` to reopen one on the same storage."""
         coordinator = FakeCoordinator()
         app = DaedalusTuiApp(
             runner=FakeRunner(),
             directory=Path("/workspace/project"),
             settings=settings(),
             coordinator=coordinator,
-            prompting_settings=prompting_settings(),
+            prompting_settings=prompting or prompting_settings(),
         )
         return app, coordinator
 
@@ -3074,6 +3075,76 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             task_list.action_select_cursor()
             await pilot.pause()
             self.assertEqual(prompt.text, "follow-up in progress")
+
+    async def test_closing_the_window_clears_the_composer_prompt(self):
+        """Reopening Daedalus starts on an empty composer, not last night's text."""
+        prompting = prompting_settings()
+        app, _ = self.make_app(prompting)
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("half-typed idea I never sent")
+            await pilot.pause()
+            saved = app.prompt_store.load_draft(app._active_project_path, None)
+            self.assertEqual(saved.text, "half-typed idea I never sent")
+        self.assertIsNone(app.prompt_store.load_draft(app._active_project_path, None))
+
+        reopened, _ = self.make_app(prompting)
+        async with reopened.run_test() as pilot:
+            await pilot.pause()
+            self.assertEqual(reopened.query_one("#prompt-input", DaedalusVimTextArea).text, "")
+
+    async def test_a_fatal_error_still_leaves_the_composer_prompt_on_disk(self):
+        """A crash is not a deliberate close, so the draft stays recoverable."""
+        prompting = prompting_settings()
+        app, _ = self.make_app(prompting)
+        async with app.run_test() as pilot:
+            app.query_one("#prompt-input", DaedalusVimTextArea).insert("work in progress")
+            await pilot.pause()
+            app._fatal_error = True
+        saved = app.prompt_store.load_draft(app._active_project_path, None)
+        self.assertEqual(saved.text, "work in progress")
+
+    async def test_keeping_prompts_across_sessions_is_configurable(self):
+        prompting = replace(prompting_settings(), clear_drafts_on_exit=False)
+        app, _ = self.make_app(prompting)
+        async with app.run_test() as pilot:
+            app.query_one("#prompt-input", DaedalusVimTextArea).insert("keep me for tomorrow")
+            await pilot.pause()
+
+        reopened, _ = self.make_app(prompting)
+        async with reopened.run_test() as pilot:
+            await pilot.pause()
+            self.assertEqual(
+                reopened.query_one("#prompt-input", DaedalusVimTextArea).text,
+                "keep me for tomorrow",
+            )
+
+    async def test_closing_the_window_keeps_a_stashed_prompt(self):
+        """Interruption sets a prompt aside deliberately; closing must not eat it."""
+        prompting = prompting_settings()
+        app, coordinator = self.make_app(prompting)
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("Build the login page")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            await pilot.pause()
+            prompt.insert("a different follow-up I was typing")
+            await pilot.pause()
+            app.action_interrupt_task()
+            await pilot.pause()
+            stashed = [
+                draft
+                for draft in app.prompt_store.list_drafts(app._active_project_path, record.task_id)
+                if draft.kind == "stashed"
+            ]
+            self.assertEqual([draft.text for draft in stashed], ["a different follow-up I was typing"])
+        kept = [
+            draft
+            for draft in app.prompt_store.list_drafts(app._active_project_path, record.task_id)
+            if draft.kind == "stashed"
+        ]
+        self.assertEqual([draft.text for draft in kept], ["a different follow-up I was typing"])
 
     async def test_all_tasks_toggle_reveals_completed_history(self):
         app, coordinator = self.make_app()

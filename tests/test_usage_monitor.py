@@ -460,32 +460,76 @@ class UsageMonitorTests(unittest.TestCase):
         self.assertEqual(reading.summary, "Codex 5h 62% · week 31% (plus)")
         self.assertEqual([window.used_percent for window in reading.windows], [62, 31])
 
+    def write_codex_relative_session(self, recorded_at: float, *, timestamp: bool = True) -> Path:
+        """Write a payload whose resets are durations counted from its own time."""
+        path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / "rollout.jsonl"
+        event: dict = {
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "plan_type": "pro",
+                "rate_limits": {
+                    "primary": {"used_percent": 12.4, "window_minutes": 300, "resets_in_seconds": 5_400},
+                    "secondary": {"used_percent": 88.0, "window_minutes": 10080, "resets_in_seconds": 90_000},
+                },
+            },
+        }
+        if timestamp:
+            event["timestamp"] = _stamp(recorded_at)
+        path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+        os.utime(path, (recorded_at, recorded_at))
+        return path
+
     def test_codex_reading_accepts_the_relative_reset_field(self):
         """Codex reports ``resets_in_seconds``; only ``resets_at`` was read."""
         now = 1_800_000_000.0
-        path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / "rollout.jsonl"
-        path.write_text(
-            json.dumps(
-                {
-                    "type": "event_msg",
-                    "payload": {
-                        "type": "token_count",
-                        "plan_type": "pro",
-                        "rate_limits": {
-                            "primary": {"used_percent": 12.4, "window_minutes": 300, "resets_in_seconds": 5_400},
-                            "secondary": {"used_percent": 88.0, "window_minutes": 10080, "resets_in_seconds": 90_000},
-                        },
-                    },
-                }
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        self.write_codex_relative_session(now)
         reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
         self.assertTrue(reading.ok)
         self.assertEqual(reading.summary, "Codex 5h 12% · week 88% (pro)")
         self.assertIn("resets in 1h 30m", reading.detail)
         self.assertIn("resets in 1d 1h", reading.detail)
+
+    def test_a_relative_reset_counts_down_from_when_codex_wrote_it(self):
+        """The countdown must not restart on every poll of the same payload."""
+        now = 1_800_000_000.0
+        self.write_codex_relative_session(now - 3_600)
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        # 5_400s recorded an hour ago leaves half an hour, not another 90m.
+        self.assertIn("resets in 30m", reading.detail)
+        self.assertEqual([window.used_percent for window in reading.windows], [12.4, 88.0])
+
+    def test_a_window_that_has_already_reset_reports_no_usage(self):
+        """The bug: a finished 5h window kept showing its last percentage."""
+        now = 1_800_000_000.0
+        self.write_codex_relative_session(now - 6 * 3_600)
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        self.assertTrue(reading.ok)
+        # The 5h window reset four and a half hours ago; the weekly one has not.
+        self.assertEqual(reading.summary, "Codex 5h 0% · week 88% (pro)")
+        self.assertEqual([window.used_percent for window in reading.windows], [0.0, 88.0])
+        self.assertIn("5h: 0% used, reset after this reading (was 12%", reading.detail)
+        self.assertIn("resets in 19h 00m", reading.detail)
+
+    def test_a_reset_window_is_detected_without_an_event_timestamp(self):
+        """An older Codex line without a timestamp is dated by the file itself."""
+        now = 1_800_000_000.0
+        self.write_codex_relative_session(now - 6 * 3_600, timestamp=False)
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        self.assertEqual(reading.summary, "Codex 5h 0% · week 88% (pro)")
+
+    def test_an_absolute_reset_that_has_passed_also_reports_no_usage(self):
+        """``resets_at`` in the past means the quota refilled, whatever its age."""
+        now = 1_800_000_000.0
+        # The helper's resets_at values sit ahead of ``recorded``, so a session
+        # written three days ago has a long-expired 5h window.
+        recorded = now - 3 * 86_400
+        self.write_codex_session("rollout.jsonl", 34, 12, recorded)
+        path = self.home / ".codex" / "sessions" / "2026" / "09" / "15" / "rollout.jsonl"
+        os.utime(path, (recorded, recorded))
+        reading = UsageMonitor(UsageSettings(), home=self.home).read_codex("Codex", now)
+        self.assertEqual(reading.summary, "Codex 5h 0% · week 0% (plus)")
+        self.assertIn("3d 0h ago", reading.detail)
 
     def test_an_empty_trailing_payload_does_not_hide_the_real_numbers(self):
         now = 1_800_000_000.0

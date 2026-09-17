@@ -195,6 +195,7 @@ class PromptingSettings:
 
     data_root: Path = field(default_factory=tui_project_root)
     draft_autosave_delay_ms: int = 300
+    clear_drafts_on_exit: bool = True
     task_title_length: int = 60
     viewer_visible_by_default: bool = False
     viewer_minimum_width: int = 40
@@ -508,6 +509,7 @@ def load_prompting_settings(parameter_path: Path | None = None) -> PromptingSett
     settings = PromptingSettings(
         data_root=data_root.resolve(),
         draft_autosave_delay_ms=int(drafts.get("autosave_delay_ms", 300)),
+        clear_drafts_on_exit=bool(drafts.get("clear_on_exit", True)),
         task_title_length=int(titles.get("maximum_length", 60)),
         viewer_visible_by_default=bool(viewer.get("visible_by_default", False)),
         viewer_minimum_width=int(viewer.get("minimum_width", 40)),

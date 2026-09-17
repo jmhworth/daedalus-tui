@@ -4,7 +4,9 @@ Neither provider CLI exposes a non-interactive ``usage`` subcommand (Claude
 Code 2.1 hangs waiting for a terminal and Codex 0.154 refuses without one), so
 by default the monitor reads the same local data those CLIs display in their
 own ``/usage`` and ``/status`` views: Codex writes rate-limit windows into its
-session logs after every turn, and Claude Code maintains a per-day token
+session logs after every turn (a snapshot, so a window whose recorded reset
+time has passed is reported as refilled rather than redrawn at its last
+percentage), and Claude Code maintains a per-day token
 statistics cache that may also include its status-line rate-limit windows.
 Claude Code's cache is only a derived summary, so its session transcripts are
 read as the raw record of what was actually spent, and when Claude Code
@@ -148,19 +150,37 @@ def _number(value: object) -> float | None:
     return float(value)
 
 
-def _window_reset_seconds(window: dict, now: float) -> float | None:
-    """Return seconds until a window resets from provider duration or timestamp.
+def _epoch(value: object) -> float | None:
+    """Return an epoch time from an ISO timestamp or a numeric one."""
+    number = _number(value)
+    if number is not None:
+        return number
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
 
-    Codex reports ``resets_in_seconds`` (a duration); other payloads carry
-    ``resets_at`` as an absolute epoch or ISO timestamp. Reading only one
-    spelling silently drops the reset time from the panel, so all are accepted.
+
+def _window_reset_seconds(window: dict, recorded_at: float) -> float | None:
+    """Return seconds from ``recorded_at`` until a window resets.
+
+    Codex reports ``resets_in_seconds`` (a duration counted from the moment the
+    payload was written); other payloads carry ``resets_at`` as an absolute
+    epoch or ISO timestamp. Reading only one spelling silently drops the reset
+    time from the panel, so all are accepted. ``recorded_at`` is when the
+    payload was written, which is ``now`` only for a reading taken live.
     """
     relative = _number(window.get("resets_in_seconds"))
     if relative is not None:
         return relative
     absolute = _number(window.get("resets_at"))
     if absolute is not None:
-        return absolute - now
+        return absolute - recorded_at
     reset_text = window.get("resets_at")
     if not isinstance(reset_text, str) or not reset_text.strip():
         return None
@@ -170,7 +190,22 @@ def _window_reset_seconds(window: dict, now: float) -> float | None:
         return None
     if reset_at.tzinfo is None:
         reset_at = reset_at.replace(tzinfo=timezone.utc)
-    return reset_at.timestamp() - now
+    return reset_at.timestamp() - recorded_at
+
+
+def _window_remaining_seconds(window: dict, recorded_at: float, now: float) -> float | None:
+    """Return seconds from ``now`` until a recorded window resets.
+
+    A stored payload's countdown has been running since the payload was
+    written, so the duration Codex recorded has to be anchored to that moment
+    before it is compared with the present. Anchoring it to ``now`` instead
+    would restart the countdown on every poll and the window would never be
+    seen to reset.
+    """
+    offset = _window_reset_seconds(window, recorded_at)
+    if offset is None:
+        return None
+    return recorded_at + offset - now
 
 
 def _format_duration(remaining: float | None) -> str:
@@ -189,6 +224,7 @@ def _format_duration(remaining: float | None) -> str:
 
 
 def _format_reset(window: dict, now: float) -> str:
+    """Describe a window read live, whose countdown starts at this moment."""
     return _format_duration(_window_reset_seconds(window, now))
 
 
@@ -611,6 +647,12 @@ class UsageMonitor:
         no usage in it at all. Scanning back through the newest few logs until
         a payload with real percentages appears keeps the panel showing the
         operator's actual limits instead of "no usage data yet".
+
+        The payload is a snapshot of a moment that has since passed. Each
+        window carries the time it resets, so a window whose reset has already
+        gone by is reported as empty: the quota really did refill, and
+        redrawing the last recorded percentage would keep claiming usage the
+        operator got back hours or days ago.
         """
         sessions_dir = self._expand(self.settings.codex_sessions_dir)
         source = str(sessions_dir)
@@ -628,11 +670,15 @@ class UsageMonitor:
 
         candidates.sort(key=lambda entry: entry[0], reverse=True)
         scanned = candidates[: max(1, self.settings.session_scan_limit)]
-        found: tuple[dict, Path, float] | None = None
+        found: tuple[dict, float, Path] | None = None
         for modified, path in scanned:
-            rate_limits = self._last_codex_rate_limits(path)
-            if rate_limits is not None:
-                found = (rate_limits, path, modified)
+            reading = self._last_codex_rate_limits(path)
+            if reading is not None:
+                rate_limits, recorded_at = reading
+                # The event's own timestamp dates the payload exactly; the
+                # file's modification time is the closest stand-in when a Codex
+                # build writes the line without one.
+                found = (rate_limits, modified if recorded_at is None else recorded_at, path)
                 break
         if found is None:
             return ProviderUsage(
@@ -645,8 +691,9 @@ class UsageMonitor:
                 source,
             )
 
-        rate_limits, path, modified = found
+        rate_limits, recorded_at, path = found
         windows: list[UsageWindow] = []
+        details: list[str] = []
         for key, fallback_label in _CODEX_WINDOW_KEYS:
             window = rate_limits.get(key)
             if not isinstance(window, dict):
@@ -655,30 +702,45 @@ class UsageMonitor:
             if used is None:
                 continue
             window_label = _window_label(window.get("window_minutes"), fallback_label)
-            windows.append(UsageWindow(window_label, used, _format_reset(window, now)))
+            remaining = _window_remaining_seconds(window, recorded_at, now)
+            if remaining is not None and remaining <= 0:
+                # The window reset after this payload was written, so every
+                # token it recorded has been given back.
+                windows.append(UsageWindow(window_label, 0.0))
+                details.append(
+                    f"{window_label}: 0% used, reset after this reading "
+                    f"(was {used:.0f}% {_format_age(now - recorded_at)})"
+                )
+                continue
+            reset_text = _format_duration(remaining)
+            windows.append(UsageWindow(window_label, used, reset_text))
+            details.append(
+                f"{window_label}: {used:.0f}% used" + (f", {reset_text}" if reset_text else "")
+            )
         if not windows:
             return ProviderUsage("codex", label, f"{label}: no usage data yet", str(path), False, now, source)
 
         plan = rate_limits.get("plan_type")
         plan_text = f" ({plan})" if isinstance(plan, str) and plan else ""
         summary = f"{label} " + " · ".join(f"{window.label} {window.used_percent:.0f}%" for window in windows) + plan_text
-        details = [
-            f"{window.label}: {window.used_percent:.0f}% used" + (f", {window.reset_text}" if window.reset_text else "")
-            for window in windows
-        ]
         # The reading is only as fresh as the turn that produced it; showing
         # its age makes a stale number obvious instead of misleading.
-        age = _format_age(now - modified)
+        age = _format_age(now - recorded_at)
         details.append(f"from {path.name} ({age})")
         return ProviderUsage("codex", label, summary, "\n".join(details), True, now, source, tuple(windows))
 
-    def _last_codex_rate_limits(self, path: Path) -> dict | None:
-        """Return the newest rate-limit payload in one session log, if any.
+    def _last_codex_rate_limits(self, path: Path) -> tuple[dict, float | None] | None:
+        """Return the newest rate-limit payload in one session log and its time.
 
         Only the file's tail is read: session logs grow without bound and the
         newest payload is always at the end. A payload without a single usable
         percentage is skipped so an empty trailing entry cannot mask the real
         numbers written earlier in the same session.
+
+        The event's ``timestamp`` is returned beside the payload because the
+        reset times inside it are counted from the moment Codex wrote it, not
+        from the moment it is read. ``None`` means the line carried no usable
+        timestamp and the caller should date the payload some other way.
         """
         try:
             with path.open("rb") as handle:
@@ -713,7 +775,7 @@ class UsageMonitor:
                 if "plan_type" not in rate_limits and isinstance(payload.get("plan_type"), str):
                     # Newer Codex builds carry the plan beside the windows.
                     rate_limits = {**rate_limits, "plan_type": payload["plan_type"]}
-                return rate_limits
+                return rate_limits, _epoch(event.get("timestamp") or payload.get("timestamp"))
         return None
 
     def read_claude(self, label: str, now: float) -> ProviderUsage:
