@@ -83,6 +83,7 @@ wizard; Daedalus never writes project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-16: Removed the unused `synchronize_env_file` credential-copy helper; launch-root `.env` remains read-only with the Register setup wizard as the only operator path.
 - 2026-09-16: Replaced automatic project `.env` sync with a Register setup wizard that scaffolds files, instructs manual launch-root env setup, and blocks Continue until credentials are detected.
 - 2026-09-16: Aligned the missing-credentials bootstrap test with simplified API keys so it asserts the database-access failure without writing a project `.env`.
 - 2026-09-16: Simplified launch-root Supabase env to URL + publishable/secret keys (with anon/service_role/private aliases), auto-derived project ref from `*.supabase.co` URLs, and clarified that DB URL or access token remains required only for migration push.

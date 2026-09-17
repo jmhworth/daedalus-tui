@@ -130,11 +130,16 @@ class LocalOrchestrator:
         try:
             project_worktree_settings = load_project_worktree_settings(self.repository)
             self.emit("worktree", "Validating the primary Git worktree.")
+            # Commit dirty primary files on start/resume so send is not blocked.
+            if manager.validate_primary(auto_commit_dirty=True):
+                self.emit(
+                    "worktree",
+                    "Auto-committed dirty primary worktree changes.",
+                )
             if context is None:
-                context = manager.create(task_id)
+                context = manager.create(task_id, validate=False)
                 self.emit("worktree", f"Created {context.branch_name} at {context.path}.")
             else:
-                manager.validate_primary()
                 self.emit("worktree", f"Resuming {context.branch_name} at {context.path}.")
             manager.provision_worktree(context, project_worktree_settings)
             self._raise_if_stopped(control)

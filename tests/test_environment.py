@@ -1,104 +1,54 @@
-import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-from tui.environment import read_env_file, synchronize_env_file
+from tui.environment import cursor_environment, read_env_file, redact_environment_values
 
 
 class EnvironmentTests(unittest.TestCase):
-    def test_sync_preserves_comments_unrelated_values_and_is_idempotent(self):
+    def test_read_env_file_skips_comments_and_exports(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / ".env"
-            target = root / "project" / ".env"
-            source.write_text(
-                "# Shared connection\nSUPABASE_PROJECT_REF=shared-ref\nSUPABASE_URL=https://example.test\n",
+            path = Path(directory) / ".env"
+            path.write_text(
+                "# comment\n"
+                "export SUPABASE_URL=https://example.test\n"
+                "LOCAL_SETTING=one\n"
+                "QUOTED=\"value with spaces\"\n",
                 encoding="utf-8",
             )
-            target.parent.mkdir()
-            target.write_text(
-                "# Keep this comment\nLOCAL_SETTING=one\nSUPABASE_PROJECT_REF=\n",
-                encoding="utf-8",
-            )
+            values = read_env_file(path)
+            self.assertEqual(values["SUPABASE_URL"], "https://example.test")
+            self.assertEqual(values["LOCAL_SETTING"], "one")
+            self.assertEqual(values["QUOTED"], "value with spaces")
+            self.assertNotIn("# comment", values)
 
-            first = synchronize_env_file(
-                source,
-                target,
-                ("SUPABASE_PROJECT_REF", "SUPABASE_URL"),
-                project_values={"SUPABASE_SCHEMA": "demo"},
-                required_keys=("SUPABASE_PROJECT_REF",),
-            )
-            second = synchronize_env_file(
-                source,
-                target,
-                ("SUPABASE_PROJECT_REF", "SUPABASE_URL"),
-                project_values={"SUPABASE_SCHEMA": "demo"},
-                required_keys=("SUPABASE_PROJECT_REF",),
-            )
-
-            self.assertTrue(first.succeeded)
-            self.assertTrue(first.changed)
-            self.assertTrue(second.succeeded)
-            self.assertFalse(second.changed)
-            text = target.read_text(encoding="utf-8")
-            self.assertIn("# Keep this comment", text)
-            self.assertIn("LOCAL_SETTING=one", text)
-            self.assertEqual(read_env_file(target)["SUPABASE_SCHEMA"], "demo")
-
-    def test_conflict_does_not_modify_target(self):
+    def test_cursor_environment_prefers_process_over_files(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            source = root / ".env"
-            target = root / "project.env"
-            source.write_text("SUPABASE_PROJECT_REF=ref-a\n", encoding="utf-8")
-            target.write_text("# untouched\nSUPABASE_PROJECT_REF=ref-b\n", encoding="utf-8")
-            before = target.read_text(encoding="utf-8")
+            project = root / "project"
+            project.mkdir()
+            (project / ".env").write_text("CURSOR_API_KEY=from-project\n", encoding="utf-8")
+            launch = root / "launch.env"
+            launch.write_text("CURSOR_API_KEY=from-launch\n", encoding="utf-8")
+            import os
+            from unittest.mock import patch
 
-            result = synchronize_env_file(
-                source,
-                target,
-                ("SUPABASE_PROJECT_REF",),
-                required_keys=("SUPABASE_PROJECT_REF",),
-            )
+            with patch.dict(os.environ, {"CURSOR_API_KEY": "from-process"}, clear=False):
+                environment = cursor_environment(project, (launch,))
+            self.assertEqual(environment["CURSOR_API_KEY"], "from-process")
 
-            self.assertFalse(result.succeeded)
-            self.assertIn("SUPABASE_PROJECT_REF", result.message)
-            self.assertEqual(target.read_text(encoding="utf-8"), before)
-
-    def test_process_environment_is_not_written_by_sync(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / ".env"
-            target = root / "project.env"
-            source.write_text("SUPABASE_PROJECT_REF=file-ref\n", encoding="utf-8")
-            with patch.dict(os.environ, {"SUPABASE_PROJECT_REF": "runtime-ref"}):
-                result = synchronize_env_file(
-                    source,
-                    target,
-                    ("SUPABASE_PROJECT_REF",),
-                    required_keys=("SUPABASE_PROJECT_REF",),
-                )
-
-            self.assertTrue(result.succeeded)
-            self.assertEqual(read_env_file(target)["SUPABASE_PROJECT_REF"], "file-ref")
-
-    def test_resolved_values_overlay_satisfies_required_keys(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "launch.env"
-            target = root / "project.env"
-            source.write_text("SUPABASE_ANON_KEY=anon-from-alias\n", encoding="utf-8")
-            result = synchronize_env_file(
-                source,
-                target,
-                ("SUPABASE_PUBLISHABLE_KEY",),
-                required_keys=("SUPABASE_PUBLISHABLE_KEY",),
-                resolved_values={"SUPABASE_PUBLISHABLE_KEY": "anon-from-alias"},
-            )
-            self.assertTrue(result.succeeded)
-            self.assertEqual(read_env_file(target)["SUPABASE_PUBLISHABLE_KEY"], "anon-from-alias")
+    def test_redact_environment_values_masks_secrets(self):
+        message = "failed with token=secret-value and url=https://example.test"
+        redacted = redact_environment_values(
+            message,
+            {
+                "SUPABASE_SECRET_KEY": "secret-value",
+                "SUPABASE_URL": "https://example.test",
+            },
+        )
+        self.assertNotIn("secret-value", redacted)
+        self.assertNotIn("https://example.test", redacted)
+        self.assertIn("[redacted]", redacted)
 
 
 if __name__ == "__main__":
