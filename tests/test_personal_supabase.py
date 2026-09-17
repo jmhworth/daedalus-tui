@@ -16,7 +16,7 @@ from tui.personal_supabase import (
     preflight_personal_supabase,
     profile_guidance_section,
     project_ref_from_supabase_url,
-    probe_launch_personal_supabase_environment,
+    probe_project_personal_supabase_environment,
     remove_personal_supabase,
     register_personal_supabase,
     resolve_personal_supabase_environment,
@@ -60,7 +60,7 @@ class PersonalSupabaseTests(unittest.TestCase):
         self._git(project, "add", ".")
         self._git(project, "commit", "-m", "initial")
 
-    def _write_launch_env(self, launch: Path, *, token: bool = False, legacy_keys: bool = False) -> None:
+    def _write_project_env(self, project: Path, *, token: bool = False, legacy_keys: bool = False) -> None:
         if legacy_keys:
             lines = [
                 "SUPABASE_URL=https://shared-ref.supabase.co",
@@ -77,7 +77,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             lines.append("SUPABASE_ACCESS_TOKEN=access-token")
         else:
             lines.append("SUPABASE_DB_URL=postgres://user:password@example.test:5432/db")
-        (launch / ".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        (project / ".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def test_schema_matches_validated_project_slug(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -213,7 +213,7 @@ class PersonalSupabaseTests(unittest.TestCase):
         self.assertIn("never writes credentials", section)
         self.assertNotIn("synchronizes the ignored project", section)
 
-    def test_launch_bootstrap_validates_root_env_without_writing_project_env(self):
+    def test_project_bootstrap_validates_project_env(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             launch = root / "launch"
@@ -221,14 +221,14 @@ class PersonalSupabaseTests(unittest.TestCase):
             project.mkdir(parents=True)
             self._seed_project(launch, "demo-app")
             register_personal_supabase(project, schema="demo-app")
-            self._write_launch_env(launch)
+            self._write_project_env(project)
             config = project / "supabase" / "config.toml"
             original = config.read_text(encoding="utf-8")
 
-            result = bootstrap_personal_supabase(project, launch)
+            result = bootstrap_personal_supabase(project)
             self.assertEqual(result.status, "success")
             self.assertEqual(result.project_ref, "shared-ref")
-            self.assertFalse((project / ".env").exists())
+            self.assertTrue((project / ".env").exists())
             self.assertIsNotNone(result.environment)
             assert result.environment is not None
             self.assertEqual(result.environment["SUPABASE_PROJECT_REF"], "shared-ref")
@@ -238,18 +238,13 @@ class PersonalSupabaseTests(unittest.TestCase):
                 self.assertIn('project_id = "shared-ref"', config.read_text(encoding="utf-8"))
             self.assertEqual(config.read_text(encoding="utf-8"), original)
 
-    def test_probe_launch_env_uses_child_exit_code_without_project_env(self):
+    def test_probe_project_env_uses_child_exit_code(self):
         with tempfile.TemporaryDirectory() as tmp:
-            launch = Path(tmp)
+            root = Path(tmp)
+            launch = root / "launch"
             project = self._seed_project(launch, "demo-app")
-            (project / ".env").write_text(
-                "SUPABASE_URL=https://project-only.supabase.co\n"
-                "SUPABASE_PUBLISHABLE_KEY=project-key\n"
-                "SUPABASE_SECRET_KEY=project-secret\n"
-                "SUPABASE_DB_URL=postgres://project/db\n",
-                encoding="utf-8",
-            )
-            missing_ok, missing_error = probe_launch_personal_supabase_environment(launch)
+            self._write_project_env(launch)
+            missing_ok, missing_error = probe_project_personal_supabase_environment(project)
             self.assertFalse(missing_ok)
             self.assertIsNotNone(missing_error)
             assert missing_error is not None
@@ -257,12 +252,12 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertNotIn("project-key", missing_error)
             self.assertNotIn("project-secret", missing_error)
 
-            self._write_launch_env(launch)
-            present_ok, present_error = probe_launch_personal_supabase_environment(launch)
+            self._write_project_env(project)
+            present_ok, present_error = probe_project_personal_supabase_environment(project)
             self.assertTrue(present_ok)
             self.assertIsNone(present_error)
 
-    def test_launch_bootstrap_reports_missing_credentials_without_writing_project_env(self):
+    def test_project_bootstrap_reports_missing_credentials(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             launch = root / "launch"
@@ -270,18 +265,18 @@ class PersonalSupabaseTests(unittest.TestCase):
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
             # API credentials alone are not enough when database access is required.
-            (launch / ".env").write_text(
+            (project / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
                 "SUPABASE_SECRET_KEY=secret-key\n",
                 encoding="utf-8",
             )
 
-            result = bootstrap_personal_supabase(project, launch)
+            result = bootstrap_personal_supabase(project)
 
             self.assertEqual(result.status, "failed")
             self.assertIn("database access", result.message)
-            self.assertFalse((project / ".env").exists())
+            self.assertTrue((project / ".env").exists())
 
     def test_disabled_push_bootstrap_validates_without_database_access(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -290,7 +285,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self._seed_project(launch, "demo-app")
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
-            (launch / ".env").write_text(
+            (project / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
                 "SUPABASE_SECRET_KEY=secret-key\n",
@@ -299,40 +294,39 @@ class PersonalSupabaseTests(unittest.TestCase):
 
             result = bootstrap_personal_supabase(
                 project,
-                launch,
                 require_database_access=False,
             )
 
             self.assertEqual(result.status, "success")
-            self.assertFalse((project / ".env").exists())
+            self.assertTrue((project / ".env").exists())
             assert result.environment is not None
             self.assertEqual(result.environment["SUPABASE_PROJECT_REF"], "shared-ref")
 
-    def test_launch_bootstrap_accepts_legacy_and_private_key_aliases(self):
+    def test_project_bootstrap_accepts_legacy_and_private_key_aliases(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             launch = root / "launch"
             self._seed_project(launch, "demo-app")
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
-            self._write_launch_env(launch, legacy_keys=True)
+            self._write_project_env(project, legacy_keys=True)
 
-            result = bootstrap_personal_supabase(project, launch)
+            result = bootstrap_personal_supabase(project)
 
             self.assertEqual(result.status, "success")
-            self.assertFalse((project / ".env").exists())
+            self.assertTrue((project / ".env").exists())
             assert result.environment is not None
             self.assertEqual(result.environment["SUPABASE_PUBLISHABLE_KEY"], "anon-key")
             self.assertEqual(result.environment["SUPABASE_SECRET_KEY"], "service-key")
 
-            (launch / ".env").write_text(
+            (project / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
                 "SUPABASE_PRIVATE_KEY=private-key\n"
                 "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
                 encoding="utf-8",
             )
-            private = bootstrap_personal_supabase(project, launch)
+            private = bootstrap_personal_supabase(project)
             self.assertEqual(private.status, "success")
             assert private.environment is not None
             self.assertEqual(private.environment["SUPABASE_SECRET_KEY"], "private-key")
@@ -426,7 +420,7 @@ class PersonalSupabaseTests(unittest.TestCase):
     def test_preflight_token_requires_visible_project_ref(self):
         with tempfile.TemporaryDirectory() as tmp:
             launch = Path(tmp)
-            self._write_launch_env(launch, token=True)
+            self._write_project_env(launch, token=True)
 
             def fake_run(command, capture_output, text, env, timeout):
                 self.assertEqual(command[:3], ["supabase", "projects", "list"])
@@ -454,7 +448,7 @@ class PersonalSupabaseTests(unittest.TestCase):
     def test_preflight_db_url_uses_reachability_probe(self):
         with tempfile.TemporaryDirectory() as tmp:
             launch = Path(tmp)
-            self._write_launch_env(launch, token=False)
+            self._write_project_env(launch, token=False)
 
             with patch("tui.personal_supabase.socket.create_connection") as connect:
                 connect.return_value.__enter__ = lambda self: None
@@ -472,7 +466,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             launch = root / "launch"
             project = self._seed_project(launch, "demo-app")
             self._init_git_repo(project, "main")
-            self._write_launch_env(launch, token=True)
+            self._write_project_env(project, token=True)
             push_calls = []
             progress = []
 
@@ -488,7 +482,6 @@ class PersonalSupabaseTests(unittest.TestCase):
             with patch("tui.personal_supabase.push_migrations", side_effect=fake_push):
                 result = activate_personal_supabase(
                     project,
-                    launch,
                     "main",
                     schema="demo-app",
                     run_process=fake_run,
@@ -557,7 +550,7 @@ class PersonalSupabaseTests(unittest.TestCase):
                 project / "supabase" / "migrations" / "20260101000000_create_personal_schema.sql"
             )
             before = migration.read_text(encoding="utf-8")
-            self._write_launch_env(launch, token=True)
+            self._write_project_env(project, token=True)
 
             def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
                 return SimpleNamespace(returncode=0, stdout="shared-ref\n", stderr="")
@@ -568,7 +561,6 @@ class PersonalSupabaseTests(unittest.TestCase):
             ):
                 result = activate_personal_supabase(
                     project,
-                    launch,
                     "main",
                     schema="demo-app",
                     run_process=fake_run,
@@ -586,7 +578,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             launch = root / "launch"
             project = self._seed_project(launch, "demo-app")
             self._init_git_repo(project, "main")
-            self._write_launch_env(launch, token=True)
+            self._write_project_env(project, token=True)
 
             def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
                 return SimpleNamespace(returncode=1, stdout="", stderr="auth failed")
@@ -594,7 +586,6 @@ class PersonalSupabaseTests(unittest.TestCase):
             with patch("tui.personal_supabase.push_migrations") as push:
                 result = activate_personal_supabase(
                     project,
-                    launch,
                     "main",
                     schema="demo-app",
                     run_process=fake_run,

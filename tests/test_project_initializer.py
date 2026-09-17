@@ -85,10 +85,7 @@ class ProjectInitializerTests(unittest.TestCase):
             self.assertEqual(result["status"], "success")
             self.assertTrue((destination / "AGENTS.md").is_file())
             self.assertTrue((destination / ".agents" / "profiles" / "coding.md").is_file())
-            self.assertEqual(
-                (destination / ".env").read_bytes(),
-                launch_env.read_bytes(),
-            )
+            self.assertFalse((destination / ".env").exists())
             self.assertEqual((destination / "README.md").read_text().splitlines()[0],
                              "# example-project")
             daedalus = destination / ".daedalus"

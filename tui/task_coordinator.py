@@ -688,7 +688,7 @@ class TaskCoordinator:
         return None
 
     def _orchestrator(self, on_event: Callable[..., None]) -> LocalOrchestrator:
-        """Construct an orchestrator with the shared launch environment when configured."""
+        """Construct an orchestrator with the project environment when configured."""
         options: dict[str, object] = {"integration_gate": self.integration.run_when_ready}
         if self.environment_path is not None:
             options["environment_path"] = self.environment_path

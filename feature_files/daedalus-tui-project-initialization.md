@@ -6,7 +6,7 @@ The TUI can initialize a new Daedalus-compatible project under the launch root b
 ## Key Points
 - **Launch-root destination**: The `Ctrl+Shift+N` shortcut opens a modal where the user supplies only a project slug and optional GitHub opt-in; the destination is always a direct child of the TUI launch root.
 - **Template copy**: Initializer-owned files under `tui/templates/project-initializer/` are copied into an atomic temporary sibling, then renamed into place.
-- **Launch environment**: When the launch root has a `.env`, the initializer copies it byte-for-byte into the new project's ignored `.env` before Git setup, so local provider and Supabase configuration is available immediately.
+- **Project environment**: New projects do not inherit credentials from the launch root; operators create the project's ignored `.env` from its `.env.example` when needed.
 - **`.daedalus` scaffold**: New projects receive a TOML `.daedalus` with an empty `[worktree]` table (`install_command`, `readonly_paths`) so orchestration provisioning is ready to configure.
 - **Recoverable requests**: A `.git/daedalus-initialization-request-id` marker lets retries recognize initializer-owned projects without overwriting unrelated directories.
 - **Local by default**: Graphify install and Git init/commit always run; GitHub creation is optional and private.
@@ -25,7 +25,7 @@ The TUI can initialize a new Daedalus-compatible project under the launch root b
 HACKING
 
 ## State Log
-- 2026-09-16: New Project now copies an existing launch-root `.env` into the new ignored project `.env` before initialization commits, making local Supabase configuration available on first launch.
+- 2026-09-16: New Project no longer copies a launch-root `.env`; project credentials remain isolated and are configured from the new project's `.env.example`.
 - 2026-09-14: Removed New Project personal-Supabase opt-in; Activate is post-init only via the personal-supabase feature.
 - 2026-09-13: Updated initialization guidance so registered projects inherit shared Supabase connection details from the launch-root environment at launch.
 - 2026-09-13: New Project can optionally register a personal shared-Supabase schema (file scaffolding only) before the initial commit.

@@ -238,7 +238,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 "[worktree]\ninstall_command = []\nreadonly_paths = []\n",
                 encoding="utf-8",
             )
-            (root / ".env").write_text(
+            (project / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
                 "SUPABASE_SECRET_KEY=secret-key\n"
@@ -300,7 +300,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     await pilot.pause()
                     self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
                     self.assertTrue((project / "supabase" / "config.toml").exists())
-                    self.assertFalse((project / ".env").exists())
+                    self.assertTrue((project / ".env").exists())
                     continue_button = app.screen.query_one(
                         "#continue-personal-supabase-wizard-button",
                         Button,
@@ -350,7 +350,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 outcomes: list[bool] = []
                 app.push_screen(
-                    PersonalSupabaseSetupWizardScreen(project, "demo-app", root),
+                    PersonalSupabaseSetupWizardScreen(project, "demo-app"),
                     outcomes.append,
                 )
                 await pilot.pause()
@@ -365,7 +365,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     "#continue-personal-supabase-wizard-button",
                     Button,
                 )
-                self.assertIn(str((root / ".env").resolve()), str(instructions.render()))
+                self.assertIn(str((project / ".env").resolve()), str(instructions.render()))
                 continue_button.press()
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
@@ -375,9 +375,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     str(status.render()),
                 )
                 self.assertIn("SUPABASE_URL", str(status.render()))
-                self.assertIn(str((root / ".env").resolve()), str(status.render()))
+                self.assertIn(str((project / ".env").resolve()), str(status.render()))
 
-                (root / ".env").write_text(
+                (project / ".env").write_text(
                     "SUPABASE_URL=https://shared-ref.supabase.co\n"
                     "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
                     "SUPABASE_SECRET_KEY=secret-key\n"
@@ -523,7 +523,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             from tui.personal_supabase import PersonalSupabaseBootstrapResult
 
-            def fake_bootstrap(project_path, launch_root, require_database_access=True):
+            def fake_bootstrap(project_path, require_database_access=True):
                 return PersonalSupabaseBootstrapResult(
                     "success",
                     project_path,

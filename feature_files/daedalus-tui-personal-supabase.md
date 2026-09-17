@@ -7,14 +7,14 @@ humans and agents can develop against a dedicated schema. Phase 2 (Activate)
 is software-owned Daedalus ecosystem readiness: commit the scaffold onto the
 already-checked-out operating branch, live-preflight Supabase connectivity, and
 orchestration-owned `supabase db push`. File scaffolding alone is not
-ecosystem-ready. Operators set launch-root credentials manually via a setup
-wizard; Daedalus never writes project `.env` files.
+ecosystem-ready. Operators set each project's credentials manually via a setup
+wizard; Daedalus never copies credentials between project `.env` files.
 
 ## Key Points
 - **Shared database, per-project schema**: Schema identity is always the validated
   project slug. Apps share auth on the single Supabase project; agents must never
   default to `public`.
-- **Simplified launch-root credentials**: Prefer `SUPABASE_URL`,
+- **Project-local credentials**: Prefer `SUPABASE_URL`,
   `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` (Supabase's new API key
   names). Legacy `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` and
   `SUPABASE_PRIVATE_KEY` (secret alias) still resolve. `SUPABASE_PROJECT_REF` is
@@ -27,17 +27,17 @@ wizard; Daedalus never writes project `.env` files.
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
   claim ecosystem readiness.
 - **Setup wizard**: After name confirmation, Register opens a setup wizard that
-  scaffolds files, then instructs the operator to set launch-root `.env` values
-  and shows the absolute path of that file. Continue runs
-  `python -m tui.env_presence_probe` with cwd = launch root and gates on the
-  child exit code (key-name diagnostics only; secret values stay in the child).
+  scaffolds files, then instructs the operator to set the active project's
+  ignored `.env` values and shows the absolute path of that file. Continue runs
+  `python -m tui.env_presence_probe` with cwd = the project root and gates on
+  the child exit code (key-name diagnostics only; secret values stay in the child).
   Missing credentials keep the wizard open with an "Environment variables still
-  not detected" correction that repeats the checked path. Project `.env` files
-  are never consulted for this gate. Daedalus does not write `.env` files.
+  not detected" correction that repeats the checked path. Daedalus does not
+  write `.env` files.
 - **Phase 2 — Activate**: After the wizard succeeds, the software runs Activate when
   gates pass: require HEAD already on the selected operating/target branch (no
   checkout/switch), refuse unrelated dirty files, software-owned local commit of
-  known scaffold paths + marker, launch-root env validation (read-only),
+  known scaffold paths + marker, project-local env validation (read-only),
   access-method-aware live preflight, then `db push`. Remote Git publish remains
   the optional operator Push action in the Command Menu.
 - **Existing projects only**: Personal Supabase is post-init for projects already
@@ -53,19 +53,19 @@ wizard; Daedalus never writes project `.env` files.
   `activated`), activated, and blocked reasons (`last_activate_status` /
   redacted error class—no credentials). Launch validates all registered projects;
   launch `db push` runs only for activated projects when `supabase_db_push_enabled`.
-- **Supabase connected**: Launch-root required API settings + one DB access method
+- **Supabase connected**: Project-local required API settings + one DB access method
   (`SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`), `supabase` on PATH, and a
   bounded non-destructive access-method-aware reachability probe before push.
 - **Deliberate linking**: Confirmation warns about scaffold + Activate prerequisites;
   the Activate action stays disabled until the exact project name is entered.
 - **Agent teaching**: Idempotently appends a Personal Supabase Schema section to
   `.agents/profiles/coding.md` and `architecture.md` (no Cursor skill file).
-- **Canonical environment**: The launch-root `.env` owns shared connection values;
-  orchestration reads that file for personal-Supabase validation and CLI overlays
-  (broader agent env loading may still apply process overrides elsewhere). The
-  Register wizard presence gate probes only the launch-root file via child exit
-  code and never consults project `.env` files. Project `.env.example` documents
-  placeholders; Daedalus never syncs credentials into ignored project `.env` files.
+- **Canonical environment**: Each project's ignored `.env` owns its connection
+  values; orchestration reads that file for personal-Supabase validation and CLI
+  overlays (broader agent env loading may still apply process overrides
+  elsewhere). The Register wizard presence gate probes only the active project's
+  file via child exit code. Project `.env.example` documents placeholders;
+  Daedalus never syncs credentials between project `.env` files.
 - **Manual API exposure**: Operators must allow-list the schema in Supabase Dashboard
   Data API / PostgREST settings after the migration is applied remotely.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
@@ -73,9 +73,9 @@ wizard; Daedalus never writes project `.env` files.
 
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
-  gate/commit, live preflight, Activate orchestration, launch-root env validation,
+  gate/commit, live preflight, Activate orchestration, project-local env validation,
   child-process env presence probe, and temporary CLI configuration.
-- `tui/env_presence_probe.py`: Launch-root cwd child entry that exits 0/1 after
+- `tui/env_presence_probe.py`: Project-root cwd child entry that exits 0/1 after
   resolving required Supabase keys (stderr key names only).
 - `tui/environment.py`: Comment-preserving `.env` reading/loading helpers (no
   personal-Supabase credential writes); BOM-safe parse and process overrides.
@@ -90,9 +90,9 @@ wizard; Daedalus never writes project `.env` files.
 HACKING
 
 ## State Log
-- 2026-09-16: Wizard Continue now probes launch-root `.env` via a child-process exit code (never loads secrets in the TUI), shows the absolute path being checked, and ignores project `.env` files for that gate.
-- 2026-09-16: Removed the unused `synchronize_env_file` credential-copy helper; launch-root `.env` remains read-only with the Register setup wizard as the only operator path.
-- 2026-09-16: Replaced automatic project `.env` sync with a Register setup wizard that scaffolds files, instructs manual launch-root env setup, and blocks Continue until credentials are detected.
+- 2026-09-16: Wizard Continue now probes the active project's `.env` via a child-process exit code (never loads secrets in the TUI), shows the absolute path being checked, and no longer depends on the launch-root `.env`.
+- 2026-09-16: Removed the unused `synchronize_env_file` credential-copy helper; project `.env` remains operator-managed with the Register setup wizard as the only guidance path.
+- 2026-09-16: Replaced automatic project `.env` sync with a Register setup wizard that scaffolds files, instructs manual project env setup, and blocks Continue until credentials are detected.
 - 2026-09-16: Aligned the missing-credentials bootstrap test with simplified API keys so it asserts the database-access failure without writing a project `.env`.
 - 2026-09-16: Simplified launch-root Supabase env to URL + publishable/secret keys (with anon/service_role/private aliases), auto-derived project ref from `*.supabase.co` URLs, and clarified that DB URL or access token remains required only for migration push.
 - 2026-09-16: Repaired local cleanup so generated `.env.example` files are fully removed when empty and TUI callbacks preserve operator-supplied project paths across symlinked temporary directories.

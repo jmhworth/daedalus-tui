@@ -1,12 +1,12 @@
-"""Child-process probe for launch-root Supabase env key presence.
+"""Child-process probe for project-local Supabase env key presence.
 
 Invoke as ``python -m tui.env_presence_probe`` with ``cwd`` set to the Daedalus
-launch root. Exit ``0`` when required keys resolve from that directory's
+project root. Exit ``0`` when required keys resolve from that directory's
 ``.env`` file; otherwise exit ``1`` and print a key-name-only diagnostic on
 stderr (never secret values).
 
 The probe deliberately ignores process ``SUPABASE_*`` overrides so Continue
-confirms the launch-root file was saved, not that keys happen to exist in the
+confirms the project file was saved, not that keys happen to exist in the
 parent shell. Daedalus uses the exit code so the parent TUI process does not
 need to load ``.env`` contents just to decide whether Continue may proceed.
 """

@@ -10,11 +10,10 @@ def cursor_environment(directory: Path, extra_files: tuple[Path, ...] = ()) -> d
     """Return the process environment plus local Cursor credentials.
 
     Explicit process variables always win over values in `.env` files. The
-    target repository's `.env` is checked before the standalone TUI's `.env`.
+    target directory's `.env` is checked before explicitly supplied files.
     """
     environment = os.environ.copy()
-    package_root = Path(__file__).resolve().parents[1]
-    paths = (directory / ".env", *extra_files, package_root / ".env")
+    paths = (directory / ".env", *extra_files)
     seen: set[Path] = set()
     for path in paths:
         path = path.resolve()

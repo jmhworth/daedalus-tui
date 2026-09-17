@@ -59,8 +59,8 @@ from .personal_supabase import (
     resolve_project_ref_from_environment,
     schema_from_project_root,
     temporary_supabase_cli_config,
-    launch_personal_supabase_env_path,
-    probe_launch_personal_supabase_environment,
+    project_personal_supabase_env_path,
+    probe_project_personal_supabase_environment,
 )
 from .projects import DaedalusProject, discover_projects, is_direct_child_project
 from .plan import (
@@ -512,17 +512,16 @@ class PersonalSupabaseConfirmationScreen(ModalScreen[bool]):
 
 
 class PersonalSupabaseSetupWizardScreen(ModalScreen[bool]):
-    """Guide scaffold completion and manual launch-root env setup before Activate."""
+    """Guide scaffold completion and manual project env setup before Activate."""
 
     BINDINGS = [
         ("escape", "cancel_wizard", "Cancel"),
     ]
 
-    def __init__(self, project_path: Path, schema: str, launch_root: Path) -> None:
+    def __init__(self, project_path: Path, schema: str) -> None:
         super().__init__()
-        self.project_path = project_path
+        self.project_path = project_path.resolve()
         self.schema = schema
-        self.launch_root = launch_root
         self.settings = load_personal_supabase_settings()
         self._scaffold_ready = False
 
@@ -571,7 +570,7 @@ class PersonalSupabaseSetupWizardScreen(ModalScreen[bool]):
         scaffold.update(
             str(self.settings["wizard_scaffold_done"]).format(schema=self.schema)
         )
-        env_path = launch_personal_supabase_env_path(self.launch_root)
+        env_path = project_personal_supabase_env_path(self.project_path)
         instructions.update(
             str(self.settings["wizard_env_instructions"]).format(env_path=env_path)
         )
@@ -593,13 +592,13 @@ class PersonalSupabaseSetupWizardScreen(ModalScreen[bool]):
             return
         status = self.query_one("#personal-supabase-wizard-status", Static)
         # Presence only: child process exit code, never load secret values here.
-        present, error = probe_launch_personal_supabase_environment(
-            self.launch_root,
+        present, error = probe_project_personal_supabase_environment(
+            self.project_path,
             require_database_access=True,
         )
         if not present:
             missing_prefix = str(self.settings["wizard_env_missing"])
-            env_path = launch_personal_supabase_env_path(self.launch_root)
+            env_path = project_personal_supabase_env_path(self.project_path)
             detail = error or "required Supabase settings are missing."
             status.update(f"{missing_prefix} Checked {env_path}. {detail}")
             return
@@ -1444,7 +1443,6 @@ class DaedalusTuiApp(App[None]):
                     with lock:
                         prepared = bootstrap_personal_supabase(
                             project_path,
-                            self.launch_root,
                             require_database_access=self.orchestration_settings.supabase_db_push_enabled,
                         )
                         push_message = ""
@@ -1456,7 +1454,7 @@ class DaedalusTuiApp(App[None]):
                         if should_push:
                             runtime_environment = cursor_environment(
                                 project_path,
-                                (project_path / ".env", self.launch_root / ".env"),
+                                (project_path / ".env",),
                             )
                             project_ref = resolve_project_ref_from_environment(
                                 runtime_environment,
@@ -1521,7 +1519,7 @@ class DaedalusTuiApp(App[None]):
             self._set_status(f"Supabase bootstrap incomplete ({len(failures)} project(s))")
             return
         if registered:
-            action = "launch environment validated"
+            action = "project environment validated"
             if self.orchestration_settings.supabase_db_push_enabled:
                 action = "bootstrap complete"
             self._set_status(f"Supabase {action} ({len(registered)} project(s))")
@@ -1940,10 +1938,10 @@ class DaedalusTuiApp(App[None]):
         project_path: Path,
         schema: str,
     ) -> None:
-        """Scaffold files, then guide manual launch-root env setup before Activate."""
+        """Scaffold files, then guide manual project env setup before Activate."""
         self._set_status("Personal Supabase setup…")
         self.push_screen(
-            PersonalSupabaseSetupWizardScreen(project_path, schema, self.launch_root),
+            PersonalSupabaseSetupWizardScreen(project_path, schema),
             lambda ready: self._on_personal_supabase_wizard_finished(
                 ready,
                 project_path,
@@ -1994,7 +1992,6 @@ class DaedalusTuiApp(App[None]):
                 with lock:
                     result = activate_personal_supabase(
                         root,
-                        self.launch_root,
                         operating_branch,
                         schema=schema,
                         executable=self.orchestration_settings.supabase_executable,
@@ -2573,7 +2570,7 @@ class DaedalusTuiApp(App[None]):
             coordinator = self._external_coordinator
             self._external_coordinator = None
             coordinator.settings = settings
-            coordinator.environment_path = self.launch_root / ".env"
+            coordinator.environment_path = project_path / ".env"
             coordinator.migration_push_lock = self._migration_push_locks.setdefault(
                 project_path, threading.Lock()
             )
@@ -2584,7 +2581,7 @@ class DaedalusTuiApp(App[None]):
                 settings,
                 self._on_task_event,
                 memory_path=self.launch_root / DEFAULT_MEMORY_FILE,
-                environment_path=self.launch_root / ".env",
+                environment_path=project_path / ".env",
                 migration_push_lock=self._migration_push_locks.setdefault(
                     project_path, threading.Lock()
                 ),

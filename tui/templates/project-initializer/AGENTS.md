@@ -24,9 +24,8 @@ Do not automatically read every file under `.agents/`.
 ## Shared personal Supabase
 
 If this project has a `[personal_supabase]` registration in `.daedalus`, its
-schema is project-specific but shared connection details belong to the Daedalus
-launch-root `.env`. Set those credentials there manually; Daedalus does not write
-project `.env` credential copies.
+schema and connection details belong to this project's ignored `.env`. Set those
+credentials there manually; Daedalus does not copy credentials between projects.
 Never commit credentials, use the `public` schema, or run `supabase db push`;
 orchestration prepares and applies migrations after Activate.
 

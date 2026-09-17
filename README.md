@@ -46,8 +46,8 @@ defaults in the `[layout]` table of
 `parameter_files/daedalus-tui.toml` (`compact_width`, `short_height`,
 `compact_task_sidebar_height`, and `compact_prompt_height`).
 
-For Cursor CLI, edit the launch-root `.env` file (or copy `.env.example` to a
-new `.env`) and set your key:
+For Cursor CLI, edit the active project's `.env` file (or copy its
+`.env.example` to a new `.env`) and set your key:
 
 ```bash
 cp .env.example .env
@@ -58,23 +58,22 @@ The TUI passes `CURSOR_API_KEY` to Cursor only when it is not already present
 in the process environment. You can also authenticate with `agent login`.
 
 For personal shared Supabase projects, keep `SUPABASE_URL`,
-`SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in this launch-root
-`.env` (legacy `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`, and
+`SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in the active project's
+ignored `.env` (legacy `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`, and
 `SUPABASE_PRIVATE_KEY` as a secret alias, still work). `SUPABASE_PROJECT_REF`
 is optional when the URL is `https://<ref>.supabase.co`. For Activate and
 migration push, also set either `SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`
 (API keys alone cannot push SQL). Registered projects store only their schema
-marker; New Project also copies the launch-root `.env` into the new project's
-ignored `.env`. Operators set launch-root Supabase credentials manually (the
-Register setup wizard checks for them); Daedalus does not sync those values into
-project `.env` files. When `supabase_db_push_enabled` is enabled,
+marker; operators set project-local Supabase credentials manually (the Register
+setup wizard checks the active project's file). Daedalus does not sync those
+values into another project. When `supabase_db_push_enabled` is enabled,
 startup pushes migrations only for projects that have been Activated (ecosystem-ready);
 scaffolded projects wait for explicit Activate via the Command Menu (`Ctrl+K`).
 The same menu provides an exact-project-name-confirmed local cleanup action for
 removing a broken personal-Supabase scaffold; cleanup does not change the remote
 database. Process environment variables remain runtime overrides and are never
-written to disk. Copy the root `.env.example` to `.env`; do not put Supabase
-credentials in tracked feature, parameter, or `.env.example` files.
+written to disk. Copy the project's `.env.example` to `.env`; do not put
+Supabase credentials in tracked feature, parameter, or `.env.example` files.
 
 Each prompt creates an independent local Git worktree based on the configured
 `target_branch` (default `main`; `primary_branch` remains accepted as an
