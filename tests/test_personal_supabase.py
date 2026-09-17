@@ -16,6 +16,7 @@ from tui.personal_supabase import (
     preflight_personal_supabase,
     profile_guidance_section,
     project_ref_from_supabase_url,
+    probe_launch_personal_supabase_environment,
     remove_personal_supabase,
     register_personal_supabase,
     resolve_personal_supabase_environment,
@@ -236,6 +237,30 @@ class PersonalSupabaseTests(unittest.TestCase):
             with temporary_supabase_cli_config(project, "shared-ref"):
                 self.assertIn('project_id = "shared-ref"', config.read_text(encoding="utf-8"))
             self.assertEqual(config.read_text(encoding="utf-8"), original)
+
+    def test_probe_launch_env_uses_child_exit_code_without_project_env(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            launch = Path(tmp)
+            project = self._seed_project(launch, "demo-app")
+            (project / ".env").write_text(
+                "SUPABASE_URL=https://project-only.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=project-key\n"
+                "SUPABASE_SECRET_KEY=project-secret\n"
+                "SUPABASE_DB_URL=postgres://project/db\n",
+                encoding="utf-8",
+            )
+            missing_ok, missing_error = probe_launch_personal_supabase_environment(launch)
+            self.assertFalse(missing_ok)
+            self.assertIsNotNone(missing_error)
+            assert missing_error is not None
+            self.assertIn("SUPABASE_URL", missing_error)
+            self.assertNotIn("project-key", missing_error)
+            self.assertNotIn("project-secret", missing_error)
+
+            self._write_launch_env(launch)
+            present_ok, present_error = probe_launch_personal_supabase_environment(launch)
+            self.assertTrue(present_ok)
+            self.assertIsNone(present_error)
 
     def test_launch_bootstrap_reports_missing_credentials_without_writing_project_env(self):
         with tempfile.TemporaryDirectory() as tmp:

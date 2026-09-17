@@ -31,7 +31,8 @@ def read_env_file(path: Path) -> dict[str, str]:
         return {}
     values: dict[str, str] = {}
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        # utf-8-sig drops a leading BOM so the first key is not ``\ufeffNAME``.
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
     except (OSError, UnicodeError):
         return values
     for line in lines:
@@ -41,6 +42,7 @@ def read_env_file(path: Path) -> dict[str, str]:
         if stripped.startswith("export "):
             stripped = stripped[7:].lstrip()
         key, separator, value = stripped.partition("=")
+        key = key.strip()
         if not separator or not key or any(character.isspace() for character in key):
             continue
         value = value.strip()
@@ -48,6 +50,18 @@ def read_env_file(path: Path) -> dict[str, str]:
             value = value[1:-1]
         values[key] = value
     return values
+
+
+def apply_process_supabase_overrides(values: dict[str, str]) -> dict[str, str]:
+    """Return file values with non-empty process ``SUPABASE_*`` overrides applied."""
+    merged = dict(values)
+    for key, value in os.environ.items():
+        if not key.startswith("SUPABASE_"):
+            continue
+        stripped = value.strip()
+        if stripped:
+            merged[key] = stripped
+    return merged
 
 
 def redact_environment_values(message: str, environment: dict[str, str] | None = None) -> str:

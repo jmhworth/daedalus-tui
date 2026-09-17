@@ -59,7 +59,8 @@ from .personal_supabase import (
     resolve_project_ref_from_environment,
     schema_from_project_root,
     temporary_supabase_cli_config,
-    validate_launch_personal_supabase_environment,
+    launch_personal_supabase_env_path,
+    probe_launch_personal_supabase_environment,
 )
 from .projects import DaedalusProject, discover_projects, is_direct_child_project
 from .plan import (
@@ -570,7 +571,10 @@ class PersonalSupabaseSetupWizardScreen(ModalScreen[bool]):
         scaffold.update(
             str(self.settings["wizard_scaffold_done"]).format(schema=self.schema)
         )
-        instructions.update(str(self.settings["wizard_env_instructions"]))
+        env_path = launch_personal_supabase_env_path(self.launch_root)
+        instructions.update(
+            str(self.settings["wizard_env_instructions"]).format(env_path=env_path)
+        )
         status.update("")
         continue_button.disabled = False
         continue_button.focus()
@@ -588,14 +592,16 @@ class PersonalSupabaseSetupWizardScreen(ModalScreen[bool]):
         if not self._scaffold_ready:
             return
         status = self.query_one("#personal-supabase-wizard-status", Static)
-        _environment, error = validate_launch_personal_supabase_environment(
+        # Presence only: child process exit code, never load secret values here.
+        present, error = probe_launch_personal_supabase_environment(
             self.launch_root,
             require_database_access=True,
-            settings=self.settings,
         )
-        if error:
+        if not present:
             missing_prefix = str(self.settings["wizard_env_missing"])
-            status.update(f"{missing_prefix} {error}")
+            env_path = launch_personal_supabase_env_path(self.launch_root)
+            detail = error or "required Supabase settings are missing."
+            status.update(f"{missing_prefix} Checked {env_path}. {detail}")
             return
         status.update("")
         self.dismiss(True)

@@ -27,10 +27,13 @@ wizard; Daedalus never writes project `.env` files.
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
   claim ecosystem readiness.
 - **Setup wizard**: After name confirmation, Register opens a setup wizard that
-  scaffolds files, then instructs the operator to set launch-root `.env` values.
-  Continue re-reads that file; missing credentials keep the wizard open with an
-  "Environment variables still not detected" correction. Daedalus does not write
-  `.env` files.
+  scaffolds files, then instructs the operator to set launch-root `.env` values
+  and shows the absolute path of that file. Continue runs
+  `python -m tui.env_presence_probe` with cwd = launch root and gates on the
+  child exit code (key-name diagnostics only; secret values stay in the child).
+  Missing credentials keep the wizard open with an "Environment variables still
+  not detected" correction that repeats the checked path. Project `.env` files
+  are never consulted for this gate. Daedalus does not write `.env` files.
 - **Phase 2 — Activate**: After the wizard succeeds, the software runs Activate when
   gates pass: require HEAD already on the selected operating/target branch (no
   checkout/switch), refuse unrelated dirty files, software-owned local commit of
@@ -58,9 +61,11 @@ wizard; Daedalus never writes project `.env` files.
 - **Agent teaching**: Idempotently appends a Personal Supabase Schema section to
   `.agents/profiles/coding.md` and `architecture.md` (no Cursor skill file).
 - **Canonical environment**: The launch-root `.env` owns shared connection values;
-  orchestration reads that file (and process overrides) for CLI work. Project
-  `.env.example` documents placeholders; Daedalus never syncs credentials into
-  ignored project `.env` files.
+  orchestration reads that file for personal-Supabase validation and CLI overlays
+  (broader agent env loading may still apply process overrides elsewhere). The
+  Register wizard presence gate probes only the launch-root file via child exit
+  code and never consults project `.env` files. Project `.env.example` documents
+  placeholders; Daedalus never syncs credentials into ignored project `.env` files.
 - **Manual API exposure**: Operators must allow-list the schema in Supabase Dashboard
   Data API / PostgREST settings after the migration is applied remotely.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
@@ -69,20 +74,23 @@ wizard; Daedalus never writes project `.env` files.
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
   gate/commit, live preflight, Activate orchestration, launch-root env validation,
-  and temporary CLI configuration.
+  child-process env presence probe, and temporary CLI configuration.
+- `tui/env_presence_probe.py`: Launch-root cwd child entry that exits 0/1 after
+  resolving required Supabase keys (stderr key names only).
 - `tui/environment.py`: Comment-preserving `.env` reading/loading helpers (no
-  personal-Supabase credential writes).
+  personal-Supabase credential writes); BOM-safe parse and process overrides.
 - `tui/app.py`: Command Menu, confirmation modal, setup wizard, activation progress
   modal, and scaffold+Activate / retry worker.
 - `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation and
   wizard copy, activate commit message, and preflight timeout.
-- `tests/test_personal_supabase.py`, `tests/test_app.py`: Coverage.
+- `tests/test_personal_supabase.py`, `tests/test_app.py`, `tests/test_environment.py`: Coverage.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-16: Wizard Continue now probes launch-root `.env` via a child-process exit code (never loads secrets in the TUI), shows the absolute path being checked, and ignores project `.env` files for that gate.
 - 2026-09-16: Removed the unused `synchronize_env_file` credential-copy helper; launch-root `.env` remains read-only with the Register setup wizard as the only operator path.
 - 2026-09-16: Replaced automatic project `.env` sync with a Register setup wizard that scaffolds files, instructs manual launch-root env setup, and blocks Continue until credentials are detected.
 - 2026-09-16: Aligned the missing-credentials bootstrap test with simplified API keys so it asserts the database-access failure without writing a project `.env`.

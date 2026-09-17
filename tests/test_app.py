@@ -357,10 +357,15 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue((project / "supabase" / "config.toml").exists())
                 self.assertFalse((project / ".env").exists())
                 status = app.screen.query_one("#personal-supabase-wizard-status", Static)
+                instructions = app.screen.query_one(
+                    "#personal-supabase-wizard-instructions",
+                    Static,
+                )
                 continue_button = app.screen.query_one(
                     "#continue-personal-supabase-wizard-button",
                     Button,
                 )
+                self.assertIn(str((root / ".env").resolve()), str(instructions.render()))
                 continue_button.press()
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
@@ -370,6 +375,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     str(status.render()),
                 )
                 self.assertIn("SUPABASE_URL", str(status.render()))
+                self.assertIn(str((root / ".env").resolve()), str(status.render()))
 
                 (root / ".env").write_text(
                     "SUPABASE_URL=https://shared-ref.supabase.co\n"

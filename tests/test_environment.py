@@ -22,6 +22,37 @@ class EnvironmentTests(unittest.TestCase):
             self.assertEqual(values["QUOTED"], "value with spaces")
             self.assertNotIn("# comment", values)
 
+    def test_read_env_file_strips_bom_and_key_padding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ".env"
+            path.write_bytes(
+                b"\xef\xbb\xbfSUPABASE_URL = https://bom.example.test\n"
+                b"SUPABASE_PUBLISHABLE_KEY= publishable \n"
+            )
+            values = read_env_file(path)
+            self.assertEqual(values["SUPABASE_URL"], "https://bom.example.test")
+            self.assertEqual(values["SUPABASE_PUBLISHABLE_KEY"], "publishable")
+
+    def test_apply_process_supabase_overrides_wins_when_non_empty(self):
+        import os
+        from unittest.mock import patch
+
+        from tui.environment import apply_process_supabase_overrides
+
+        with patch.dict(
+            os.environ,
+            {"SUPABASE_URL": "https://from-process.test", "SUPABASE_SECRET_KEY": "  "},
+            clear=False,
+        ):
+            merged = apply_process_supabase_overrides(
+                {
+                    "SUPABASE_URL": "https://from-file.test",
+                    "SUPABASE_SECRET_KEY": "from-file",
+                }
+            )
+        self.assertEqual(merged["SUPABASE_URL"], "https://from-process.test")
+        self.assertEqual(merged["SUPABASE_SECRET_KEY"], "from-file")
+
     def test_cursor_environment_prefers_process_over_files(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

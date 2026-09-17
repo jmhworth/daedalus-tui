@@ -11,6 +11,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import tomllib
 from collections.abc import Callable, Iterator
 
@@ -510,6 +511,62 @@ def load_personal_supabase_status(project_root: Path) -> PersonalSupabaseStatus:
     )
 
 
+def launch_personal_supabase_env_path(launch_root: Path) -> Path:
+    """Return the canonical launch-root ``.env`` path operators must edit."""
+    return launch_root.expanduser().resolve() / ".env"
+
+
+def load_launch_personal_supabase_env_values(launch_root: Path) -> dict[str, str]:
+    """Load values from the launch-root ``.env`` only (no process overrides).
+
+    Wizard Continue uses :func:`probe_launch_personal_supabase_environment` so the
+    TUI never needs these values just to gate setup. Activate/bootstrap still load
+    the file when building CLI environments.
+    """
+    return read_env_file(launch_personal_supabase_env_path(launch_root))
+
+
+def probe_launch_personal_supabase_environment(
+    launch_root: Path,
+    *,
+    require_database_access: bool = True,
+    run_process=subprocess.run,
+    timeout_seconds: float = 30.0,
+) -> tuple[bool, str | None]:
+    """Check required launch-root Supabase keys via a child process exit code.
+
+    The parent only observes the exit code and a key-name diagnostic on failure.
+    Secret values stay inside the probe process (cwd = launch root).
+    """
+    launch = launch_root.expanduser().resolve()
+    env = {
+        **os.environ,
+        "DAEDALUS_ENV_PROBE_REQUIRE_DB": "1" if require_database_access else "0",
+    }
+    # cwd is the launch root (not the package), so keep the TUI importable.
+    existing_pythonpath = env.get("PYTHONPATH", "").strip()
+    env["PYTHONPATH"] = (
+        f"{TUI_ROOT}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(TUI_ROOT)
+    )
+    try:
+        process = run_process(
+            [sys.executable, "-m", "tui.env_presence_probe"],
+            cwd=launch,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Launch environment presence probe timed out."
+    except OSError as error:
+        return False, f"Launch environment presence probe failed to start: {error}."
+    if process.returncode == 0:
+        return True, None
+    message = (process.stderr or process.stdout or "").strip()
+    return False, message or "Launch environment could not be validated."
+
+
 def validate_launch_personal_supabase_environment(
     launch_root: Path,
     *,
@@ -521,10 +578,13 @@ def validate_launch_personal_supabase_environment(
     Returns ``(environment, None)`` on success. The environment merges file
     values with preferred/derived keys for CLI use. On failure returns
     ``(file_values_or_None, error)``.
+
+    Prefer :func:`probe_launch_personal_supabase_environment` when only a
+    presence check is needed (wizard Continue) so the TUI process never loads
+    secret values just to gate the next step.
     """
     config = settings or load_personal_supabase_settings()
-    source = launch_root.expanduser().resolve() / ".env"
-    source_values = read_env_file(source)
+    source_values = load_launch_personal_supabase_env_values(launch_root)
     resolved, resolve_error = resolve_personal_supabase_environment(
         source_values,
         config,
@@ -946,8 +1006,7 @@ def preflight_personal_supabase(
         if timeout_seconds is not None
         else settings["preflight_timeout_seconds"]
     )
-    source = launch_root.expanduser().resolve() / ".env"
-    values = read_env_file(source)
+    values = load_launch_personal_supabase_env_values(launch_root)
     resolved, resolve_error = resolve_personal_supabase_environment(
         values,
         settings,
