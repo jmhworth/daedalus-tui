@@ -78,3 +78,6 @@ This project uses a dedicated Postgres schema `daedalus-tui` on the operator's s
 - Auth is shared across apps on this Supabase project; reuse the existing auth setup.
 - Agents must not run `supabase db push`; orchestration owns remote migration apply after verification when `supabase/migrations/` changes.
 - After the first remote apply, the operator must allow-list this schema in the Supabase Dashboard Data API / PostgREST exposed-schemas settings.
+
+# Orchestrate Mode worker cards
+A task whose worktree contains `.daedalus-orchestration/task.md` is a worker task in an Orchestrate Mode session. That card is authoritative for scope: do exactly what it says, stay inside its file scope, tick its checklist items as you finish them, and end your response with the required `BEGIN_DAEDALUS_WORKER_REPORT` payload. The card directory is Daedalus bookkeeping and is never committed.

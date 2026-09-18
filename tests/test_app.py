@@ -1347,6 +1347,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Ctrl+K", shortcut_text)
             self.assertIn("Ctrl+P", shortcut_text)
             self.assertIn("Ctrl+T", shortcut_text)
+            self.assertIn("Ctrl+O", shortcut_text)
             self.assertIn("gg / G", shortcut_text)
             self.assertIn("dd", shortcut_text)
 

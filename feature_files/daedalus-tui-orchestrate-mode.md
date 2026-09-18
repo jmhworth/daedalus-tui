@@ -59,16 +59,33 @@ repository exploration.
   `## Worker` role rule blocks the prompt builders embed by heading.
 - `tui/templates/orchestrate/task-card.md`: Task card template filled per card.
 - `tui/orchestrate_protocol.py`: Planner payload and worker report parsing,
-  dispatch readiness, card rendering, and checklist tick parsing.
-- `tui/prompts.py`: `build_planner_prompt`, `build_planner_round_prompt`, and
-  `build_worker_prompt`.
+  dispatch readiness, card rendering, tick parsing, and the card's verify
+  command.
+- `tui/orchestrate_session.py`: `OrchestrationSession`, `TaskCard`, and
+  `SessionStore` (plan, card, report, and digest files; the worktree card).
+- `tui/orchestrate_coordinator.py`: `OrchestrateCoordinator`, the per-project
+  dispatcher running planner rounds, worker scheduling, and the failure loop
+  on one thread per session, plus `SessionEventRecord` for the app's queue.
+- `tui/prompts.py`: `build_planner_prompt`, `build_planner_round_prompt`,
+  `build_worker_prompt`, and the card branch of `build_task_prompt`.
+- `tui/orchestrator.py`: `orchestrate-plan` mode with `planner_output`, the
+  `resolver_selection` override, and the `before_agent`/`after_agent` hooks.
+- `tui/task_coordinator.py`: Worker fields on `TaskRecord`, the card and hook
+  keywords of `submit`, and task observers.
+- `tui/memory.py`: Orchestration snapshots and the worker `session_id` and
+  `card_id` pass-through on task snapshots.
+- `tui/app.py`, `tui/app.tcss`: The Orchestrate Mode button, `Ctrl+O`, the
+  view switcher, the orchestrate view, and session event rendering.
 - `tui/git_worktree.py`: `.daedalus-orchestration` registered as a runtime
   artifact, including its directory-prefixed status entries.
-- `AGENTS.md`, `tui/templates/project-initializer/AGENTS.md`: The Orchestrate
-  Mode expectations carried into this repository and initialized projects.
-- `tests/test_orchestrate_protocol.py`, `tests/test_prompts.py`,
-  `tests/test_config.py`, `tests/test_git_worktree.py`: Coverage for parsing,
-  prompt minimality, settings loading, and artifact exclusion.
+- `AGENTS.md`, `tui/templates/project-initializer/AGENTS.md`,
+  `.agents/profiles/coding.md`: The Orchestrate Mode expectations carried into
+  this repository, initialized projects, and coding agents.
+- `tests/test_orchestrate_protocol.py`, `tests/test_orchestrate_session.py`,
+  `tests/test_orchestrate_coordinator.py`, `tests/test_orchestrate_end_to_end.py`,
+  `tests/test_prompts.py`, `tests/test_orchestrator.py`,
+  `tests/test_task_coordinator.py`, `tests/test_app.py`, `tests/test_config.py`,
+  `tests/test_git_worktree.py`: Coverage from parsing to the real-Git session.
 
 ## Dev Mode
 HACKING
@@ -84,3 +101,23 @@ HACKING
   rendering and tick parsing) plus the planner, planner-round, and worker prompt
   builders, with the worker builder structurally unable to receive the
   operator's prompt.
+- 2026-09-17: Added `tui/orchestrate_session.py` (session and card state, the
+  `SessionStore` writing `PLAN.md`, cards, reports, digests, and the worktree
+  card) and orchestration snapshots in memory; sessions restored mid-flight are
+  marked `stopped` and never auto-resume.
+- 2026-09-17: Taught the orchestrator the `orchestrate-plan` mode (planning
+  profile, worktree reset, raw `planner_output`), a `resolver_selection`
+  override, and `before_agent`/`after_agent` hooks; `build_task_prompt` and the
+  repair and resolver prompts embed the card instead of the operator prompt for
+  worker tasks, and `TaskCoordinator.submit` carries session, card, and hooks.
+- 2026-09-17: Added `tui/orchestrate_coordinator.py`: one thread per session
+  runs planner rounds with one corrective retry, dispatches ready cards bounded
+  by max-workers and `max_concurrent_tasks`, captures reports and ticks through
+  the hooks, re-issues failed cards within the reissue limit (a re-issued card's
+  promotion satisfies its dependents), and ends on `done`, a cap, or a stop.
+- 2026-09-17: Added the orchestrate view (button and `Ctrl+O`, role selects,
+  max-workers input, autosaved prompt, Start/Stop, session selector, board,
+  planner log, summary line, `PLAN.md` in the viewer, card ids on worker inbox
+  rows) with one dispatcher per project created beside its task coordinator.
+- 2026-09-17: Added the real-Git end-to-end and conflict tests, the README
+  section, and the coding-profile paragraph on worker cards.

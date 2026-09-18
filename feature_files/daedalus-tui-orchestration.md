@@ -94,3 +94,4 @@ HACKING
 - 2026-08-20: Added restart recovery for failed and interrupted tasks, preserving actionable task records and existing worktree contexts across TUI relaunches.
 - 2026-09-05: Restricted orchestration project discovery and refresh retention to immediate launch-root children so nested coordinators cannot reappear in the selector.
 - 2026-09-16: Replaced task-id-only, repair-only, and resolver-only commit subjects with the stable readable task title plus an explicit orchestration-stage suffix, and carried that subject into post-promotion graph commits.
+- 2026-09-17: Exposed a `resolver_selection` override and `before_agent`/`after_agent` hooks on `LocalOrchestrator` (plus task observers on `TaskCoordinator`) so Orchestrate Mode can resolve conflicts with the planner's model and place and read a task card in the worktree; ordinary tasks are unaffected.

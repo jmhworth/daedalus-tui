@@ -415,3 +415,27 @@ way they update feature files.
 When resuming, the optional notes field is sent to the agent only when it has
 content. The resume prompt tells the agent to preserve existing work, inspect
 `git status` and `git diff`, and continue from the current worktree.
+
+## Orchestrate Mode
+
+The **Orchestrate Mode** button (or `Ctrl+O`) swaps the task view for a
+second view where one prompt is planned and run by a team of agents. A
+**Planner** (Claude Fable by default) reads the repository in a read-only
+worktree and returns a JSON plan of small task cards; at most *N* **Workers**
+(Claude Opus by default, *N* set in the max-workers input, capped by the
+parameter file and by `max_concurrent_tasks`) each run one card as an
+ordinary coding task with its own worktree, verification, integration, and
+promotion. After every wave the planner receives a bounded status digest
+and may add cards, re-issue a failed card under a new id, or declare the
+session done. Merge conflicts between worker branches are resolved with the
+planner's model. Each worker prompt carries only the role rules, the coding
+profile, its card, and the worktree boundary, never the operator's prompt or
+other cards, so a session costs fewer tokens than running every task with
+the full prompt; the summary line shows how many characters reached the
+workers. Session files (`PLAN.md`, `cards/`, `reports/`, digests) live under
+`prompts/<project>/orchestrate/<session-id>/` in the TUI storage root, and
+the card a worker ticks is written to `.daedalus-orchestration/task.md` in
+its worktree, a runtime artifact that is never committed. Worker rows in the
+inbox show their card id; `Ctrl+C` in the orchestrate view stops the whole
+session, and sessions do not resume after a restart. Roles, caps, and
+budgets live in `parameter_files/daedalus-tui-orchestrate-mode.toml`.
