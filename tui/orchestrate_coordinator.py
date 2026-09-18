@@ -23,7 +23,7 @@ from typing import Callable
 from .agent_runner import AgentControl, AgentResult, AgentRunner
 from .config import OrchestrateSettings
 from .debug_log import LOGGER, log_exception
-from .git_worktree import GitWorktreeError, GitWorktreeManager, WorktreeContext
+from .git_worktree import DAEDALUS_RUNTIME_ARTIFACTS, GitWorktreeError, GitWorktreeManager, WorktreeContext
 from .local_storage import LocalStorage
 from .memory import TaskMemoryStore
 from .orchestrate_protocol import (
@@ -39,6 +39,7 @@ from .orchestrate_session import (
     TaskCard,
     cards_from_payload,
     new_session_id,
+    render_context,
 )
 from .orchestrator import BUNDLED_PROFILE_ROOT, LocalOrchestrator, OrchestrationSettings
 from .prompts import (
@@ -320,6 +321,9 @@ class OrchestrateCoordinator:
             if payload.valid and conflict is None:
                 self.store.write_plan(session, raw_payload=output)
                 self._apply_payload(session, payload)
+                if session.active:
+                    # A finished session was already published by _finish.
+                    self._publish_context(session, f"round {session.round}")
                 return
             correction = payload.error or conflict or "Planner payload was rejected."
             self._log(session, f"Planner payload rejected: {correction}")
@@ -352,6 +356,8 @@ class OrchestrateCoordinator:
                     session.max_workers,
                     verification_hint,
                     repository_map=self._repository_map(),
+                    project_context=self._project_context(session),
+                    context_filename=self.orchestrate.context_filename,
                 )
             else:
                 prompt = build_planner_round_prompt(
@@ -708,6 +714,83 @@ class OrchestrateCoordinator:
         self.store.write_plan(session)
         self._persist(session)
         self._notify(session, f"Session {status}.", "error" if status == "failed" else "status")
+        self._publish_context(session, f"session {status}")
+
+    # ------------------------------------------------------------------
+    # Context file
+    # ------------------------------------------------------------------
+
+    def _publish_context(self, session: OrchestrationSession, reason: str) -> None:
+        """Write the context file onto the operating branch and push it at once.
+
+        The file is the one session artifact that reaches the repository: it
+        is what lets the next planner continue from this session's cards. The
+        commit runs through the task coordinator's integration gate so it can
+        never land between a worker's integration-base capture and its
+        promotion, and a failure is logged on the session, never raised.
+        """
+        filename = self.orchestrate.context_filename
+        if not filename:
+            return
+        text = render_context(self.sessions())
+        commit_message = f"Daedalus: update orchestration context ({session.session_id} {reason})"
+        manager = GitWorktreeManager(
+            self.repository,
+            self.settings.primary_branch,
+            self.settings.worktree_root,
+            runtime_artifacts=(*DAEDALUS_RUNTIME_ARTIFACTS, self.settings.debug_log_filename),
+            autocommit_primary=self.settings.dirty_primary_autocommit_enabled,
+            autocommit_message=self.settings.dirty_primary_commit_message,
+            autocommit_push=self.settings.dirty_primary_push_enabled,
+            remote=self.settings.git_remote,
+            on_notice=lambda message, kind="status": self._context_notice(session, message, kind),
+        )
+
+        def operation() -> None:
+            if not manager.commit_primary_file(filename, text, commit_message):
+                return
+            self._log(session, f"Wrote {filename} to {self.settings.primary_branch} ({reason}).")
+            manager.push_primary(enabled=self.settings.promotion_push_enabled)
+
+        try:
+            gate = getattr(self.task_coordinator, "integration", None)
+            if gate is not None:
+                gate.run_when_ready(0, operation)
+            else:
+                operation()
+        except Exception as error:  # The context file is a convenience, never a session failure.
+            log_exception(f"Could not publish the orchestration context session={session.session_id}", error)
+            self._log(session, f"Could not publish {filename}: {error}")
+        self._persist(session)
+
+    def _context_notice(self, session: OrchestrationSession, message: str, kind: str = "status") -> None:
+        self._log(session, message)
+        if kind in {"pushed", "warning", "error"}:
+            self._notify(session, message, kind)
+
+    def _project_context(self, session: OrchestrationSession) -> str:
+        """Earlier sessions' record for the first planner turn, newest kept first.
+
+        Whole sessions are dropped from the oldest end until the rendering fits
+        ``planner_context_chars``, so the planner never sees a card cut in half.
+        """
+        budget = self.orchestrate.planner_context_chars
+        if budget <= 0 or not self.orchestrate.context_filename:
+            return ""
+        earlier = sorted(
+            (
+                item
+                for item in self.sessions()
+                if item.session_id != session.session_id and (item.summary or item.cards)
+            ),
+            key=lambda item: (item.started_at, item.session_id),
+        )
+        while earlier:
+            text = render_context(earlier)
+            if len(text) <= budget:
+                return text
+            earlier = earlier[1:]
+        return ""
 
     def _remove_worktree(self, context: WorktreeContext) -> None:
         try:

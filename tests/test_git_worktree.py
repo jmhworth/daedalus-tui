@@ -1,4 +1,5 @@
 import unittest
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import call, patch
@@ -435,6 +436,75 @@ class GitWorktreeTests(unittest.TestCase):
             notices,
             [(f"Pushed main to origin (commit {'a' * 40}).", "pushed")],
         )
+
+    def test_push_primary_enabled_override_ignores_the_autocommit_flag(self):
+        """The promotion push and the context file push have their own setting."""
+        notices: list[tuple[str, str]] = []
+        manager = GitWorktreeManager(
+            Path("/repo"),
+            autocommit_push=False,
+            on_notice=lambda message, kind="status": notices.append((message, kind)),
+        )
+        with patch("tui.git_worktree.remote_exists", return_value=True), patch(
+            "tui.git_worktree.push_branch", return_value="b" * 40
+        ) as push_branch:
+            self.assertFalse(manager.push_primary())
+            self.assertFalse(manager.push_primary(enabled=False))
+            push_branch.assert_not_called()
+            self.assertTrue(manager.push_primary(enabled=True))
+            push_branch.assert_called_once_with(Path("/repo").resolve(), "main", "origin")
+
+        self.assertEqual(notices, [(f"Pushed main to origin (commit {'b' * 40}).", "pushed")])
+
+    def test_commit_primary_file_commits_only_that_file_and_skips_unchanged_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            repository.mkdir()
+            git = lambda *args: subprocess.run(["git", *args], cwd=repository, capture_output=True, text=True, check=True).stdout.strip()
+            git("init", "-q", "-b", "main")
+            git("config", "user.email", "tests@example.com")
+            git("config", "user.name", "Daedalus Tests")
+            (repository / "README.md").write_text("# repo\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-q", "-m", "initial")
+            # Something the operator staged must not ride along with the context commit.
+            (repository / "staged.txt").write_text("operator work\n", encoding="utf-8")
+            git("add", "staged.txt")
+            manager = GitWorktreeManager(repository, primary_branch="main")
+
+            self.assertTrue(manager.commit_primary_file("DAEDALUS_CONTEXT.md", "# context v1\n", "Daedalus: context"))
+            self.assertFalse(manager.commit_primary_file("DAEDALUS_CONTEXT.md", "# context v1\n", "Daedalus: context again"))
+            self.assertTrue(manager.commit_primary_file("docs/nested.md", "nested\n", "Daedalus: nested"))
+
+            subjects = git("log", "--format=%s", "main").splitlines()
+            self.assertEqual(subjects, ["Daedalus: nested", "Daedalus: context", "initial"])
+            self.assertEqual(git("show", "--name-only", "--format=", "main~1"), "DAEDALUS_CONTEXT.md")
+            self.assertEqual(git("show", "main~1:DAEDALUS_CONTEXT.md"), "# context v1")
+            # The operator's staged file is still staged and still uncommitted.
+            self.assertEqual(git("diff", "--cached", "--name-only"), "staged.txt")
+            self.assertNotIn("staged.txt", git("ls-tree", "--name-only", "main"))
+
+    def test_commit_primary_file_uses_a_temporary_checkout_when_main_is_not_checked_out(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            repository.mkdir()
+            git = lambda *args: subprocess.run(["git", *args], cwd=repository, capture_output=True, text=True, check=True).stdout.strip()
+            git("init", "-q", "-b", "main")
+            git("config", "user.email", "tests@example.com")
+            git("config", "user.name", "Daedalus Tests")
+            (repository / "README.md").write_text("# repo\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-q", "-m", "initial")
+            git("checkout", "-q", "-b", "feature")
+            manager = GitWorktreeManager(repository, primary_branch="main")
+
+            self.assertTrue(manager.commit_primary_file("DAEDALUS_CONTEXT.md", "# context\n", "Daedalus: context"))
+
+            self.assertEqual(git("branch", "--show-current"), "feature")
+            self.assertEqual(git("log", "--format=%s", "main").splitlines()[0], "Daedalus: context")
+            self.assertEqual(git("show", "main:DAEDALUS_CONTEXT.md"), "# context")
+            self.assertFalse((repository / "DAEDALUS_CONTEXT.md").exists())
+            self.assertEqual(git("worktree", "list").count("\n"), 0)
 
     def test_push_branch_rejects_missing_remote(self):
         with patch("tui.git_worktree.subprocess.run") as run:

@@ -125,6 +125,9 @@ class OrchestrationSettings:
     dirty_primary_autocommit_enabled: bool = True
     dirty_primary_commit_message: str = DIRTY_PRIMARY_COMMIT_MESSAGE
     dirty_primary_push_enabled: bool = True
+    # Every successful promotion (merge conflicts resolved, target branch
+    # fast-forwarded, graph refreshed) is published to git_remote right away.
+    promotion_push_enabled: bool = True
     git_remote: str = "origin"
 
 
@@ -380,6 +383,7 @@ class LocalOrchestrator:
                 self._raise_if_stopped(control)
                 manager.promote(context, integration_base)
                 self.refresh_graphify(manager, task_id, commit_subject=commit_subject)
+                self.publish_promotion(manager)
 
             self.emit("ready", "Task is ready for serialized integration.")
             self._run_integration_gate(submission_sequence, integrate_and_promote, control)
@@ -930,6 +934,22 @@ class LocalOrchestrator:
                     f"Temporary target-branch checkout cleanup failed: {cleanup_error}",
                     "error",
                 )
+
+    def publish_promotion(self, manager: GitWorktreeManager) -> None:
+        """Push the target branch once a promotion (conflicts resolved) landed.
+
+        Runs inside the integration gate, after the graph refresh commit, so
+        the remote receives exactly the tip that was just promoted. A missing
+        remote or a failed push is reported through the manager's notices and
+        never fails the task; the promotion itself is already complete.
+        """
+        if not self.settings.promotion_push_enabled:
+            return
+        self.emit(
+            "worktree",
+            f"Publishing {self.settings.primary_branch} to {self.settings.git_remote} after promotion.",
+        )
+        manager.push_primary(enabled=True)
 
     def _run_integration_gate(
         self,

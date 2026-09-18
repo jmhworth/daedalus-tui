@@ -431,14 +431,44 @@ class GitWorktreeManager:
         self.push_primary()
         return True
 
-    def push_primary(self) -> bool:
+    def commit_primary_file(self, relative_path: str, content: str, message: str) -> bool:
+        """Write one Daedalus-owned file onto the target branch and commit it.
+
+        Used for the orchestration context file, which must reach the branch
+        (and the remote) the moment it is written so a later planner, on this
+        machine or another, starts from what was already planned. The target
+        branch need not be checked out: a short-lived worktree is used
+        otherwise. Only ``relative_path`` is committed, never anything else the
+        operator may have staged. Returns False when the file was unchanged.
+        """
+        relative_path = relative_path.strip().strip("/")
+        if not relative_path:
+            raise GitWorktreeError("Context file path cannot be empty.")
+        checkout, temporary = self.prepare_primary_checkout()
+        try:
+            target = checkout / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+            self.run_git(["add", "--", relative_path], checkout)
+            if not self.git_output(["diff", "--cached", "--name-only", "--", relative_path], checkout):
+                return False
+            self.run_git(["commit", "-m", message, "--", relative_path], checkout)
+            return True
+        finally:
+            self.cleanup_temporary_checkout(temporary)
+
+    def push_primary(self, enabled: bool | None = None) -> bool:
         """Publish the operating branch, treating a failed push as non-fatal.
 
         The point of the auto-commit is to let the task run. An unreachable or
         unauthenticated remote is reported and the work stays committed locally
         rather than turning into the start-up error this replaced.
+
+        ``enabled`` overrides the auto-commit push flag for callers with their
+        own setting, such as the post-promotion push and the orchestration
+        context file; ``None`` keeps the auto-commit behaviour.
         """
-        if not self.autocommit_push:
+        if not (self.autocommit_push if enabled is None else enabled):
             return False
         if not remote_exists(self.repository, self.remote):
             self.notify(

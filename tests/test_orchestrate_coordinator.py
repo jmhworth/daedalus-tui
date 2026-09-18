@@ -5,7 +5,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from tui.agent_runner import AgentLogEvent, AgentResult
 from tui.config import OrchestrateSettings
@@ -492,6 +492,158 @@ class ScenarioTests(unittest.TestCase):
         self.assertEqual(session.cards["t1"].status, "stopped")
         self.assertEqual(worker.status, "interrupted")
         self.assertFalse(coordinator.stop(session.session_id))
+
+    def test_context_file_is_committed_and_pushed_after_each_round_and_at_the_end(self):
+        runner = ScriptedRunner(
+            [
+                planner_payload("One card.", [card("t1", "src/t1.py")]),
+                planner_payload("All promoted.", [], done=True),
+            ]
+        )
+        manager = self.manager()
+        manager.commit_primary_file.return_value = True
+        tasks, coordinator = self.build(
+            runner, orchestration=OrchestrationSettings(max_concurrent_tasks=4, verification_commands=(("true",),), promotion_push_enabled=True)
+        )
+        patches = self.patches(manager)
+        for item in patches:
+            item.start()
+        try:
+            session = coordinator.start(OPERATOR_PROMPT, PLANNER, WORKER, max_workers=2)
+            self.wait_for(session)
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+            for item in patches:
+                item.stop()
+
+        self.assertEqual(session.status, "completed", session.error)
+        writes = [item.args for item in manager.commit_primary_file.call_args_list]
+        self.assertEqual([path for path, _, _ in writes], ["DAEDALUS_CONTEXT.md", "DAEDALUS_CONTEXT.md"])
+        self.assertEqual(
+            [message for _, _, message in writes],
+            [
+                f"Daedalus: update orchestration context ({session.session_id} round 1)",
+                f"Daedalus: update orchestration context ({session.session_id} session completed)",
+            ],
+        )
+        first, last = (content for _, content, _ in writes)
+        self.assertIn(OPERATOR_PROMPT, first)
+        self.assertIn("#### t1 — Do t1", first)
+        self.assertIn("| t1 | Do t1 | pending |", first)
+        self.assertIn("| t1 | Do t1 | promoted |", last)
+        self.assertIn("Status: completed", last)
+        # Pushed immediately after each write, with the promotion push setting.
+        self.assertEqual(manager.push_primary.call_args_list[-2:], [call(enabled=True), call(enabled=True)])
+        self.assertIn("Wrote DAEDALUS_CONTEXT.md to main (round 1).", session.log)
+        self.assertIn("Wrote DAEDALUS_CONTEXT.md to main (session completed).", session.log)
+        # The round-1 write happened before any worker was dispatched.
+        wrote = next(index for index, line in enumerate(session.log) if line.startswith("Wrote DAEDALUS_CONTEXT.md"))
+        dispatched = next(index for index, line in enumerate(session.log) if line.startswith("Dispatched t1"))
+        self.assertLess(wrote, dispatched)
+
+    def test_context_file_failure_is_logged_and_never_fails_the_session(self):
+        runner = ScriptedRunner(
+            [planner_payload("One card.", [card("t1", "src/t1.py")]), planner_payload("Done.", [], done=True)]
+        )
+        manager = self.manager()
+        manager.commit_primary_file.side_effect = RuntimeError("disk full")
+        tasks, coordinator = self.build(
+            runner, orchestration=OrchestrationSettings(max_concurrent_tasks=4, verification_commands=(("true",),), promotion_push_enabled=False)
+        )
+        patches = self.patches(manager)
+        for item in patches:
+            item.start()
+        try:
+            session = coordinator.start(OPERATOR_PROMPT, PLANNER, WORKER, max_workers=1)
+            self.wait_for(session)
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+            for item in patches:
+                item.stop()
+
+        self.assertEqual(session.status, "completed", session.error)
+        self.assertTrue(any(line.startswith("Could not publish DAEDALUS_CONTEXT.md: disk full") for line in session.log))
+        self.assertFalse(any(line.startswith("Wrote DAEDALUS_CONTEXT.md") for line in session.log))
+        manager.push_primary.assert_not_called()
+
+    def test_context_file_can_be_disabled_with_an_empty_name(self):
+        runner = ScriptedRunner([planner_payload("Done already.", [], done=True)])
+        manager = self.manager()
+        tasks, coordinator = self.build(runner, orchestrate=OrchestrateSettings(context_filename=""))
+        patches = self.patches(manager)
+        for item in patches:
+            item.start()
+        try:
+            session = coordinator.start(OPERATOR_PROMPT, PLANNER, WORKER, max_workers=1)
+            self.wait_for(session)
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+            for item in patches:
+                item.stop()
+
+        manager.commit_primary_file.assert_not_called()
+        self.assertNotIn("BEGIN_DAEDALUS_PROJECT_CONTEXT", runner.planner_prompts[0])
+
+    def test_a_later_session_planner_receives_the_earlier_sessions_context(self):
+        """The orc-005 failure: a new planner saw a bare repository and asked for the old cards."""
+        runner = ScriptedRunner(
+            [
+                planner_payload("First session card.", [card("t1", "src/t1.py")]),
+                planner_payload("First session done.", [], done=True),
+                planner_payload("Second session card.", [card("t2", "src/t2.py")]),
+                planner_payload("Second session done.", [], done=True),
+            ]
+        )
+        manager = self.manager()
+        tasks, coordinator = self.build(runner)
+        patches = self.patches(manager)
+        for item in patches:
+            item.start()
+        try:
+            first = self.wait_for(coordinator.start(OPERATOR_PROMPT, PLANNER, WORKER, max_workers=1))
+            second = self.wait_for(coordinator.start("Continue the earlier plan.", PLANNER, WORKER, max_workers=1))
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+            for item in patches:
+                item.stop()
+
+        self.assertEqual((first.status, second.status), ("completed", "completed"), (first.error, second.error))
+        self.assertNotIn("BEGIN_DAEDALUS_PROJECT_CONTEXT", runner.planner_prompts[0])
+        prompt = runner.planner_prompts[2]
+        self.assertIn("BEGIN_DAEDALUS_PROJECT_CONTEXT", prompt)
+        self.assertIn(f"## Session {first.session_id}", prompt)
+        self.assertIn(OPERATOR_PROMPT, prompt)
+        self.assertIn("| t1 | Do t1 | promoted |", prompt)
+        self.assertIn("`DAEDALUS_CONTEXT.md`", prompt)
+        self.assertNotIn(f"## Session {second.session_id}", prompt)
+        # The context file itself records both sessions, oldest first.
+        content = manager.commit_primary_file.call_args.args[1]
+        self.assertLess(content.index(f"## Session {first.session_id}"), content.index(f"## Session {second.session_id}"))
+
+    def test_planner_context_drops_the_oldest_sessions_whole_to_fit_the_budget(self):
+        runner = ScriptedRunner([planner_payload("Done.", [], done=True)])
+        tasks, coordinator = self.build(runner, orchestrate=OrchestrateSettings(planner_context_chars=1_600))
+        try:
+            for index in range(1, 4):
+                session = coordinator.start(f"Session {index} prompt.", PLANNER, WORKER, max_workers=1)
+                session.summary = f"Summary {index}. " + "x" * 600
+                session.status = "completed"
+                session.started_at = float(index)
+            current = coordinator.start("Current.", PLANNER, WORKER, max_workers=1)
+            self.wait_for(current)
+            context = coordinator._project_context(current)
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+
+        self.assertLessEqual(len(context), 1_600)
+        self.assertNotIn("Session 1 prompt.", context)
+        self.assertIn("Session 3 prompt.", context)
+        self.assertNotIn("Current.", context)
 
     def test_sessions_restore_as_stopped_after_a_restart(self):
         tasks = TaskCoordinator(self.repository, object(), OrchestrationSettings(), memory_path=self.memory.path)

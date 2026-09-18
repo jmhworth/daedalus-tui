@@ -55,6 +55,20 @@ repository exploration.
   builds, the default planner effort is `medium`, and streamed planner
   messages are written to the session log with elapsed seconds while the
   round runs.
+- **The context file is the one session artifact that reaches the repository**:
+  after every accepted planner round and when a session ends, the coordinator
+  renders every session of the project (prompt, summary, full cards with
+  ticks, scope, interfaces, verify command, worker notes, and outcome) to
+  `DAEDALUS_CONTEXT.md` (`context_filename`), commits only that file onto the
+  operating branch through the task coordinator's integration gate (so it can
+  never land between a worker's base capture and its promotion), and pushes it
+  immediately when `promotion_push_enabled` is on. The round-one write precedes
+  dispatch, so worker worktrees already carry it. The next session's first
+  planner turn embeds the file inline (bounded by `planner_context_chars`,
+  dropping the oldest sessions whole) and the planner rules say to continue
+  from it, which is what makes "assign the cards you already made" work in a
+  fresh session instead of failing on a bare repository. A failed write or
+  push is logged on the session and never fails it.
 - **Interface to orchestration**: worktrees, verification, repairs, the
   integration gate, promotion, and the conflict resolver all belong to
   `feature_files/daedalus-tui-orchestration.md`. Orchestrate Mode only selects
@@ -75,7 +89,8 @@ repository exploration.
   dispatch readiness, card rendering, tick parsing, and the card's verify
   command.
 - `tui/orchestrate_session.py`: `OrchestrationSession`, `TaskCard`, and
-  `SessionStore` (plan, card, report, and digest files; the worktree card).
+  `SessionStore` (plan, card, report, and digest files; the worktree card),
+  plus `render_context` for the repository context file.
 - `tui/orchestrate_coordinator.py`: `OrchestrateCoordinator`, the per-project
   dispatcher running planner rounds, worker scheduling, and the failure loop
   on one thread per session, plus `SessionEventRecord` for the app's queue.
@@ -140,3 +155,10 @@ HACKING
   planner effort, and live planner progress lines to speed the planner up,
   and opened both roles to Codex (ChatGPT) and Cursor CLI with provider,
   model, and effort selectors per role in the orchestrate view.
+- 2026-09-18: Added the repository context file: `render_context` writes every
+  session's prompt, plan, and full card outcomes to `DAEDALUS_CONTEXT.md`,
+  the coordinator commits and pushes it after each accepted planner round and
+  at session end (through the integration gate, before dispatch), the first
+  planner turn embeds it bounded by `planner_context_chars`, and the planner
+  rules tell the planner to continue from it. Context-file pushes arrive as
+  session events and are recorded in the Push log like task pushes.

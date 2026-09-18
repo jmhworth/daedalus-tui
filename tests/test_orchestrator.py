@@ -248,6 +248,73 @@ class OrchestratorTests(unittest.TestCase):
         manager.discard_graphify_changes.assert_not_called()
         manager.cleanup_temporary_checkout.assert_called_once_with(None)
 
+    def test_successful_promotion_pushes_the_target_branch(self):
+        """Once conflicts are resolved and the branch fast-forwarded, the tip is published."""
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(verification_commands=(("true",),), graphify_update_enabled=False),
+                lambda phase, message, channel: events.append((phase, message, channel)),
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            manager.has_unmerged_paths.return_value = False
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch("tui.orchestrator.migrations_pending", return_value=False),
+                patch("tui.orchestrator.load_firebase_status", return_value=FirebaseStatus(False, None)),
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-5.6-luna", "medium")
+
+        self.assertTrue(result.succeeded)
+        manager.promote.assert_called_once()
+        manager.push_primary.assert_called_once_with(enabled=True)
+        self.assertLess(
+            manager.method_calls.index(call.promote(context, manager.capture_primary.return_value)),
+            manager.method_calls.index(call.push_primary(enabled=True)),
+        )
+        self.assertTrue(any("Publishing main to origin after promotion." == message for _, message, _ in events))
+
+    def test_promotion_push_can_be_disabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(
+                    verification_commands=(("true",),),
+                    graphify_update_enabled=False,
+                    promotion_push_enabled=False,
+                ),
+                lambda *_: None,
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            manager.has_unmerged_paths.return_value = False
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch("tui.orchestrator.migrations_pending", return_value=False),
+                patch("tui.orchestrator.load_firebase_status", return_value=FirebaseStatus(False, None)),
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-5.6-luna", "medium")
+
+        self.assertTrue(result.succeeded)
+        manager.promote.assert_called_once()
+        manager.push_primary.assert_not_called()
+
     def test_merge_failure_deploys_resolver_and_retries_verification(self):
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)

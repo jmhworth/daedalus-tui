@@ -3019,6 +3019,8 @@ class DaedalusTuiApp(App[None]):
         """Keep an orchestration push visible after task events repaint the UI."""
         project_path = self._project_for_record(record)
         if project_path is None:
+            project_path = self._project_for_session_record(record)
+        if project_path is None:
             return
         pushed = parse_push_notice(message)
         if pushed is not None:
@@ -4803,6 +4805,20 @@ class DaedalusTuiApp(App[None]):
         self._refresh_orchestrate_view()
         if message and self._orchestrate_view_shown:
             self._set_orchestrate_status(message)
+        if kind == "pushed" and message:
+            # The context file push arrives as a session event, not a task
+            # event; record it in the push log like any other Daedalus push.
+            self._apply_push_confirmation(record, message)
+
+    def _project_for_session_record(self, record) -> Path | None:
+        """Project owning an orchestrate session event, or None for task records."""
+        session_id = getattr(record, "session_id", None)
+        if not session_id:
+            return None
+        for project_path, orchestrator in self._orchestrators.items():
+            if orchestrator.get(session_id) is not None:
+                return project_path
+        return None
 
     def _refresh_orchestrate_view(self) -> None:
         """Render the session selector, board, planner log, and summary."""

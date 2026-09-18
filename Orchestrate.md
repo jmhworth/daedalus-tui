@@ -97,6 +97,7 @@ and shapes other sections implement so they fit together.
 | Worker task id | existing coordinator task id; the record gains `session_id` and `card_id` |
 | Storage | `<data_root>/prompts/<project-key>/orchestrate/<session-id>/` |
 | Worktree runtime artifact | `.daedalus-orchestration/` (directory, never staged) |
+| Repository context file | `DAEDALUS_CONTEXT.md` (`files.context_filename`) at the operating-branch root; committed alone and pushed after every accepted planner round and at session end, rendered by `render_context` and embedded in the first planner turn bounded by `limits.planner_context_chars` |
 | UI ids | `#orchestrate-mode-button`, `#orchestrate-view`, `#tasks-view`, `#view-switcher`, `#planner-model-select`, `#worker-model-select`, `#max-workers-input`, `#orchestrate-prompt`, `#orchestrate-board`, `#planner-log`, `#orchestrate-start-button`, `#orchestrate-stop-button` |
 | Shortcut | `Ctrl+O` toggles Task view and Orchestrate view |
 

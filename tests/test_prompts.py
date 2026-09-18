@@ -246,6 +246,24 @@ class OrchestratePromptTests(unittest.TestCase):
         self.assertIn("tui/app.py\ntui/config.py", prompt)
         self.assertIn("END_DAEDALUS_REPOSITORY_MAP", prompt)
 
+    def test_planner_prompt_embeds_the_project_context_and_names_its_file(self):
+        from tui.prompts import build_planner_prompt
+
+        prompt = build_planner_prompt(
+            OPERATOR_PROMPT,
+            project_context="## Session orc-001-abcdef12\n\n| t1 | Add parser | promoted |",
+            context_filename="DAEDALUS_CONTEXT.md",
+        )
+
+        self.assertIn("BEGIN_DAEDALUS_PROJECT_CONTEXT", prompt)
+        self.assertIn("## Session orc-001-abcdef12", prompt)
+        self.assertIn("| t1 | Add parser | promoted |", prompt)
+        self.assertIn("`DAEDALUS_CONTEXT.md`", prompt)
+        self.assertIn("Cards marked promoted are already merged", prompt)
+        self.assertIn("END_DAEDALUS_PROJECT_CONTEXT", prompt)
+        self.assertLess(prompt.index("END_DAEDALUS_PROJECT_CONTEXT"), prompt.index("Decompose the request above"))
+        self.assertNotIn("BEGIN_DAEDALUS_PROJECT_CONTEXT", build_planner_prompt(OPERATOR_PROMPT))
+
     def test_planner_round_prompt_carries_the_digest_and_its_options(self):
         from tui.orchestrate_protocol import load_role_rules
         from tui.prompts import build_planner_round_prompt

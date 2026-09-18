@@ -379,6 +379,8 @@ def build_planner_prompt(
     max_workers: int = 3,
     verification_hint: str = "",
     repository_map: str = "",
+    project_context: str = "",
+    context_filename: str = "",
 ) -> str:
     """Build the first planner turn: decompose one operator prompt into cards.
 
@@ -386,6 +388,9 @@ def build_planner_prompt(
     files, so this prompt carries the read-only boundary Plan mode uses.
     ``repository_map`` is a bounded path listing so the planner can name
     ``read_first`` entries without spending tool calls on discovering the tree.
+    ``project_context`` is the bounded orchestration context file (earlier
+    sessions' prompts, plans, and card outcomes) so a new session continues
+    from what was already planned; ``context_filename`` names where it lives.
     """
     hint = (
         f"\n\nThe project's verification command is: {verification_hint.strip()}"
@@ -399,6 +404,7 @@ def build_planner_prompt(
         f"{_embedded_topic(topic_text, 'plan')}"
         f"{_embedded_role_rules(role_rules, 'Planner')}"
         f"{_embedded_repository_map(repository_map)}"
+        f"{_embedded_project_context(project_context, context_filename)}"
         "Decompose the request above into small, self-contained tasks. Each task is handed to a "
         "separate worker agent that sees only its own card: the goal, checklist, file scope, "
         "read_first list, interfaces, and verify command you write. A worker that has to explore "
@@ -550,6 +556,28 @@ def _embedded_topic(topic_text: str | None, mode: str) -> str:
     if topic_text is None:
         return ""
     return embed_topic(topic_text, mode)
+
+
+def _embedded_project_context(project_context: str, context_filename: str = "") -> str:
+    """Embed the orchestration context file so earlier sessions are not re-planned."""
+    if not project_context.strip():
+        return ""
+    location = (
+        f" Daedalus commits it at `{context_filename.strip()}` in this repository and rewrites "
+        "it after every planner round; do not edit it."
+        if context_filename.strip()
+        else ""
+    )
+    return (
+        "BEGIN_DAEDALUS_PROJECT_CONTEXT\n"
+        "The record below covers the earlier Orchestrate Mode sessions for this repository: "
+        "their prompts, plans, cards, and outcomes. It is supplied inline so you continue from "
+        "what was already planned instead of starting over. Cards marked promoted are already "
+        "merged into the branch this worktree was cut from; cards that were stopped, failed, or "
+        f"never dispatched may be re-issued under new ids when the request still needs them.{location}\n"
+        f"{project_context.strip()}\n"
+        "END_DAEDALUS_PROJECT_CONTEXT\n\n"
+    )
 
 
 def _embedded_repository_map(repository_map: str) -> str:

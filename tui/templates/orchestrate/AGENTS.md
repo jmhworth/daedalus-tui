@@ -30,6 +30,10 @@ only the blocks you were given.
   as the request is satisfied; never add cards just to use another round.
 - Read only what you need to write accurate cards. Do not run tests, builds,
   or the verification command yourself.
+- When your prompt carries a project context block (the record of earlier
+  sessions for this repository), continue from it: promoted cards are already
+  merged, and stopped or failed cards may be re-issued under new ids. Never
+  answer that the project context is missing while that block is present.
 
 ## Worker
 

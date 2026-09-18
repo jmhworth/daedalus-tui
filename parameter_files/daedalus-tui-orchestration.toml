@@ -20,6 +20,13 @@ debug_log_filename = ".daedalus-debug.log"
 dirty_primary_autocommit_enabled = true
 dirty_primary_commit_message = "Daedalus: commit pending changes before starting a task"
 dirty_primary_push_enabled = true
+# Every successful promotion is published to git_remote as soon as the task's
+# merge conflicts are resolved and the target branch has been fast-forwarded
+# (after the graph refresh commit, when one runs). Orchestrate Mode's context
+# file is pushed the same way the moment it is written. A failed or missing
+# push is reported as a warning and never fails the task. Set this to false to
+# keep promotions local and publish with the settings-bar Push control.
+promotion_push_enabled = true
 git_remote = "origin"
 
 graphify_update_enabled = true

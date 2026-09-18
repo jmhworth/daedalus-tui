@@ -14,6 +14,7 @@ from tui.orchestrate_session import (
     TaskCard,
     cards_from_payload,
     new_session_id,
+    render_context,
     render_digest,
 )
 
@@ -148,6 +149,37 @@ class SessionStoreTests(unittest.TestCase):
         bounded = small.write_digest(session)
         self.assertLessEqual(len(bounded), 80)
         self.assertTrue((self.store.session_dir(session.project_key, session.session_id) / "digest-round-2.txt").is_file())
+
+    def test_context_renders_every_session_oldest_first_with_full_cards(self):
+        older = make_session(session_id="orc-001-abcdef12", started_at=100.0, finished_at=200.0, status="stopped", error="Daedalus was closed while this session was active.")
+        older.cards["t1"].status = "promoted"
+        older.cards["t1"].checklist_state = (True, True)
+        older.cards["t1"].promoted_commit = "a" * 40
+        older.cards["t2"].status = "stopped"
+        older.cards["t2"].report = WorkerReport("t2", "partial", (False,), (), "renderer needs the parser API", "note for the planner")
+        newer = make_session(session_id="orc-002-abcdef12", started_at=300.0, prompt="Second prompt.", summary="", cards={})
+        context = render_context([newer, older])
+
+        self.assertTrue(context.startswith("# Daedalus orchestration context\n"))
+        self.assertLess(context.index("## Session orc-001-abcdef12"), context.index("## Session orc-002-abcdef12"))
+        self.assertIn("Status: stopped    Round: 1    Workers: 2    Started: ", context)
+        self.assertIn("Build the thing.", context)
+        self.assertIn("Split parsing from rendering.", context)
+        self.assertIn("| t1 | Add parser | promoted | 2/2 | — | aaaaaaaaaaaa |", context)
+        self.assertIn("| t2 | Add renderer | stopped | 0/1 | t1 | — |", context)
+        self.assertIn("#### t1 — Add parser", context)
+        self.assertIn("- [x] parser exists", context)
+        self.assertIn("- [ ] renderer exists", context)
+        self.assertIn("- File scope: tui/parse.py", context)
+        self.assertIn("- Read first: tui/plan.py:1-40", context)
+        self.assertIn("- Interfaces: parse(text) -> Result", context)
+        self.assertIn("- Verify: pytest tests/test_parse.py", context)
+        self.assertIn("- Worker notes: note for the planner", context)
+        self.assertIn("- Worker errors: renderer needs the parser API", context)
+        self.assertIn("### Outcome\n\nDaedalus was closed while this session was active.", context)
+        self.assertIn("Second prompt.", context)
+        self.assertIn("(no plan recorded)", context)
+        self.assertEqual(render_context([]).rstrip().splitlines()[-1], "No sessions recorded yet.")
 
     def test_waiting_cards_name_their_dependencies(self):
         session = make_session()

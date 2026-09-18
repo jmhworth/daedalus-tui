@@ -237,6 +237,10 @@ class OrchestrateSettings:
     #: Characters of repository file listing handed to the first planner turn
     #: so it can name ``read_first`` paths without exploring the tree itself.
     planner_repository_map_chars: int = 8_000
+    #: Characters of the committed orchestration context file (earlier
+    #: sessions' prompts, plans, and card outcomes) embedded in the first
+    #: planner turn so a new session continues from what was already planned.
+    planner_context_chars: int = 12_000
     task_reissue_limit: int = 2
     planner_digest_budget_chars: int = 12_000
     worker_report_budget_chars: int = 4_000
@@ -244,6 +248,10 @@ class OrchestrateSettings:
     session_dirname: str = "orchestrate"
     card_filename: str = "task.md"
     runtime_artifact_dirname: str = ".daedalus-orchestration"
+    #: Repository-relative path of the orchestration context file Daedalus
+    #: commits and pushes onto the operating branch after every planner round.
+    #: An empty string disables the file.
+    context_filename: str = "DAEDALUS_CONTEXT.md"
     board_title_width: int = 28
     planner_log_lines: int = 400
 
@@ -516,6 +524,7 @@ def load_orchestration_settings(parameter_path: Path | None = None) -> Orchestra
         ).strip()
         or DIRTY_PRIMARY_COMMIT_MESSAGE,
         dirty_primary_push_enabled=bool(values.get("dirty_primary_push_enabled", True)),
+        promotion_push_enabled=bool(values.get("promotion_push_enabled", True)),
         git_remote=str(values.get("git_remote", "origin")).strip() or "origin",
     )
 
@@ -561,6 +570,9 @@ def load_orchestrate_settings(
         planner_repository_map_chars=int(
             limits.get("planner_repository_map_chars", defaults.planner_repository_map_chars)
         ),
+        planner_context_chars=int(
+            limits.get("planner_context_chars", defaults.planner_context_chars)
+        ),
         task_reissue_limit=int(limits.get("task_reissue_limit", defaults.task_reissue_limit)),
         planner_digest_budget_chars=int(
             limits.get("planner_digest_budget_chars", defaults.planner_digest_budget_chars)
@@ -576,6 +588,7 @@ def load_orchestrate_settings(
         runtime_artifact_dirname=str(
             files.get("runtime_artifact_dirname", defaults.runtime_artifact_dirname)
         ),
+        context_filename=str(files.get("context_filename", defaults.context_filename)).strip(),
         board_title_width=int(ui.get("board_title_width", defaults.board_title_width)),
         planner_log_lines=int(ui.get("planner_log_lines", defaults.planner_log_lines)),
     )
@@ -601,6 +614,10 @@ def load_orchestrate_settings(
         raise ValueError(f"{path} limits.planner_round_limit must not be negative.")
     if settings.planner_repository_map_chars < 0:
         raise ValueError(f"{path} limits.planner_repository_map_chars must not be negative.")
+    if settings.planner_context_chars < 0:
+        raise ValueError(f"{path} limits.planner_context_chars must not be negative.")
+    if settings.context_filename.startswith("/") or ".." in Path(settings.context_filename).parts:
+        raise ValueError(f"{path} files.context_filename must be a path inside the repository.")
     if settings.default_max_workers > settings.max_workers_limit:
         raise ValueError(
             f"{path} limits.default_max_workers must not exceed limits.max_workers_limit."

@@ -43,6 +43,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(orchestration.supabase_executable, "supabase")
         self.assertTrue(orchestration.firebase_deploy_enabled)
         self.assertEqual(orchestration.firebase_executable, "firebase")
+        # Promotions are published as soon as their conflicts are resolved.
+        self.assertTrue(orchestration.promotion_push_enabled)
 
     def test_loads_claude_provider_models_effort_and_permission_mode(self):
         root = Path(__file__).resolve().parents[1]
@@ -356,8 +358,21 @@ class OrchestrateSettingsTests(unittest.TestCase):
         self.assertEqual(settings.session_dirname, "orchestrate")
         self.assertEqual(settings.card_filename, "task.md")
         self.assertEqual(settings.runtime_artifact_dirname, ".daedalus-orchestration")
+        self.assertEqual(settings.context_filename, "DAEDALUS_CONTEXT.md")
+        self.assertEqual(settings.planner_context_chars, 12_000)
         self.assertEqual(settings.board_title_width, 28)
         self.assertEqual(settings.planner_log_lines, 400)
+
+    def test_context_filename_must_stay_inside_the_repository(self):
+        for value in ("/etc/context.md", "../context.md"):
+            path = self.parameter_file(f'[files]\ncontext_filename = "{value}"\n')
+            with self.assertRaises(ValueError) as error:
+                load_orchestrate_settings(path)
+            self.assertIn("context_filename", str(error.exception))
+        path = self.parameter_file('[files]\ncontext_filename = ""\n[limits]\nplanner_context_chars = 0\n')
+        settings = load_orchestrate_settings(path)
+        self.assertEqual(settings.context_filename, "")
+        self.assertEqual(settings.planner_context_chars, 0)
 
     def test_missing_file_falls_back_to_the_documented_defaults(self):
         settings = load_orchestrate_settings(Path("/nonexistent/orchestrate.toml"))

@@ -6,6 +6,7 @@ Everything else — worktrees, verification, integration, the resolver, and
 promotion — is the real orchestration pipeline.
 """
 
+from dataclasses import replace
 import json
 import re
 import subprocess
@@ -152,10 +153,12 @@ class EndToEndTests(unittest.TestCase):
     def tearDown(self):
         self._directory.cleanup()
 
-    def run_session(self, runner, max_workers=2):
-        tasks = TaskCoordinator(self.repository, runner, self.settings, memory_path=self.memory.path)
+    def run_session(self, runner, max_workers=2, settings=None, events=None):
+        settings = settings or self.settings
+        on_event = None if events is None else (lambda record, phase, message, kind: events.append((phase, message, kind)))
+        tasks = TaskCoordinator(self.repository, runner, settings, on_event, memory_path=self.memory.path)
         coordinator = OrchestrateCoordinator(
-            tasks, runner, self.settings, OrchestrateSettings(), self.storage, self.memory
+            tasks, runner, settings, OrchestrateSettings(), self.storage, self.memory, on_event
         )
         try:
             session = coordinator.start(OPERATOR_PROMPT, PLANNER, WORKER, max_workers=max_workers)
@@ -204,6 +207,66 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(git(self.repository, "status", "--porcelain"), "")
         self.assertEqual(session.tokens_planner, 14)
         self.assertEqual(session.tokens_workers, 12)
+
+    def test_context_file_and_every_promotion_are_pushed_to_the_remote(self):
+        """A bare origin stands in for GitHub; nothing is left unpublished."""
+        origin = self.repository.parent / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+        git(self.repository, "remote", "add", "origin", str(origin))
+        git(self.repository, "push", "-q", "-u", "origin", "main")
+        settings = replace(self.settings, promotion_push_enabled=True)
+        events = []
+        runner = FileEditingRunner(
+            [
+                payload("Two independent cards.", [card("t1", "src/one.py"), card("t2", "src/two.py")]),
+                payload("All promoted.", [], done=True),
+            ]
+        )
+        session, tasks = self.run_session(runner, settings=settings, events=events)
+
+        self.assertEqual(session.status, "completed", session.error)
+        subjects = git(self.repository, "log", "--format=%s", "main").splitlines()
+        self.assertEqual(subjects[-1], "initial")
+        self.assertEqual(subjects[-2], f"Daedalus: update orchestration context ({session.session_id} round 1)")
+        self.assertEqual(subjects[0], f"Daedalus: update orchestration context ({session.session_id} session completed)")
+        self.assertEqual(sum("Write t" in subject for subject in subjects), 2)
+        # The remote holds exactly the local tip: promotions and context commits were pushed.
+        self.assertEqual(git(origin, "rev-parse", "main"), git(self.repository, "rev-parse", "main"))
+        context = (self.repository / "DAEDALUS_CONTEXT.md").read_text(encoding="utf-8")
+        self.assertIn(f"## Session {session.session_id}", context)
+        self.assertIn(OPERATOR_PROMPT, context)
+        self.assertIn("| t1 | Write t1 | promoted |", context)
+        self.assertIn("| t2 | Write t2 | promoted |", context)
+        self.assertIn("Status: completed", context)
+        self.assertEqual(git(self.repository, "status", "--porcelain"), "")
+        # Worker worktrees were cut after the round-1 context commit, so the
+        # file was already part of the branch every worker started from.
+        round_one = git(self.repository, "show", "main~3:DAEDALUS_CONTEXT.md")
+        self.assertIn("| t1 | Write t1 | pending |", round_one)
+        self.assertFalse({path for path in self.committed_paths() if path.startswith(".daedalus-orchestration")})
+        pushed = [message for phase, message, kind in events if kind == "pushed"]
+        # One push per promotion plus one per context write.
+        self.assertEqual(len(pushed), 4, pushed)
+        self.assertTrue(all(message.startswith("Pushed main to origin (commit ") for message in pushed))
+        self.assertTrue(all(record.status == "completed" for record in tasks.tasks()))
+
+    def test_promotion_push_disabled_keeps_the_context_file_local(self):
+        origin = self.repository.parent / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+        git(self.repository, "remote", "add", "origin", str(origin))
+        git(self.repository, "push", "-q", "-u", "origin", "main")
+        initial = git(self.repository, "rev-parse", "main")
+        settings = replace(self.settings, promotion_push_enabled=False)
+        runner = FileEditingRunner(
+            [payload("One card.", [card("t1", "src/one.py")]), payload("Done.", [], done=True)]
+        )
+        session, _ = self.run_session(runner, settings=settings)
+
+        self.assertEqual(session.status, "completed", session.error)
+        self.assertEqual(git(origin, "rev-parse", "main"), initial)
+        self.assertNotEqual(git(self.repository, "rev-parse", "main"), initial)
+        self.assertTrue((self.repository / "DAEDALUS_CONTEXT.md").is_file())
+        self.assertIn("DAEDALUS_CONTEXT.md", git(self.repository, "ls-tree", "--name-only", "main"))
 
     def test_out_of_scope_edit_conflicts_and_the_planner_model_resolves_it(self):
         """The parser rejects overlapping scopes, so the conflict comes from a stray edit."""

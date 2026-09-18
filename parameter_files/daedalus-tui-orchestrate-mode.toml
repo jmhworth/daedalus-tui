@@ -37,15 +37,25 @@ planner_digest_budget_chars = 12000
 worker_report_budget_chars = 4000
 worker_card_budget_chars = 6000
 planner_repository_map_chars = 8000
+planner_context_chars = 12000   # characters of the context file sent with the first planner turn
 
 # Where session artifacts live. Session files (plan, cards, reports, digests)
 # are written under the TUI storage root; the card the worker actually ticks is
 # written into its worktree under the runtime-artifact directory, which Git
 # never stages because it is registered as one of Daedalus' own runtime files.
+#
+# `context_filename` is the one session artifact that does reach the
+# repository: after every accepted planner round (and when a session ends)
+# Daedalus writes every session's prompt, summary, cards, and outcomes to this
+# path on the operating branch, commits it, and pushes it immediately when
+# `promotion_push_enabled` is on in the orchestration parameter file. The next
+# session's planner receives it inline, so "continue what you planned" works
+# across sessions, restarts, and machines. Set it to "" to disable the file.
 [files]
 session_dirname = "orchestrate"
 card_filename = "task.md"
 runtime_artifact_dirname = ".daedalus-orchestration"
+context_filename = "DAEDALUS_CONTEXT.md"
 
 # Orchestrate view dimensions: the board's Title column width and how many
 # lines of planner output the log keeps before discarding the oldest.

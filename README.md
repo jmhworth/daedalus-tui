@@ -142,10 +142,13 @@ the task starts from what you actually have. A missing remote or a failed push
 is reported as a warning and the task still runs. Set
 `dirty_primary_autocommit_enabled = false` in the orchestration parameter file
 to get the old "primary worktree must be clean" error back, or
-`dirty_primary_push_enabled = false` to commit without publishing. Apart from
-that commit, automated orchestration does not push remotes; use the
-settings-bar Push control when you want to publish the selected operating
-branch to `origin`. Failed worktrees are preserved
+`dirty_primary_push_enabled = false` to commit without publishing. Every
+successful promotion is also pushed: once a task's merge conflicts are
+resolved, the target branch fast-forwarded, and any graph refresh committed,
+orchestration publishes the branch to `origin` before the task is reported
+complete (`promotion_push_enabled = false` keeps promotions local). The
+settings-bar Push control remains for publishing the selected operating
+branch by hand. Failed worktrees are preserved
 for inspection. Task-owned commits use the task's readable title (derived from
 the requested goal), adding a short repair, resolver, or graphify-stage suffix
 when applicable, so the Git history describes the work that completed. A
@@ -450,3 +453,17 @@ its worktree, a runtime artifact that is never committed. Worker rows in the
 inbox show their card id; `Ctrl+C` in the orchestrate view stops the whole
 session, and sessions do not resume after a restart. Roles, caps, and
 budgets live in `parameter_files/daedalus-tui-orchestrate-mode.toml`.
+
+One session artifact does reach the repository: after every accepted planner
+round, and again when the session ends, Daedalus writes `DAEDALUS_CONTEXT.md`
+(`context_filename`) at the root of the operating branch with every
+session's prompt, summary, and full cards (goal, ticked checklist, scope,
+interfaces, verify command, worker notes, outcome), commits only that file,
+and pushes it immediately when `promotion_push_enabled` is on. The round-one
+write lands before the workers' worktrees are cut, so every worker starts
+from a branch that already carries it. The next session's first planner turn
+receives the file inline (bounded by `planner_context_chars`, dropping the
+oldest sessions whole), so a prompt such as "continue the plan you made"
+works across sessions, restarts, and machines instead of failing with a
+planner that sees only a bare repository. Set `context_filename = ""` to
+disable the file.
