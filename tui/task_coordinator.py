@@ -377,10 +377,23 @@ class TaskCoordinator:
         self.context_budget_chars = max(1, int(context_budget_chars))
         self.run_log_max_bytes = max(1, int(run_log_max_bytes))
         self.memory = TaskMemoryStore(memory_path or self.repository / DEFAULT_MEMORY_FILE)
+        # Extra listeners beside the app's callback; the Orchestrate Mode
+        # dispatcher registers one to learn when its worker tasks settle.
+        self._observers: list[TaskEventCallback] = []
         self._restore_tasks()
 
     def set_event_callback(self, callback: TaskEventCallback | None) -> None:
         self.on_event = callback
+
+    def add_task_observer(self, callback: TaskEventCallback) -> None:
+        with self._lock:
+            if callback not in self._observers:
+                self._observers.append(callback)
+
+    def remove_task_observer(self, callback: TaskEventCallback) -> None:
+        with self._lock:
+            if callback in self._observers:
+                self._observers.remove(callback)
 
     # ------------------------------------------------------------------
     # Submission
@@ -1925,6 +1938,11 @@ class TaskCoordinator:
     def _notify(self, record: TaskRecord, phase: str, message: str, kind: str) -> None:
         if self.on_event is not None:
             self.on_event(record, phase, message, kind)
+        for observer in tuple(self._observers):
+            try:
+                observer(record, phase, message, kind)
+            except Exception as error:  # An observer must never break a task.
+                log_exception(f"Task observer failed task={record.task_id} phase={phase}", error)
 
 
 __all__ = [

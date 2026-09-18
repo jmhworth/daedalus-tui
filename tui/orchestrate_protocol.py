@@ -84,8 +84,12 @@ def load_card_template() -> str:
     return CARD_TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
-def parse_planner_payload(response: str) -> PlannerPayload:
-    """Extract and validate the planner's task list from one agent response."""
+def parse_planner_payload(response: str, known_ids: Iterable[str] = ()) -> PlannerPayload:
+    """Extract and validate the planner's task list from one agent response.
+
+    ``known_ids`` are cards from earlier rounds: a later round may depend on
+    them, but may not reuse their ids.
+    """
     payload_text = _payload_text(response, ORCHESTRATION_START, ORCHESTRATION_END)
     if payload_text is None:
         return _invalid_plan("Planner response was not in the required format.")
@@ -113,7 +117,7 @@ def parse_planner_payload(response: str) -> PlannerPayload:
     except ValueError as error:
         return _invalid_plan(str(error), summary)
 
-    error = _plan_structure_error(tasks, done)
+    error = _plan_structure_error(tasks, done, set(known_ids))
     if error is not None:
         return _invalid_plan(error, summary)
     return PlannerPayload(summary.strip(), tuple(tasks), done)
@@ -294,14 +298,20 @@ def _parse_task(raw_task: Any) -> PlannerTask:
     )
 
 
-def _plan_structure_error(tasks: Sequence[PlannerTask], done: bool) -> str | None:
+def _plan_structure_error(
+    tasks: Sequence[PlannerTask], done: bool, known_ids: set[str] | None = None
+) -> str | None:
     """Return the first rule the plan as a whole breaks, if any."""
     ids = [task.task_id for task in tasks]
     if len(ids) != len(set(ids)):
         return "Planner tasks must use unique ids."
     if done and tasks:
         return "A finished plan cannot include new tasks."
-    known = set(ids)
+    earlier = known_ids or set()
+    reused = sorted(set(ids) & earlier)
+    if reused:
+        return f"Planner tasks reuse ids from an earlier round: {', '.join(reused)}."
+    known = set(ids) | earlier
     for task in tasks:
         for parent in task.depends_on:
             if parent == task.task_id:

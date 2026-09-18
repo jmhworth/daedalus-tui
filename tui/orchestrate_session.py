@@ -498,7 +498,7 @@ def _report_text(card: TaskCard) -> str:
         pieces.append(f"errors: {report.errors}")
     if report.notes:
         pieces.append(f"notes: {report.notes}")
-    if not report.valid and report.error:
+    if not report.valid and report.error and report.error != report.errors:
         pieces.append(f"parse: {report.error}")
     return " | ".join(pieces)
 
