@@ -314,3 +314,50 @@ class OrchestratePromptTests(unittest.TestCase):
 
         self.assertLessEqual(len(digest), 500)
         self.assertIn("truncated to fit the context budget", digest)
+
+
+class WorkerTaskPromptTests(unittest.TestCase):
+    """``build_task_prompt`` with a card delegates to the worker builder."""
+
+    def card(self) -> str:
+        from tui.orchestrate_protocol import PlannerTask, load_card_template, render_task_card
+
+        task = PlannerTask(
+            "t3",
+            "Add baz",
+            "Add the baz helper.",
+            ("baz exists",),
+            ("tui/baz.py",),
+            verify="pytest tests/test_baz.py",
+        )
+        return render_task_card(task, load_card_template())
+
+    def test_card_replaces_the_operator_prompt_and_history(self):
+        from tui.prompts import RESUMPTION_TEXT, build_task_prompt
+
+        prompt = build_task_prompt(
+            OPERATOR_PROMPT,
+            "coding",
+            resume_notes=("HISTORY_SENTINEL",),
+            resumed=True,
+            profile_text="CODING_PROFILE_SENTINEL",
+            topic_text="TOPIC_SENTINEL",
+            orchestrate_card=self.card(),
+        )
+
+        self.assertTrue(prompt.startswith("TASK_MODE: coding"))
+        self.assertIn("# t3 — Add baz", prompt)
+        self.assertIn("CODING_PROFILE_SENTINEL", prompt)
+        self.assertIn("Run this verification before reporting: pytest tests/test_baz.py", prompt)
+        self.assertIn("BEGIN_DAEDALUS_WORKER_REPORT", prompt)
+        self.assertIn(RESUMPTION_TEXT, prompt)
+        self.assertNotIn(OPERATOR_PROMPT, prompt)
+        self.assertNotIn("HISTORY_SENTINEL", prompt)
+        self.assertNotIn("TOPIC_SENTINEL", prompt)
+
+    def test_card_verify_command_reads_the_verify_section(self):
+        from tui.orchestrate_protocol import card_verify_command
+
+        self.assertEqual(card_verify_command(self.card()), "pytest tests/test_baz.py")
+        self.assertEqual(card_verify_command("# t\n\n## Verify\n(no verification command was given)\n"), "")
+        self.assertEqual(card_verify_command("# t\n\n## Goal\npytest\n"), "")

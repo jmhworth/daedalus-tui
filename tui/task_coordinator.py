@@ -203,6 +203,22 @@ class TaskRecord:
     execution_id: str | None = field(default=None, repr=False, compare=False)
     diagnostics_dir: Path | None = field(default=None, repr=False, compare=False)
     prompts_dir: Path | None = field(default=None, repr=False, compare=False)
+    # --- Orchestrate Mode worker fields ---------------------------------------
+    # A worker task belongs to a session and runs one card. The card markdown
+    # replaces the operator prompt in every agent prompt built for the task.
+    session_id: str | None = None
+    card_id: str | None = None
+    card_markdown: str | None = field(default=None, repr=False, compare=False)
+    # Per-task orchestrator options the dispatcher injects: the resolver
+    # selection and the hooks that place and read the card. Not persisted;
+    # sessions never resume after a restart.
+    resolver_selection: tuple[str, str, str] | None = field(default=None, repr=False, compare=False)
+    before_agent: Callable[[WorktreeContext], None] | None = field(default=None, repr=False, compare=False)
+    after_agent: Callable[..., None] | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def is_worker(self) -> bool:
+        return bool(self.session_id and self.card_id)
 
     @property
     def display_title(self) -> str:
@@ -378,11 +394,22 @@ class TaskCoordinator:
         reasoning: str,
         mode: str = "coding",
         topic: str | None = None,
+        *,
+        session_id: str | None = None,
+        card_id: str | None = None,
+        card_markdown: str | None = None,
+        resolver_selection: tuple[str, str, str] | None = None,
+        before_agent: Callable[[WorktreeContext], None] | None = None,
+        after_agent: Callable[..., None] | None = None,
     ) -> TaskRecord:
         """Start a new conversation from its first user prompt.
 
         The exact prompt is archived and the queued turn is persisted before
         the run is dispatched; a storage failure raises and launches nothing.
+
+        ``session_id``, ``card_id``, and ``card_markdown`` make the task an
+        Orchestrate Mode worker: its agent prompts are built from the card and
+        never from ``prompt``, which is only the inbox title and commit subject.
         """
         with self._lock:
             if self._closed:
@@ -400,6 +427,12 @@ class TaskCoordinator:
                 reasoning,
                 mode=mode,
                 topic=cleaned_topic,
+                session_id=session_id,
+                card_id=card_id,
+                card_markdown=card_markdown,
+                resolver_selection=resolver_selection,
+                before_agent=before_agent,
+                after_agent=after_agent,
             )
             record.title = generate_task_title(prompt, self.title_length, fallback_id=task_id)
             record.prompt_history = [prompt]
@@ -1249,12 +1282,25 @@ class TaskCoordinator:
             resume_notes += (record.retry_output_context,)
         record.retry_output_context = None
         execution_id = record.execution_id or record.task_id
+        # Worker-only options are passed only when set so orchestrator doubles
+        # with the plain signature keep working.
+        orchestrator_options: dict[str, object] = {}
+        if record.resolver_selection is not None:
+            orchestrator_options["resolver_selection"] = record.resolver_selection
+        if record.before_agent is not None:
+            orchestrator_options["before_agent"] = record.before_agent
+        if record.after_agent is not None:
+            orchestrator_options["after_agent"] = record.after_agent
+        run_options: dict[str, object] = {}
+        if record.card_markdown is not None:
+            run_options["orchestrate_card"] = record.card_markdown
         orchestrator = LocalOrchestrator(
             self.repository,
             self.runner,
             self.settings,
             lambda phase, message, kind="status": self._handle_event(record, run_id, phase, message, kind),
             integration_gate=self.integration.run_when_ready,
+            **orchestrator_options,
         )
         set_task_title = getattr(orchestrator, "set_task_title", None)
         if callable(set_task_title):
@@ -1273,6 +1319,7 @@ class TaskCoordinator:
                 resume_notes=resume_notes,
                 resume_from=record.resume_from,
                 topic_slug=record.topic,
+                **run_options,
             )
         except Exception as error:  # Keep one unexpected task failure isolated from the pool.
             log_event(
@@ -1623,6 +1670,8 @@ class TaskCoordinator:
                 project_key=self.project_key if record.turns else None,
                 diagnostics_dir=record.diagnostics_dir,
                 prompts_dir=record.prompts_dir,
+                session_id=record.session_id,
+                card_id=record.card_id,
             )
         except (OSError, ValueError) as error:
             # Persistent task history must never change orchestration behavior.
@@ -1727,6 +1776,8 @@ class TaskCoordinator:
                 prompt_history=prompt_history,
                 resume_from=resume_from,
                 title=title,
+                session_id=snapshot.get("session_id") if isinstance(snapshot.get("session_id"), str) else None,
+                card_id=snapshot.get("card_id") if isinstance(snapshot.get("card_id"), str) else None,
             )
             self._attach_storage_paths(record)
             self._restore_conversation(record, snapshot, restart_interrupted)

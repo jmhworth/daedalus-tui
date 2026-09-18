@@ -216,6 +216,29 @@ def parse_card_ticks(markdown: str) -> tuple[bool, ...]:
     return tuple(ticks)
 
 
+def card_verify_command(markdown: str) -> str:
+    """Return the command under a card's ``## Verify`` heading, or ``""``."""
+    section = _section(markdown.splitlines(), "verify")
+    for line in section:
+        text = line.strip()
+        if text and not text.startswith("(") and not text.startswith("```"):
+            return text
+    return ""
+
+
+def _section(lines: Sequence[str], name: str) -> list[str]:
+    section: list[str] = []
+    inside = False
+    for line in lines:
+        heading = _HEADING.match(line)
+        if heading:
+            inside = heading.group(1).strip().lower() == name
+            continue
+        if inside:
+            section.append(line)
+    return section
+
+
 def _checklist_section(lines: Sequence[str]) -> list[str]:
     section: list[str] = []
     inside = False

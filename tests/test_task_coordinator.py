@@ -1306,3 +1306,77 @@ class InterruptionAndFollowUpTests(unittest.TestCase):
         ran = []
         gate.run_when_ready(3, lambda: ran.append(True))
         self.assertEqual(ran, [True])
+
+
+class WorkerTaskSubmissionTests(unittest.TestCase):
+    """Orchestrate Mode workers are ordinary coding tasks carrying a card."""
+
+    def test_submit_with_a_card_produces_a_worker_prompt_without_the_operator_prompt(self):
+        from tui.agent_runner import AgentResult
+
+        class RecordingRunner:
+            def __init__(self):
+                self.requests = []
+
+            def run(self, request, on_event=None):
+                self.requests.append(request)
+                return AgentResult("claude", 0, "BEGIN_DAEDALUS_WORKER_REPORT {\"task\": \"t1\", \"status\": \"done\"} END_DAEDALUS_WORKER_REPORT")
+
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = RecordingRunner()
+            coordinator = TaskCoordinator(repository, runner, OrchestrationSettings(max_concurrent_tasks=1))
+            context = WorktreeContext(repository, "001", "base", "agent/task-001", repository / "worktree")
+            context.path.mkdir()
+            manager = unittest.mock.Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            hooks = []
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=unittest.mock.Mock(succeeded=True, output="")),
+                patch("tui.orchestrator.migrations_pending", return_value=False),
+                patch("tui.orchestrator.load_firebase_status", return_value=unittest.mock.Mock(registered=False)),
+            ):
+                record = coordinator.submit(
+                    "t1: Add parser",
+                    "claude",
+                    "claude-opus-5",
+                    "high",
+                    session_id="orc-001-abcdef12",
+                    card_id="t1",
+                    card_markdown="# t1 — Add parser\n\n## Goal\nCARD_SENTINEL\n\n## Checklist\n- [ ] parser\n",
+                    resolver_selection=("claude", "claude-fable-5-1", "high"),
+                    before_agent=lambda context: hooks.append(("before", context.path)),
+                    after_agent=lambda context, result: hooks.append(("after", context.path)),
+                )
+                record.future.result(timeout=5)
+            snapshot = coordinator.memory.get_tasks()[f"task-{record.task_id}"]
+            coordinator.shutdown()
+
+        self.assertTrue(record.is_worker)
+        self.assertEqual((record.session_id, record.card_id), ("orc-001-abcdef12", "t1"))
+        self.assertEqual(record.status, "completed")
+        self.assertEqual(len(runner.requests), 1)
+        prompt = runner.requests[0].prompt
+        self.assertIn("CARD_SENTINEL", prompt)
+        self.assertIn("BEGIN_DAEDALUS_WORKER_REPORT", prompt)
+        self.assertNotIn("t1: Add parser", prompt)
+        self.assertEqual(hooks, [("before", context.path), ("after", context.path)])
+        self.assertEqual((snapshot["session_id"], snapshot["card_id"]), ("orc-001-abcdef12", "t1"))
+
+    def test_worker_fields_are_restored_from_memory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            memory_path = repository / ".daedalus-memory.json"
+            TaskMemoryStore(memory_path).record_task(
+                "task-001-abcd1234", "t1: Add parser", "claude", "claude-opus-5", "high", "coding", "completed",
+                submitted_at=0, project=repository, logical_task_id="001-abcd1234",
+                session_id="orc-001-abcdef12", card_id="t1",
+            )
+            coordinator = TaskCoordinator(repository, object(), OrchestrationSettings(), memory_path=memory_path)
+            record = coordinator.get("001-abcd1234")
+            coordinator.shutdown()
+        self.assertIsNotNone(record)
+        self.assertEqual((record.session_id, record.card_id), ("orc-001-abcdef12", "t1"))
+        self.assertTrue(record.is_worker)

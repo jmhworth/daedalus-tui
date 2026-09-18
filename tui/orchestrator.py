@@ -27,9 +27,11 @@ from .git_worktree import (
     WorktreeContext,
 )
 from .project_config import load_project_worktree_settings
+from .orchestrate_protocol import load_role_rules
 from .prompts import (
     build_firebase_repair_prompt,
     build_migration_repair_prompt,
+    build_planner_prompt,
     build_repair_prompt,
     build_resolver_prompt,
     build_task_prompt,
@@ -42,11 +44,19 @@ from .verification import discover_commands, run_verification, truncate_diagnost
 EventCallback = Callable[[str, str, str], None]
 IntegrationGate = Callable[..., None]
 StopCheck = Callable[[], "str | None"]
+#: Builds the first agent prompt from the profile and topic the orchestrator
+#: loaded from the worktree; Orchestrate Mode uses it for planner turns.
+PromptBuilder = Callable[["str | None", "str | None"], str]
+BeforeAgentHook = Callable[[WorktreeContext], None]
+AfterAgentHook = Callable[[WorktreeContext, AgentResult], None]
 PROFILE_FILENAMES = {
     "coding": "coding.md",
     "plan": "planning.md",
     "integrating": "integrating.md",
 }
+#: Modes whose agent only reads the repository; the worktree is reset afterwards.
+PLANNING_MODES = frozenset({"plan", "orchestrate-plan"})
+READ_ONLY_MODES = frozenset({"ask", *PLANNING_MODES})
 #: Profiles shipped with Daedalus, used when a target project has no
 #: ``.agents/profiles`` of its own (projects opened by path rather than
 #: initialized by Daedalus).
@@ -133,6 +143,9 @@ class OrchestrationResult:
     # The user stopped the run without discarding anything; the task can
     # continue from the same worktree and branch.
     interrupted: bool = False
+    # Raw agent output of an ``orchestrate-plan`` run, for the dispatcher to
+    # parse into cards. Transcript events still carry the same text.
+    planner_output: str | None = None
 
 
 class AgentStopped(RuntimeError):
@@ -149,12 +162,22 @@ class LocalOrchestrator:
         settings: OrchestrationSettings,
         on_event: EventCallback,
         integration_gate: IntegrationGate | None = None,
+        resolver_selection: tuple[str, str, str] | None = None,
+        before_agent: BeforeAgentHook | None = None,
+        after_agent: AfterAgentHook | None = None,
     ):
         self.repository = repository.resolve()
         self.runner = runner
         self.settings = settings
         self.on_event = on_event
         self.integration_gate = integration_gate or (lambda _sequence, operation, *_extra: operation())
+        # Orchestrate Mode resolves conflicts with the planner's model, the
+        # role that knows the whole plan, instead of the worker's.
+        self.resolver_selection = resolver_selection
+        # Hooks around the first agent run: place a task card in the worktree
+        # before it, read the ticked card back after it and before the commit.
+        self.before_agent = before_agent
+        self.after_agent = after_agent
         self._tokens_consumed = 0
         self._gate_accepts_stop_check = _accepts_stop_check(self.integration_gate)
         self._task_title: str | None = None
@@ -177,7 +200,17 @@ class LocalOrchestrator:
         resume_notes: tuple[str, ...] = (),
         resume_from: str | None = None,
         topic_slug: str | None = None,
+        orchestrate_card: str | None = None,
+        prompt_builder: PromptBuilder | None = None,
     ) -> OrchestrationResult:
+        """Run one task end to end.
+
+        ``orchestrate_card`` marks a worker task: the agent and every repair
+        agent see the card instead of ``prompt``. ``prompt_builder`` replaces
+        the standard task prompt for the first agent run and receives the
+        profile and topic text loaded from the worktree; ``orchestrate-plan``
+        falls back to the bundled planner prompt when none is given.
+        """
         task_id = task_id or uuid.uuid4().hex[:12]
         LOGGER.info(
             "Orchestration started task=%s mode=%s provider=%s resume_from=%s topic=%s",
@@ -216,43 +249,63 @@ class LocalOrchestrator:
 
             selection = (provider, model, reasoning)
             commit_subject = task_commit_subject(prompt, task_id, self._task_title)
+            # Repair and resolver agents for a worker task see its card, never
+            # an operator prompt the worker itself was not given.
+            task_description = orchestrate_card if orchestrate_card is not None else prompt
+            planning = mode in PLANNING_MODES
             skip_to_integration = (
-                mode not in {"ask", "plan"}
+                mode not in READ_ONLY_MODES
                 and resume_from == "integration"
                 and existing_context is not None
             )
             if not skip_to_integration:
                 self.emit(
-                    "planning" if mode == "plan" else "agent",
+                    "planning" if planning else "agent",
                     f"Planning with {provider} in the isolated worktree."
-                    if mode == "plan"
+                    if planning
                     else f"Running {provider} in the isolated worktree.",
                 )
-                profile_text = self.load_profile(context.path, mode)
+                profile_text = self.load_profile(context.path, "plan" if planning else mode)
                 topic_text = self.load_topic(context.path, topic_slug)
-                result = self.run_agent(
-                    manager,
-                    context,
-                    selection,
-                    build_task_prompt(
+                if prompt_builder is not None:
+                    agent_prompt = prompt_builder(profile_text, topic_text)
+                elif mode == "orchestrate-plan":
+                    agent_prompt = build_planner_prompt(
+                        prompt, load_role_rules(), profile_text=profile_text, topic_text=topic_text
+                    )
+                else:
+                    agent_prompt = build_task_prompt(
                         prompt,
                         mode,
                         resume_notes,
                         resumed=existing_context is not None,
                         profile_text=profile_text,
                         topic_text=topic_text,
-                    ),
+                        orchestrate_card=orchestrate_card,
+                    )
+                if self.before_agent is not None:
+                    self.before_agent(context)
+                result = self.run_agent(
+                    manager,
+                    context,
+                    selection,
+                    agent_prompt,
                     control,
-                    event_phase="planning" if mode == "plan" else "agent",
+                    event_phase="planning" if planning else "agent",
                 )
+                if self.after_agent is not None:
+                    self.after_agent(context, result)
                 if not result.succeeded:
                     raise RuntimeError(result.error or "Agent execution failed.")
 
-                if mode in {"ask", "plan"}:
+                if mode in READ_ONLY_MODES:
                     manager.discard_graphify_changes(context.path)
-                if mode == "plan":
+                if planning:
                     manager.reset_task_to_base(context)
-                    self.emit("questioning", "Plan ready. Review it, answer questions, or start coding.")
+                    if mode == "plan":
+                        self.emit("questioning", "Plan ready. Review it, answer questions, or start coding.")
+                    else:
+                        self.emit("questioning", "Planner round finished; its worktree was reset.")
                     return OrchestrationResult(
                         True,
                         task_id,
@@ -261,6 +314,7 @@ class LocalOrchestrator:
                         context=context,
                         awaiting_plan=True,
                         tokens_consumed=self._completed_tokens(),
+                        planner_output=result.output if mode == "orchestrate-plan" else None,
                     )
                 if mode == "ask":
                     manager.remove_successful(context)
@@ -282,7 +336,7 @@ class LocalOrchestrator:
                     manager,
                     context,
                     selection,
-                    prompt,
+                    task_description,
                     control,
                     topic_slug=topic_slug,
                     commit_subject=commit_subject,
@@ -291,7 +345,7 @@ class LocalOrchestrator:
                     manager,
                     context,
                     selection,
-                    prompt,
+                    task_description,
                     control,
                     topic_slug=topic_slug,
                     commit_subject=commit_subject,
@@ -300,7 +354,7 @@ class LocalOrchestrator:
                     manager,
                     context,
                     selection,
-                    prompt,
+                    task_description,
                     control,
                     topic_slug=topic_slug,
                     commit_subject=commit_subject,
@@ -315,7 +369,7 @@ class LocalOrchestrator:
                     manager,
                     context,
                     selection,
-                    prompt,
+                    task_description,
                     control,
                     topic_slug=topic_slug,
                     commit_subject=commit_subject,
@@ -715,9 +769,15 @@ class LocalOrchestrator:
             context.task_id,
             self._task_title,
         )
+        if self.resolver_selection is not None:
+            selection = self.resolver_selection
         for attempt in range(1, self.settings.resolver_attempt_limit + 1):
             self._raise_if_stopped(control)
-            self.emit("resolving", f"Launching resolver attempt {attempt}/{self.settings.resolver_attempt_limit}.")
+            self.emit(
+                "resolving",
+                f"Launching resolver attempt {attempt}/{self.settings.resolver_attempt_limit}"
+                f" with {selection[0]} {selection[1]}.",
+            )
             profile_text = self.load_profile(context.path, "integrating")
             topic_text = self.load_topic(context.path, topic_slug)
             result = self.run_agent(

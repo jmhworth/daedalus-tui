@@ -1062,3 +1062,180 @@ class InterruptionTests(unittest.TestCase):
             ran = []
             orchestrator._run_integration_gate(7, lambda: ran.append(True), None)
         self.assertEqual((calls, ran), ([7], [True]))
+
+
+class OrchestrateModeOrchestratorTests(unittest.TestCase):
+    """Role changes for Orchestrate Mode: planner runs, resolver override, card hooks."""
+
+    def test_orchestrate_plan_resets_the_worktree_and_returns_the_raw_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult(
+                "claude", 0, "BEGIN_DAEDALUS_ORCHESTRATION {} END_DAEDALUS_ORCHESTRATION", tokens_consumed=9
+            )
+            context = WorktreeContext(repository, "orc", "base", "agent/task-orc", repository / "worktree")
+            (context.path / ".agents" / "profiles").mkdir(parents=True)
+            (context.path / ".agents" / "profiles" / "planning.md").write_text("PLANNING_PROFILE", encoding="utf-8")
+            manager = Mock()
+            manager.create.return_value = context
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository, runner, OrchestrationSettings(), lambda phase, message, kind: events.append((phase, kind))
+            )
+            built = []
+
+            def prompt_builder(profile_text, topic_text):
+                built.append((profile_text, topic_text))
+                return "PLANNER_PROMPT_SENTINEL"
+
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager):
+                result = orchestrator.run(
+                    "Build everything",
+                    "claude",
+                    "claude-fable-5-1",
+                    "high",
+                    mode="orchestrate-plan",
+                    prompt_builder=prompt_builder,
+                )
+
+        self.assertTrue(result.succeeded)
+        self.assertTrue(result.awaiting_plan)
+        self.assertEqual(result.planner_output, "BEGIN_DAEDALUS_ORCHESTRATION {} END_DAEDALUS_ORCHESTRATION")
+        self.assertEqual(result.tokens_consumed, 9)
+        self.assertEqual(built, [("PLANNING_PROFILE", None)])
+        self.assertEqual(runner.run.call_args.args[0].prompt, "PLANNER_PROMPT_SENTINEL")
+        manager.reset_task_to_base.assert_called_once_with(context)
+        manager.discard_graphify_changes.assert_called_once_with(context.path)
+        manager.commit_changes.assert_not_called()
+        manager.remove_successful.assert_not_called()
+        self.assertIn(("planning", "status"), events)
+
+    def test_orchestrate_plan_without_a_builder_uses_the_bundled_planner_prompt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "plan")
+            context = WorktreeContext(repository, "orc", "base", "agent/task-orc", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            orchestrator = LocalOrchestrator(repository, runner, OrchestrationSettings(), lambda *_: None)
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager):
+                result = orchestrator.run("Build everything", "claude", "claude-fable-5-1", "high", mode="orchestrate-plan")
+        self.assertEqual(result.planner_output, "plan")
+        prompt = runner.run.call_args.args[0].prompt
+        self.assertTrue(prompt.startswith("TASK_MODE: orchestrate-plan"))
+        self.assertIn("Build everything", prompt)
+        self.assertIn("BEGIN_DAEDALUS_ORCHESTRATION", prompt)
+
+    def test_resolver_runs_with_the_resolver_selection_and_sees_the_card(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(verification_commands=(("true",),), resolver_attempt_limit=2),
+                lambda phase, message, channel: events.append((phase, message)),
+                resolver_selection=("claude", "claude-fable-5-1", "high"),
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            manager.has_unmerged_paths.return_value = False
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+            ):
+                manager.merge_primary_into_task.side_effect = GitWorktreeError("merge conflict")
+                result = orchestrator.run(
+                    "OPERATOR_PROMPT_SENTINEL",
+                    "claude",
+                    "claude-opus-5",
+                    "high",
+                    orchestrate_card="# t1 — Card\n\n## Goal\nCARD_SENTINEL\n\n## Checklist\n- [ ] one\n\n## Verify\npytest\n",
+                )
+
+        self.assertTrue(result.succeeded)
+        requests = [call_args.args[0] for call_args in runner.run.call_args_list]
+        self.assertEqual([request.model for request in requests], ["claude-opus-5", "claude-fable-5-1"])
+        self.assertIn("CARD_SENTINEL", requests[0].prompt)
+        self.assertNotIn("OPERATOR_PROMPT_SENTINEL", requests[0].prompt)
+        self.assertTrue(requests[1].prompt.startswith("TASK_MODE: integrating"))
+        self.assertIn("CARD_SENTINEL", requests[1].prompt)
+        self.assertNotIn("OPERATOR_PROMPT_SENTINEL", requests[1].prompt)
+        self.assertTrue(any(phase == "resolving" and "claude-fable-5-1" in message for phase, message in events))
+
+    def test_repair_agents_for_a_worker_see_the_card_not_the_prompt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(verification_commands=(("true",),)),
+                lambda *_: None,
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch(
+                    "tui.orchestrator.run_verification",
+                    side_effect=[VerificationResult(False, "boom"), VerificationResult(True, ""), VerificationResult(True, "")],
+                ),
+            ):
+                result = orchestrator.run(
+                    "OPERATOR_PROMPT_SENTINEL",
+                    "claude",
+                    "claude-opus-5",
+                    "high",
+                    orchestrate_card="# t1 — Card\n\n## Goal\nCARD_SENTINEL\n\n## Checklist\n- [ ] one\n",
+                )
+
+        self.assertTrue(result.succeeded)
+        repair_prompt = runner.run.call_args_list[1].args[0].prompt
+        self.assertIn("Repair the failing verification suite", repair_prompt)
+        self.assertIn("CARD_SENTINEL", repair_prompt)
+        self.assertNotIn("OPERATOR_PROMPT_SENTINEL", repair_prompt)
+
+    def test_before_and_after_agent_hooks_receive_the_worktree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "WORKER_OUTPUT")
+            calls = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda *_: None,
+                before_agent=lambda context: calls.append(("before", context.path)),
+                after_agent=lambda context, result: calls.append(("after", context.path, result.output)),
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            context.path.mkdir()
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch("tui.orchestrator.migrations_pending", return_value=False),
+                patch("tui.orchestrator.load_firebase_status", return_value=FirebaseStatus(False, None)),
+            ):
+                result = orchestrator.run("Build it", "claude", "claude-opus-5", "high", orchestrate_card="# t1 — Card\n")
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual(calls, [("before", context.path), ("after", context.path, "WORKER_OUTPUT")])
+        # The card was read before the commit, so its ticks reflect the worker's run.
+        self.assertLess(
+            manager.method_calls.index(call.commit_changes(context.path, "Daedalus: Build it")),
+            len(manager.method_calls),
+        )

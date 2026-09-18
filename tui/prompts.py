@@ -3,10 +3,17 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from .orchestrate_protocol import card_verify_command, load_role_rules
 from .topics import embed_topic
 
 
 CONVERSATION_HEADER = "Conversation so far (earlier turns of this same task, oldest first):"
+RESUMPTION_TEXT = (
+    "This is a resumption of work already started in this existing worktree. "
+    "Do not restart the task or discard work that is already present. "
+    "First inspect the current state with git status and git diff, then continue "
+    "from the existing implementation and make only the updates still needed."
+)
 LATEST_INSTRUCTION_HEADER = "Latest instruction (respond to this one):"
 ORIGINAL_GOAL_HEADER = "Original request for this task:"
 
@@ -121,7 +128,27 @@ def build_task_prompt(
     resumed: bool = False,
     profile_text: str | None = None,
     topic_text: str | None = None,
+    orchestrate_card: str | None = None,
+    role_rules: str | None = None,
 ) -> str:
+    """Build the first agent prompt for a task.
+
+    ``orchestrate_card`` marks an Orchestrate Mode worker: the prompt is then
+    built by :func:`build_worker_prompt` from the card alone. ``prompt``,
+    ``topic_text``, and ``resume_notes`` are deliberately ignored in that case
+    so the worker never receives the operator's prompt or any history; only
+    the resumption sentence is kept when ``resumed`` is set.
+    """
+    if orchestrate_card is not None:
+        worker_prompt = build_worker_prompt(
+            orchestrate_card,
+            role_rules if role_rules is not None else load_role_rules(),
+            profile_text,
+            verify_command=card_verify_command(orchestrate_card),
+        )
+        if not resumed:
+            return worker_prompt
+        return f"{worker_prompt}\n\n{RESUMPTION_TEXT}"
     if mode == "ask":
         instructions = (
             "Answer the user's question using the repository as read-only context. "
@@ -169,12 +196,7 @@ def build_task_prompt(
     if not resumed:
         return task_prompt
 
-    continuation = (
-        "This is a resumption of work already started in this existing worktree. "
-        "Do not restart the task or discard work that is already present. "
-        "First inspect the current state with git status and git diff, then continue "
-        "from the existing implementation and make only the updates still needed."
-    )
+    continuation = RESUMPTION_TEXT
     cleaned_notes = [note.strip() for note in resume_notes if note.strip()]
     if cleaned_notes:
         continuation += "\n\nAdditional notes from the user:\n" + "\n\n".join(cleaned_notes)
