@@ -114,8 +114,9 @@ class LayoutSettings:
     """Safety guard and dimensions used by the responsive TUI.
 
     The wide controls are measured against their laid-out regions above this
-    width; the guard keeps very narrow terminals in compact mode while those
-    regions are not usable yet. Settings selectors below ``wide_control_min_width``
+    width: clipped toolbars wrap onto two rows first and compact mode is the
+    last resort. The guard keeps very narrow terminals in compact mode while
+    those regions are not usable yet. Settings selectors below ``wide_control_min_width``
     use the compact category/value picker instead of shrinking into unreadable
     controls.
     """

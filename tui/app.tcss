@@ -508,6 +508,47 @@ Screen {
     color: $text-muted;
 }
 
+/* Mid-width terminals keep the side-by-side workspace but wrap the task
+   toolbar and the settings row onto two rows instead of clipping them. */
+#screen.wrapped-toolbars #task-bar {
+    layout: grid;
+    grid-size: 4;
+    grid-gutter: 0 1;
+    height: auto;
+}
+
+#screen.wrapped-toolbars #task-bar #project-label {
+    display: none;
+}
+
+#screen.wrapped-toolbars #task-bar > * {
+    width: 1fr;
+    min-width: 0;
+    margin: 0;
+}
+
+#screen.wrapped-toolbars #settings {
+    layout: grid;
+    grid-size: 5;
+    grid-gutter: 0 1;
+    height: auto;
+}
+
+#screen.wrapped-toolbars #settings > * {
+    margin: 0;
+}
+
+#screen.wrapped-toolbars #orchestrate-roles {
+    layout: vertical;
+    height: auto;
+    align: left top;
+}
+
+#screen.wrapped-toolbars #orchestrate-roles > * {
+    width: 1fr;
+    margin-right: 0;
+}
+
 /* Narrow terminals use a vertical workspace and a two-level settings picker. */
 #screen.compact-width {
     padding: 1;

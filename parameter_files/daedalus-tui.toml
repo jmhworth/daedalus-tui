@@ -179,9 +179,10 @@ label = "Codex"
 command = []
 
 # Responsive safety guard and compact dimensions. Above the guard, the TUI
-# measures the wide controls' laid-out regions and enters compact mode if any
-# control is clipped. Compact mode uses a vertical workspace; short mode
-# reduces vertical chrome independently.
+# measures the wide controls' laid-out regions; a clipped toolbar first wraps
+# onto two rows with the workspace still side by side, and only enters compact
+# mode if the wrapped toolbars are clipped too. Compact mode uses a vertical
+# workspace; short mode reduces vertical chrome independently.
 [layout]
 compact_width = 100
 # Switch the wide settings row to the category/value picker when a selector

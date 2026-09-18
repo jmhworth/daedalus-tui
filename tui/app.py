@@ -11,6 +11,7 @@ import threading
 import time
 import uuid
 
+from rich.cells import cell_len
 from rich.text import Text
 from textual import events, on
 from textual.app import App, ComposeResult
@@ -1301,6 +1302,7 @@ class DaedalusTuiApp(App[None]):
         self._push_in_flight = False
         self._push_confirmation_branch: str | None = None
         self._compact_mode = False
+        self._wrapped_toolbars = False
         self._short_height_mode = False
         self._responsive_measure_pending = False
         self._displayed_error = ""
@@ -1768,13 +1770,16 @@ class DaedalusTuiApp(App[None]):
         width: int | None = None,
         height: int | None = None,
         compact: bool | None = None,
+        wrapped: bool = False,
     ) -> None:
         """Toggle responsive classes and dimensions after a viewport change.
 
         ``compact_width`` is a lower safety guard, not the primary wide-layout
         breakpoint. Above it, the actual laid-out controls are measured after
-        Textual has processed the style change so a clipped toolbar switches
-        to the compact settings picker immediately.
+        Textual has processed the style change. A clipped toolbar first wraps
+        onto two rows (``wrapped``) while the workspace stays side by side;
+        only when the wrapped toolbars are still clipped does the whole layout
+        switch to compact mode and the compact settings picker.
         """
         if not all(
             self.query(selector)
@@ -1785,10 +1790,13 @@ class DaedalusTuiApp(App[None]):
         height = self.size.height if height is None else height
         compact = width < self.settings.layout.compact_width if compact is None else compact
         short = height < self.settings.layout.short_height
+        wrapped = wrapped and not compact
         self._compact_mode = compact
+        self._wrapped_toolbars = wrapped
         self._short_height_mode = short
         screen = self.query_one("#screen", Vertical)
         screen.set_class(compact, "compact-width")
+        screen.set_class(wrapped, "wrapped-toolbars")
         screen.set_class(short, "short-height")
         task_sidebar = self.query_one("#task-sidebar", Vertical)
         prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
@@ -1819,13 +1827,20 @@ class DaedalusTuiApp(App[None]):
         self.screen.call_after_refresh(self._apply_measured_responsive_layout)
 
     def _apply_measured_responsive_layout(self) -> None:
-        """Switch to compact mode when wide controls extend past their bars."""
+        """Wrap the toolbars, then compact, when wide controls are clipped."""
         self._responsive_measure_pending = False
         if not self.query("#screen"):
             return
         width = self.size.width
         height = self.size.height
-        compact = width < self.settings.layout.compact_width or self._wide_controls_overflow()
+        compact = width < self.settings.layout.compact_width
+        if not compact and self._wide_controls_overflow():
+            if not self._wrapped_toolbars:
+                # Try the two-row toolbars first; the queued re-measurement
+                # falls back to compact mode if they are clipped as well.
+                self._apply_responsive_layout(width, height, wrapped=True)
+                return
+            compact = True
         if compact != self._compact_mode:
             self._apply_responsive_layout(width, height, compact=compact)
 
@@ -1848,8 +1863,14 @@ class DaedalusTuiApp(App[None]):
                 else []
             )
             for child in (*container.children, *nested):
+                if not child.display:
+                    continue
                 region = child.region
                 if region.width <= 0 or region.height <= 0:
+                    return True
+                # A button narrower than its label plus line padding wraps
+                # the label onto a second line.
+                if isinstance(child, Button) and region.width < cell_len(str(child.label)) + 2:
                     return True
                 if (
                     selector == settings_selector
@@ -1857,9 +1878,13 @@ class DaedalusTuiApp(App[None]):
                     and region.width < self.settings.layout.wide_control_min_width
                 ):
                     return True
+                # Controls pushed past the bar, or grown taller than it
+                # because their text wrapped, are clipped by the bar.
                 if (
                     region.x < available.x
                     or region.x + region.width > available.x + available.width
+                    or region.y < available.y
+                    or region.y + region.height > available.y + available.height
                 ):
                     return True
         return False
@@ -4679,7 +4704,9 @@ class DaedalusTuiApp(App[None]):
         else:
             self._render_selected_task_safely("orchestrate view closed")
             self.query_one("#prompt-input", DaedalusVimTextArea).focus()
-        self._queue_responsive_measurement()
+        # The two views have different toolbars, so start again from the
+        # single-row layout and let the measurement wrap or compact it.
+        self._apply_responsive_layout()
 
     def _active_orchestrator(self) -> OrchestrateCoordinator | None:
         return self._orchestrator_for(self._active_project_path)

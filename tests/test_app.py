@@ -499,21 +499,52 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(app._short_height_mode)
             self.assertEqual(app.query_one("#prompt-input").styles.height.value, 3)
 
-    async def test_responsive_layout_compacts_when_settings_selects_are_too_narrow(self):
+    async def test_responsive_layout_wraps_toolbars_before_compacting(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            await pilot.resize_terminal(125, 60)
+            # Too narrow for the toolbars even on two rows: compact mode.
+            await pilot.resize_terminal(110, 60)
             await pilot.pause()
-
+            await pilot.pause()
             self.assertTrue(app._compact_mode)
+            self.assertFalse(app._wrapped_toolbars)
             self.assertEqual(app.query_one("#settings").styles.display, "none")
             self.assertEqual(app.query_one("#compact-settings").styles.display, "block")
 
-            await pilot.resize_terminal(180, 40)
+            # A full-screen laptop terminal keeps the side-by-side workspace
+            # and wraps the task toolbar and settings row onto two rows.
+            await pilot.resize_terminal(140, 40)
+            await pilot.pause()
             await pilot.pause()
             self.assertFalse(app._compact_mode)
+            self.assertTrue(app._wrapped_toolbars)
+            screen = app.query_one("#screen")
+            self.assertTrue(screen.has_class("wrapped-toolbars"))
+            self.assertFalse(screen.has_class("compact-width"))
+            self.assertEqual(str(app.query_one("#main-workspace").styles.layout.name), "horizontal")
+            self.assertEqual(str(app.query_one("#task-bar").styles.layout.name), "grid")
             self.assertEqual(app.query_one("#settings").styles.display, "block")
             self.assertEqual(app.query_one("#compact-settings").styles.display, "none")
+            task_bar = app.query_one("#task-bar")
+            buttons = [button for button in task_bar.query(Button) if button.display]
+            self.assertEqual(len({button.region.y for button in buttons}), 2)
+            self.assertFalse(app._wide_controls_overflow())
+
+            # Once every control fits on one row, the toolbars unwrap.
+            await pilot.resize_terminal(240, 40)
+            await pilot.pause()
+            await pilot.pause()
+            self.assertFalse(app._compact_mode)
+            self.assertFalse(app._wrapped_toolbars)
+            self.assertEqual(str(app.query_one("#task-bar").styles.layout.name), "horizontal")
+            self.assertEqual(len({button.region.y for button in task_bar.query(Button)}), 1)
+
+            # Shrinking again re-wraps instead of dropping to compact mode.
+            await pilot.resize_terminal(140, 40)
+            await pilot.pause()
+            await pilot.pause()
+            self.assertFalse(app._compact_mode)
+            self.assertTrue(app._wrapped_toolbars)
 
     async def test_compact_settings_cascade_and_submission_snapshot(self):
         app, coordinator = self.make_app()
@@ -3562,10 +3593,21 @@ class OrchestrateViewTests(unittest.IsolatedAsyncioTestCase):
             roles = app.query_one("#orchestrate-roles")
             self.assertEqual(str(roles.styles.layout.name), "vertical")
 
+            # Mid-width terminals keep the wide workspace and stack the roles
+            # on their own rows; each role stays on one line.
             await pilot.resize_terminal(200, 50)
             await pilot.pause()
             await pilot.pause()
             self.assertFalse(app._compact_mode)
+            self.assertTrue(app._wrapped_toolbars)
+            self.assertEqual(str(app.query_one("#orchestrate-roles").styles.layout.name), "vertical")
+            self.assertEqual(str(app.query_one("#planner-role").styles.layout.name), "horizontal")
+
+            await pilot.resize_terminal(280, 50)
+            await pilot.pause()
+            await pilot.pause()
+            self.assertFalse(app._compact_mode)
+            self.assertFalse(app._wrapped_toolbars)
             self.assertEqual(str(app.query_one("#orchestrate-roles").styles.layout.name), "horizontal")
 
     async def test_orchestrate_draft_persists_across_relaunch(self):

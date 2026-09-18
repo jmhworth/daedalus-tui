@@ -50,14 +50,18 @@ return on the next launch, so the selector only
 ever grows by the projects you actually open, and an opened directory that no
 longer exists is dropped and forgotten at startup.
 
-The layout adapts to terminal size. Below the configured compact-width safety
-guard, or whenever a wide task/settings control is actually clipped, the task
-inbox becomes a short full-width panel, the main workspace stacks vertically,
-and the task toolbar's project and action controls remain available without
-clipping. The wide settings row is replaced by a category and value picker
-covering provider, model, reasoning, mode, topic, and operating branch. Short
-terminals also use a smaller prompt and reduced vertical chrome. Tune these
-defaults in the `[layout]` table of
+The layout adapts to terminal size in three tiers. Very wide terminals keep
+the task toolbar, the settings row, and the Orchestrate role row on single
+lines. When any of those controls would be clipped or would wrap its label,
+the toolbars wrap onto two rows (the roles stack one per row) while the task
+inbox and the workspace stay side by side; this is the layout most
+full-screen terminals get. Only below the configured compact-width safety
+guard, or when even the wrapped toolbars are clipped, does the task inbox
+become a short full-width panel, the main workspace stack vertically, and the
+wide settings row give way to a category and value picker covering provider,
+model, reasoning, mode, topic, and operating branch. Short terminals also use
+a smaller prompt and reduced vertical chrome. Tune these defaults in the
+`[layout]` table of
 `parameter_files/daedalus-tui.toml` (`compact_width`, `short_height`,
 `compact_task_sidebar_height`, and `compact_prompt_height`).
 
