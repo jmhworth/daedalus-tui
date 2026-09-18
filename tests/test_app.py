@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 from textual import events
 from textual.geometry import Offset
 from textual.selection import Selection as ScreenSelection
-from textual.widgets import Button, DataTable, Log, Select, Static, TextArea
+from textual.widgets import Button, DataTable, Input, Log, Select, Static, TextArea
 from vimkeys_input import VimMode
 
 from tui.transcript import TranscriptLog
@@ -3269,3 +3269,284 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FakeOrchestrateCoordinator:
+    """Stub dispatcher: records starts and stops and serves scripted sessions."""
+
+    def __init__(self):
+        self.callback = None
+        self.sessions_list = []
+        self.starts = []
+        self.stops = []
+
+    def set_event_callback(self, callback):
+        self.callback = callback
+
+    def start(self, prompt, planner_selection, worker_selection, max_workers, topic=None):
+        from tui.orchestrate_session import OrchestrationSession
+
+        self.starts.append((prompt, planner_selection, worker_selection, max_workers, topic))
+        session = OrchestrationSession(
+            session_id=f"orc-{len(self.sessions_list) + 1:03d}-deadbeef",
+            project_key="project",
+            prompt=prompt,
+            planner_selection=planner_selection,
+            worker_selection=worker_selection,
+            max_workers=max_workers,
+            status="planning",
+        )
+        self.sessions_list.append(session)
+        self.emit(session, "Session started.")
+        return session
+
+    def stop(self, session_id):
+        session = self.get(session_id)
+        if session is None or not session.active:
+            return False
+        self.stops.append(session_id)
+        session.status = "stopped"
+        self.emit(session, "Session stopped.")
+        return True
+
+    def sessions(self):
+        return tuple(self.sessions_list)
+
+    def get(self, session_id):
+        return next((session for session in self.sessions_list if session.session_id == session_id), None)
+
+    def plan_text(self, session):
+        return f"# Plan for {session.session_id}\n\n{session.summary}"
+
+    def shutdown(self):
+        return None
+
+    def emit(self, session, message, kind="status"):
+        from tui.orchestrate_coordinator import ORCHESTRATE_PHASE, SessionEventRecord
+
+        if self.callback:
+            record = SessionEventRecord(session.session_id, session.session_id, session.status, error=session.error)
+            self.callback(record, ORCHESTRATE_PHASE, message, kind)
+
+
+class OrchestrateViewTests(unittest.IsolatedAsyncioTestCase):
+    def make_app(self, **overrides):
+        from tui.config import OrchestrateSettings
+
+        coordinator = FakeCoordinator()
+        orchestrator = FakeOrchestrateCoordinator()
+        app = DaedalusTuiApp(
+            runner=FakeRunner(),
+            directory=Path("/workspace/project"),
+            settings=overrides.pop("settings", settings()),
+            coordinator=coordinator,
+            prompting_settings=prompting_settings(),
+            orchestrate_settings=overrides.pop("orchestrate_settings", OrchestrateSettings()),
+            orchestrate_coordinator=orchestrator,
+        )
+        return app, coordinator, orchestrator
+
+    async def test_button_and_ctrl_o_toggle_the_orchestrate_view_with_role_defaults(self):
+        from textual.widgets import ContentSwitcher
+
+        app, _, _ = self.make_app()
+        async with app.run_test() as pilot:
+            button = app.query_one("#orchestrate-mode-button", Button)
+            switcher = app.query_one("#view-switcher", ContentSwitcher)
+            self.assertEqual(str(button.label), "Orchestrate Mode")
+            self.assertEqual(switcher.current, "tasks-view")
+            self.assertEqual(app.query_one("#planner-model-select", Select).value, "claude-fable-5-1")
+            self.assertEqual(app.query_one("#worker-model-select", Select).value, "claude-opus-5")
+            self.assertEqual(app.query_one("#max-workers-input", Input).value, "3")
+            self.assertTrue(app.query_one("#orchestrate-stop-button", Button).disabled)
+
+            await pilot.resize_terminal(200, 50)
+            await pilot.pause()
+            await pilot.click("#orchestrate-mode-button")
+            await pilot.pause()
+            self.assertEqual(switcher.current, "orchestrate-view")
+            self.assertEqual(str(button.label), "Task Mode")
+            # Tab no longer toggles plan mode while the orchestrate view is shown.
+            await pilot.press("tab")
+            await pilot.pause()
+            self.assertEqual(app.query_one("#mode-select", Select).value, "coding")
+
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            self.assertEqual(switcher.current, "tasks-view")
+            self.assertEqual(str(button.label), "Orchestrate Mode")
+            from tui.app import GLOBAL_SHORTCUTS
+
+            self.assertIn("Ctrl+O", {shortcut for shortcut, _, _ in GLOBAL_SHORTCUTS})
+
+    async def test_start_submits_the_prompt_models_and_worker_count(self):
+        app, _, orchestrator = self.make_app()
+        async with app.run_test() as pilot:
+            app._set_orchestrate_view(True)
+            await pilot.pause()
+            app.query_one("#orchestrate-prompt", DaedalusVimTextArea).load_text("Build the whole feature")
+            app.query_one("#worker-model-select", Select).value = "claude-sonnet-5"
+            workers = app.query_one("#max-workers-input", Input)
+            workers.value = "2"
+            app._start_orchestration()
+            await pilot.pause()
+
+            self.assertEqual(len(orchestrator.starts), 1)
+            prompt, planner, worker, max_workers, topic = orchestrator.starts[0]
+            self.assertEqual(prompt, "Build the whole feature")
+            self.assertEqual(planner, ("claude", "claude-fable-5-1", "high"))
+            self.assertEqual(worker, ("claude", "claude-sonnet-5", "high"))
+            self.assertEqual(max_workers, 2)
+            self.assertIsNone(topic)
+            self.assertEqual(app.query_one("#orchestrate-prompt", DaedalusVimTextArea).text, "")
+            self.assertFalse(app.query_one("#orchestrate-stop-button", Button).disabled)
+            self.assertIn("orc-001-deadbeef", str(app.query_one("#orchestrate-status", Static).render()))
+            self.assertEqual(app.query_one("#orchestrate-session-select", Select).value, "orc-001-deadbeef")
+
+            # Ctrl+C in the orchestrate view stops the session, not one worker.
+            await pilot.press("ctrl+c")
+            await pilot.pause()
+            self.assertEqual(orchestrator.stops, ["orc-001-deadbeef"])
+            self.assertTrue(app.query_one("#orchestrate-stop-button", Button).disabled)
+
+    async def test_max_workers_is_validated_and_empty_prompts_are_rejected(self):
+        app, _, orchestrator = self.make_app()
+        async with app.run_test() as pilot:
+            app._set_orchestrate_view(True)
+            await pilot.pause()
+            app._start_orchestration()
+            await pilot.pause()
+            self.assertEqual(orchestrator.starts, [])
+            self.assertIn("empty", str(app.query_one("#orchestrate-status", Static).render()))
+
+            app.query_one("#orchestrate-prompt", DaedalusVimTextArea).load_text("Do it")
+            for bad in ("0", "9", "", "abc"):
+                app.query_one("#max-workers-input", Input).value = bad
+                app._start_orchestration()
+                await pilot.pause()
+                self.assertEqual(orchestrator.starts, [], bad)
+                self.assertIn("from 1 to 8", str(app.query_one("#orchestrate-status", Static).render()))
+
+            app.query_one("#max-workers-input", Input).value = "8"
+            app._start_orchestration()
+            await pilot.pause()
+            self.assertEqual(len(orchestrator.starts), 1)
+            self.assertEqual(orchestrator.starts[0][3], 8)
+
+    async def test_session_events_render_the_board_log_and_summary(self):
+        from tui.orchestrate_protocol import PlannerTask, WorkerReport
+        from tui.orchestrate_session import TaskCard
+
+        app, coordinator, orchestrator = self.make_app()
+        async with app.run_test() as pilot:
+            app._set_orchestrate_view(True)
+            await pilot.pause()
+            session = orchestrator.start("Build it", ("claude", "claude-fable-5-1", "high"), ("claude", "claude-opus-5", "high"), 2)
+            worker = coordinator.submit("t1: Add parser\n\nParse.", "claude", "claude-opus-5", "high")
+            worker.session_id = session.session_id
+            worker.card_id = "t1"
+            session.round = 1
+            session.summary = "Two cards."
+            session.status = "waiting"
+            session.tokens_planner = 40
+            session.tokens_workers = 12
+            session.log.extend(["Planner round 1 of 6.", "Dispatched t1 as task task-1; 900 characters of context."])
+            t1 = TaskCard(PlannerTask("t1", "Add parser", "Parse.", ("a", "b"), ("tui/parse.py",)))
+            t1.status = "running"
+            t1.worker_task_id = worker.task_id
+            t1.prompt_chars = 900
+            t1.checklist_state = (True, False)
+            t2 = TaskCard(PlannerTask("t2", "Add renderer with a very long title that must be clipped", "Render.", ("c",), ("tui/render.py",), depends_on=("t1",)))
+            t2.status = "waiting"
+            session.cards = {"t1": t1, "t2": t2}
+            orchestrator.emit(session, "Dispatched t1 as task task-1.")
+            await pilot.pause()
+
+            board = app.query_one("#orchestrate-board", DataTable)
+            self.assertEqual(board.row_count, 2)
+            self.assertEqual([column.label.plain for column in board.columns.values()], ["Card", "Title", "Status", "Checklist", "Worker task", "Tokens"])
+            first = board.get_row_at(0)
+            self.assertEqual(first[0], "t1")
+            self.assertEqual(first[2], "running")
+            self.assertEqual(first[3], "1/2")
+            self.assertEqual(first[4], worker.task_id)
+            second = board.get_row_at(1)
+            self.assertTrue(str(second[1]).endswith("…"))
+            self.assertLessEqual(len(str(second[1])), 28)
+            self.assertEqual(second[2], "waiting")
+            log = app.query_one("#planner-log", TranscriptLog)
+            self.assertIn("Planner round 1 of 6.", log.messages)
+            summary = str(app.query_one("#orchestrate-summary", Static).render())
+            self.assertIn("Planner tokens: 40", summary)
+            self.assertIn("Worker tokens: 12", summary)
+            self.assertIn("Total: 52", summary)
+            self.assertIn("900 chars over 1 tasks", summary)
+            self.assertFalse(app.query_one("#orchestrate-stop-button", Button).disabled)
+            # The inbox marks the worker row with its card id.
+            app._refresh_task_list()
+            task_list = app.query_one("#task-list", DataTable)
+            rows = [task_list.get_row_at(index) for index in range(task_list.row_count)]
+            self.assertTrue(any(str(row[1]).startswith("⋯ t1") for row in rows), rows)
+            # Selecting the board row focuses the worker task.
+            app._focus_board_row("t1")
+            await pilot.pause()
+            self.assertEqual(app._selected_task_id, worker.task_id)
+            self.assertIn("Selected worker task", str(app.query_one("#orchestrate-status", Static).render()))
+            # The viewer shows the plan while the orchestrate view is active.
+            with patch.object(app._viewer(), "show_sources") as show_sources:
+                app._refresh_orchestrate_view()
+                sources = show_sources.call_args.args[1]
+            self.assertEqual(sources[0].label, "Plan")
+            self.assertIn("Plan for orc-001-deadbeef", sources[0].text)
+
+            session.status = "completed"
+            session.error = None
+            t1.status = "promoted"
+            t2.status = "promoted"
+            orchestrator.emit(session, "Session completed.")
+            await pilot.pause()
+            self.assertTrue(app.query_one("#orchestrate-stop-button", Button).disabled)
+            self.assertIn("completed", str(app.query_one("#orchestrate-status", Static).render()))
+
+    async def test_compact_layout_stacks_the_role_row_and_keeps_the_task_bar_usable(self):
+        app, _, _ = self.make_app(settings=replace(settings(), layout=LayoutSettings(100, 30, 6, 3)))
+        async with app.run_test() as pilot:
+            self.assertTrue(app._compact_mode)
+            app._set_orchestrate_view(True)
+            await pilot.pause()
+            self.assertEqual(app.query_one("#orchestrate-mode-button").styles.display, "block")
+            self.assertTrue(app.query_one("#screen").has_class("compact-width"))
+            roles = app.query_one("#orchestrate-roles")
+            self.assertEqual(str(roles.styles.layout.name), "vertical")
+
+            await pilot.resize_terminal(200, 50)
+            await pilot.pause()
+            await pilot.pause()
+            self.assertFalse(app._compact_mode)
+            self.assertEqual(str(app.query_one("#orchestrate-roles").styles.layout.name), "horizontal")
+
+    async def test_orchestrate_draft_persists_across_relaunch(self):
+        prompting = prompting_settings()
+        from tui.config import OrchestrateSettings
+
+        app = DaedalusTuiApp(
+            runner=FakeRunner(), directory=Path("/workspace/project"), settings=settings(),
+            coordinator=FakeCoordinator(), prompting_settings=prompting,
+            orchestrate_settings=OrchestrateSettings(), orchestrate_coordinator=FakeOrchestrateCoordinator(),
+        )
+        async with app.run_test() as pilot:
+            app._set_orchestrate_view(True)
+            await pilot.pause()
+            app.query_one("#orchestrate-prompt", DaedalusVimTextArea).insert("Half-written orchestration prompt")
+            await pilot.pause()
+        reopened = DaedalusTuiApp(
+            runner=FakeRunner(), directory=Path("/workspace/project"), settings=settings(),
+            coordinator=FakeCoordinator(), prompting_settings=prompting,
+            orchestrate_settings=OrchestrateSettings(), orchestrate_coordinator=FakeOrchestrateCoordinator(),
+        )
+        async with reopened.run_test() as pilot:
+            await pilot.pause()
+            self.assertEqual(
+                reopened.query_one("#orchestrate-prompt", DaedalusVimTextArea).text,
+                "Half-written orchestration prompt",
+            )

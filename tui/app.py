@@ -18,15 +18,17 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, Log, Select, Static, TextArea
+from textual.widgets import Button, Checkbox, ContentSwitcher, DataTable, Footer, Header, Input, Log, Select, Static, TextArea
 from textual.widgets.select import InvalidSelectValueError
 from .agent_runner import AgentRunner
 from .clipboard import copy_to_system_clipboard, paste_from_system_clipboard
 from .config import (
     CodingStatisticsSettings,
+    OrchestrateSettings,
     PromptingSettings,
     TuiSettings,
     load_coding_statistics_settings,
+    load_orchestrate_settings,
     load_orchestration_settings,
     load_prompting_settings,
     load_tui_settings,
@@ -50,6 +52,8 @@ from .git_worktree import (
     remote_exists,
 )
 from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
+from .orchestrate_coordinator import ORCHESTRATE_PHASE, OrchestrateCoordinator
+from .orchestrate_session import OrchestrationSession
 from .project_initializer import (
     BACKENDS,
     initialize_project,
@@ -167,6 +171,7 @@ GLOBAL_SHORTCUTS = (
     ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
     ("Ctrl+T", "Show coding statistics and total Claude usage", "show_statistics"),
     ("Ctrl+H", "Show pushed commit history", "show_push_history"),
+    ("Ctrl+O", "Toggle Orchestrate Mode", "toggle_orchestrate_mode"),
 )
 
 
@@ -1186,6 +1191,8 @@ class DaedalusTuiApp(App[None]):
         statistics_settings: CodingStatisticsSettings | None = None,
         prompting_settings: PromptingSettings | None = None,
         usage_monitor: UsageMonitor | None = None,
+        orchestrate_settings: OrchestrateSettings | None = None,
+        orchestrate_coordinator: object | None = None,
     ) -> None:
         super().__init__()
         self.launch_root = (directory or Path.cwd()).resolve()
@@ -1193,6 +1200,7 @@ class DaedalusTuiApp(App[None]):
         self.settings = settings or load_tui_settings()
         self.statistics_settings = statistics_settings or load_coding_statistics_settings()
         self.orchestration_settings = load_orchestration_settings()
+        self.orchestrate_settings = orchestrate_settings or self._load_orchestrate_settings()
         self.prompting = prompting_settings or load_prompting_settings()
         # Prompt archives and diagnostics live under the TUI's own storage
         # root, never under the target project or the working directory.
@@ -1242,6 +1250,16 @@ class DaedalusTuiApp(App[None]):
         self.projects = tuple(discovered)
         self._coordinators: dict[Path, TaskCoordinator] = {}
         self._external_coordinator = coordinator
+        # One Orchestrate Mode dispatcher per project, created beside the
+        # task coordinator the first time the project's view is used.
+        self._orchestrators: dict[Path, OrchestrateCoordinator] = {}
+        self._external_orchestrator = orchestrate_coordinator
+        self._orchestrate_view_shown = False
+        self._selected_session_id: str | None = None
+        self._orchestrate_board_rows: list[tuple[str, str | None]] = []
+        self._orchestrate_draft_dirty = False
+        self._orchestrate_draft_timer = None
+        self._suppress_orchestrate_draft_events = False
         self._active_project_path = active_project
         self.directory = active_project
         self._remember_project(active_project)
@@ -1311,8 +1329,17 @@ class DaedalusTuiApp(App[None]):
             self._viewer_visible = bool(
                 self.memory.get_ui_preference("output_viewer_visible", self.prompting.viewer_visible_by_default)
             )
+            self._orchestrate_view_shown = bool(self.memory.get_ui_preference("orchestrate_view", False))
         except (OSError, ValueError):
             pass
+
+    def _load_orchestrate_settings(self) -> OrchestrateSettings:
+        """Load the Orchestrate Mode parameter file, falling back to its defaults."""
+        try:
+            return load_orchestrate_settings(tui_settings=self.settings)
+        except (OSError, ValueError) as error:
+            LOGGER.warning("Orchestrate Mode settings unavailable, using defaults: %s", error)
+            return OrchestrateSettings()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -1351,6 +1378,22 @@ class DaedalusTuiApp(App[None]):
                 yield Button("Register Backend", id="register-backend-button")
                 yield Button("Sign In", id="sign-in-button")
                 yield Button("New Task", id="new-task-button", variant="primary")
+                yield Button(
+                    "Task Mode" if self._orchestrate_view_shown else "Orchestrate Mode",
+                    id="orchestrate-mode-button",
+                )
+            with ContentSwitcher(
+                id="view-switcher",
+                initial="orchestrate-view" if self._orchestrate_view_shown else "tasks-view",
+            ):
+                with Vertical(id="tasks-view"):
+                    yield from self._compose_tasks_view()
+                with Vertical(id="orchestrate-view"):
+                    yield from self._compose_orchestrate_view()
+
+    def _compose_tasks_view(self) -> ComposeResult:
+        """The ordinary task view: settings, output, plan review, composer."""
+        if True:
             # The model and effort lists depend on the default provider: the
             # Claude default model is not a Codex option, so building these
             # controls from the Codex lists would make the initial value
@@ -1464,6 +1507,51 @@ class DaedalusTuiApp(App[None]):
                     yield Button("Retry", id="retry-button", disabled=True)
                     yield Static("Idle", id="status")
 
+    def _compose_orchestrate_view(self) -> ComposeResult:
+        """Orchestrate Mode: role row, prompt, actions, board, planner log, summary."""
+        orchestrate = self.orchestrate_settings
+        with Horizontal(id="orchestrate-roles"):
+            yield Static("Planner", classes="orchestrate-role-label")
+            yield Select(
+                self._role_model_options(orchestrate.planner_provider, orchestrate.planner_model),
+                value=orchestrate.planner_model,
+                allow_blank=False,
+                id="planner-model-select",
+            )
+            yield Static("Worker", classes="orchestrate-role-label")
+            yield Select(
+                self._role_model_options(orchestrate.worker_provider, orchestrate.worker_model),
+                value=orchestrate.worker_model,
+                allow_blank=False,
+                id="worker-model-select",
+            )
+            yield Static("Workers", classes="orchestrate-role-label")
+            yield Input(
+                value=str(orchestrate.default_max_workers),
+                type="integer",
+                id="max-workers-input",
+                tooltip=f"1 to {orchestrate.max_workers_limit} workers",
+            )
+        yield DaedalusVimTextArea(
+            id="orchestrate-prompt",
+            placeholder="Describe the whole change; the planner splits it into worker cards...",
+        )
+        with Horizontal(id="orchestrate-actions"):
+            yield Button("Start", id="orchestrate-start-button", variant="primary")
+            yield Button("Stop", id="orchestrate-stop-button", variant="error", disabled=True)
+            yield Select([], prompt="Session…", allow_blank=True, id="orchestrate-session-select")
+            yield Static("Idle", id="orchestrate-status", markup=False)
+        yield DataTable(id="orchestrate-board", cursor_type="row")
+        yield TranscriptLog(id="planner-log", auto_scroll=True)
+        yield Static("", id="orchestrate-summary", markup=False)
+
+    def _role_model_options(self, provider: str, default_model: str) -> list[tuple[str, str]]:
+        """Model choices for one Orchestrate role, always including its default."""
+        options = [(option.label, option.value) for option in self.settings.models_for(provider)]
+        if default_model and default_model not in {value for _, value in options}:
+            options.insert(0, (default_model, default_model))
+        return options
+
     def on_mount(self) -> None:
         if not self._logging_status.available:
             self._logging_status = configure_debug_logging(
@@ -1499,6 +1587,8 @@ class DaedalusTuiApp(App[None]):
             self._set_error(f"Local prompt/error storage is unavailable: {self._storage_error}")
             self._set_status("Storage unavailable")
         self.query_one("#output", TranscriptLog).set_user_color(self.screen.rich_style.color)
+        self._load_orchestrate_draft()
+        self._refresh_orchestrate_view()
         self._start_usage_polling()
 
     # ------------------------------------------------------------------
@@ -1548,7 +1638,7 @@ class DaedalusTuiApp(App[None]):
 
     def on_key(self, event: events.Key) -> None:
         """Add Vim-like navigation without changing TextArea insert behavior."""
-        if event.key == "tab" and len(self.screen_stack) == 1:
+        if event.key == "tab" and len(self.screen_stack) == 1 and not self._orchestrate_view_shown:
             self.action_toggle_plan_mode()
             event.stop()
             return
@@ -1594,6 +1684,7 @@ class DaedalusTuiApp(App[None]):
     def on_unmount(self) -> None:
         self._textual_unmounted = True
         self._close_composer_draft()
+        self._flush_orchestrate_draft()
         _unregister_app_for_thread_exit(self)
         shutdown_complete = self._shutdown_coordinators("Textual app unmount")
         if shutdown_complete:
@@ -1672,7 +1763,8 @@ class DaedalusTuiApp(App[None]):
 
     def _wide_controls_overflow(self) -> bool:
         """Return whether wide-layout controls are clipped or too narrow."""
-        for selector in ("#task-bar", "#settings"):
+        settings_selector = "#orchestrate-roles" if self._orchestrate_view_shown else "#settings"
+        for selector in ("#task-bar", settings_selector):
             containers = self.query(selector)
             if not containers:
                 continue
@@ -1685,7 +1777,7 @@ class DaedalusTuiApp(App[None]):
                 if region.width <= 0 or region.height <= 0:
                     return True
                 if (
-                    selector == "#settings"
+                    selector == settings_selector
                     and isinstance(child, Select)
                     and region.width < self.settings.layout.wide_control_min_width
                 ):
@@ -1776,7 +1868,20 @@ class DaedalusTuiApp(App[None]):
             self._flush_draft(force=True)
         except Exception as error:
             log_exception("Could not flush the composer draft during shutdown", error)
+        try:
+            self._flush_orchestrate_draft()
+        except Exception as error:
+            log_exception("Could not flush the orchestrate draft during shutdown", error)
         shutdown_complete = True
+        # Sessions stop first so their loops do not dispatch into a closing
+        # task coordinator; the task coordinator then stops the workers.
+        for orchestrator in self._orchestrators.values():
+            if hasattr(orchestrator, "set_event_callback"):
+                orchestrator.set_event_callback(None)
+            try:
+                orchestrator.shutdown()
+            except Exception as error:
+                log_exception("Orchestrate coordinator shutdown failed", error)
         for coordinator in self._coordinators.values():
             if hasattr(coordinator, "set_event_callback"):
                 coordinator.set_event_callback(None)
@@ -1793,7 +1898,7 @@ class DaedalusTuiApp(App[None]):
         self._submit_prompt()
 
     def action_toggle_plan_mode(self) -> None:
-        if len(self.screen_stack) != 1:
+        if len(self.screen_stack) != 1 or self._orchestrate_view_shown:
             return
         self._toggle_plan_mode()
 
@@ -1823,7 +1928,16 @@ class DaedalusTuiApp(App[None]):
         if len(self.screen_stack) != 1:
             # Modal dialogs keep their own cancel/close behavior.
             return
+        if self._orchestrate_view_shown:
+            # In Orchestrate Mode the interrupt stops the whole session.
+            self._stop_orchestration()
+            return
         self._interrupt_task()
+
+    def action_toggle_orchestrate_mode(self) -> None:
+        if len(self.screen_stack) != 1:
+            return
+        self._set_orchestrate_view(not self._orchestrate_view_shown)
 
     def action_toggle_output_viewer(self) -> None:
         self._set_viewer_visible(not self._viewer_visible)
@@ -1936,6 +2050,12 @@ class DaedalusTuiApp(App[None]):
             self._submit_prompt()
         elif event.button.id == "new-task-button":
             self._start_new_task()
+        elif event.button.id == "orchestrate-mode-button":
+            self._set_orchestrate_view(not self._orchestrate_view_shown)
+        elif event.button.id == "orchestrate-start-button":
+            self._start_orchestration()
+        elif event.button.id == "orchestrate-stop-button":
+            self._stop_orchestration()
         elif event.button.id == "new-project-button":
             self.action_show_new_project()
         elif event.button.id == "create-topic-button":
@@ -1987,6 +2107,13 @@ class DaedalusTuiApp(App[None]):
         if event.select.id == "prompt-history-select":
             if not self._suppress_history_select and event.value not in _SELECT_EMPTY:
                 self._load_prompt_history_entry(str(event.value))
+            return
+        if event.select.id == "orchestrate-session-select":
+            if event.value not in _SELECT_EMPTY and str(event.value) != self._selected_session_id:
+                self._selected_session_id = str(event.value)
+                self._refresh_orchestrate_view()
+            return
+        if event.select.id in {"planner-model-select", "worker-model-select"}:
             return
         if event.select.id == "compact-settings-category":
             if event.value != getattr(event.select, "_latest_value", event.value):
@@ -2260,6 +2387,9 @@ class DaedalusTuiApp(App[None]):
             self._draft_revision += 1
             self._draft_dirty = True
             self._schedule_draft_save()
+        if event.text_area.id == "orchestrate-prompt" and not self._suppress_orchestrate_draft_events:
+            self._orchestrate_draft_dirty = True
+            self._schedule_orchestrate_draft_save()
 
     def on_vim_text_area_mode_changed(self, event) -> None:
         """Keep the compact Insert/Normal/Visual indicator current."""
@@ -2676,6 +2806,9 @@ class DaedalusTuiApp(App[None]):
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Focus a task from the cross-project update inbox."""
         row_key = str(event.row_key.value)
+        if event.data_table.id == "orchestrate-board":
+            self._focus_board_row(row_key)
+            return
         task_target = self._task_rows.get(row_key)
         if task_target is None:
             return
@@ -2737,9 +2870,15 @@ class DaedalusTuiApp(App[None]):
 
     def _apply_task_event(self, record: TaskRecord, phase: str, message: str, kind: str) -> None:
         try:
+            if phase == ORCHESTRATE_PHASE:
+                self._apply_session_event(record, message, kind)
+                return
             project_path = self._project_for_record(record)
             if project_path is None:
                 return
+            if getattr(record, "is_worker", False) and kind != "message":
+                # A worker settling or advancing changes its card on the board.
+                self._refresh_orchestrate_view()
             row_key = self._task_row_key(project_path, record.task_id)
             is_selected = (
                 project_path == self._active_project_path
@@ -2820,7 +2959,38 @@ class DaedalusTuiApp(App[None]):
         if hasattr(coordinator, "set_event_callback"):
             coordinator.set_event_callback(self._on_task_event)
         self._coordinators[project_path] = coordinator
+        # The Orchestrate Mode dispatcher lives beside the task coordinator so
+        # its restored sessions are visible before the operator starts one.
+        self._orchestrator_for(project_path)
         return coordinator
+
+    def _orchestrator_for(self, project_path: Path) -> OrchestrateCoordinator | None:
+        """Return the project's Orchestrate Mode dispatcher, creating it once."""
+        project_path = project_path.resolve()
+        if project_path in self._orchestrators:
+            return self._orchestrators[project_path]
+        task_coordinator = self._coordinator_for(project_path)
+        if self._external_orchestrator is not None:
+            orchestrator = self._external_orchestrator
+            self._external_orchestrator = None
+        else:
+            try:
+                orchestrator = OrchestrateCoordinator(
+                    task_coordinator,
+                    self.runner,
+                    task_coordinator.settings,
+                    self.orchestrate_settings,
+                    self.storage,
+                    self.memory,
+                    self._on_task_event,
+                )
+            except Exception as error:
+                log_exception(f"Could not create the Orchestrate coordinator for {project_path}", error)
+                return None
+        if hasattr(orchestrator, "set_event_callback"):
+            orchestrator.set_event_callback(self._on_task_event)
+        self._orchestrators[project_path] = orchestrator
+        return orchestrator
 
     def _effective_primary_branch(self, project_path: Path) -> str:
         """Memory override for the project, else the parameter-file default."""
@@ -3244,6 +3414,10 @@ class DaedalusTuiApp(App[None]):
         self._refresh_backend_button()
         self._refresh_task_list()
         self._render_selected_task_safely("project switch")
+        self._flush_orchestrate_draft()
+        self._selected_session_id = None
+        self._load_orchestrate_draft()
+        self._refresh_orchestrate_view()
         if draft:
             self._load_composer(None, draft)
             self._draft_dirty = True
@@ -3389,9 +3563,12 @@ class DaedalusTuiApp(App[None]):
         for project_path, record in rows:
             row_key = self._task_row_key(project_path, record.task_id)
             self._task_rows[row_key] = (project_path, record.task_id)
-            project_name = self._fit_task_cell(
-                project_names.get(project_path, project_path.name), project_width
-            )
+            project_name = project_names.get(project_path, project_path.name)
+            card_id = getattr(record, "card_id", None)
+            if getattr(record, "is_worker", False) and card_id:
+                # Worker tasks of an Orchestrate session carry their card id.
+                project_name = f"⋯ {card_id}"
+            project_name = self._fit_task_cell(project_name, project_width)
             summary = " ".join(self._record_title(record).split())
             summary = self._fit_task_cell(summary, task_width)
             marker = "!" if row_key in self._updated_task_rows else ""
@@ -4392,6 +4569,272 @@ class DaedalusTuiApp(App[None]):
             return
         self._mark_task_current_session(record)
         self._set_status("Retrying")
+
+    # ------------------------------------------------------------------
+    # Orchestrate Mode view
+    # ------------------------------------------------------------------
+
+    def _set_orchestrate_view(self, shown: bool) -> None:
+        """Switch between the task view and the orchestrate view."""
+        switcher = self.query("#view-switcher")
+        if not switcher:
+            return
+        self._orchestrate_view_shown = shown
+        switcher.first().current = "orchestrate-view" if shown else "tasks-view"
+        buttons = self.query("#orchestrate-mode-button")
+        if buttons:
+            buttons.first().label = "Task Mode" if shown else "Orchestrate Mode"
+        try:
+            self.memory.set_ui_preference("orchestrate_view", shown)
+        except (OSError, ValueError):
+            pass
+        if shown:
+            self._refresh_orchestrate_view()
+            self.query_one("#orchestrate-prompt", DaedalusVimTextArea).focus()
+        else:
+            self._render_selected_task_safely("orchestrate view closed")
+            self.query_one("#prompt-input", DaedalusVimTextArea).focus()
+        self._queue_responsive_measurement()
+
+    def _active_orchestrator(self) -> OrchestrateCoordinator | None:
+        return self._orchestrator_for(self._active_project_path)
+
+    def _orchestrate_selections(self) -> tuple[tuple[str, str, str], tuple[str, str, str], int] | None:
+        """Read the role row; report the first invalid control and return None."""
+        orchestrate = self.orchestrate_settings
+        planner_model = str(self.query_one("#planner-model-select", Select).value)
+        worker_model = str(self.query_one("#worker-model-select", Select).value)
+        workers_text = self.query_one("#max-workers-input", Input).value.strip()
+        try:
+            workers = int(workers_text)
+        except ValueError:
+            workers = 0
+        if not 1 <= workers <= orchestrate.max_workers_limit:
+            self._set_orchestrate_status(
+                f"Workers must be a whole number from 1 to {orchestrate.max_workers_limit}"
+            )
+            self.query_one("#max-workers-input", Input).focus()
+            return None
+        planner = (orchestrate.planner_provider, planner_model, orchestrate.planner_reasoning)
+        worker = (orchestrate.worker_provider, worker_model, orchestrate.worker_reasoning)
+        return planner, worker, workers
+
+    def _start_orchestration(self) -> None:
+        prompt_widget = self.query_one("#orchestrate-prompt", DaedalusVimTextArea)
+        text = prompt_widget.text
+        if not text.strip():
+            self._set_orchestrate_status("Prompt cannot be empty")
+            prompt_widget.focus()
+            return
+        selections = self._orchestrate_selections()
+        if selections is None:
+            return
+        planner, worker, workers = selections
+        orchestrator = self._active_orchestrator()
+        if orchestrator is None:
+            self._set_orchestrate_status("Orchestrate Mode is unavailable for this project")
+            return
+        self._flush_orchestrate_draft()
+        try:
+            session = orchestrator.start(text, planner, worker, workers, topic=self._selected_topic())
+        except (RuntimeError, ValueError, OSError) as error:
+            self._set_orchestrate_status(f"Could not start: {error}")
+            return
+        self._selected_session_id = session.session_id
+        self._suppress_orchestrate_draft_events = True
+        try:
+            prompt_widget.load_text("")
+        finally:
+            self._suppress_orchestrate_draft_events = False
+        self._orchestrate_draft_dirty = False
+        try:
+            self.prompt_store.delete_draft(self._active_project_path, None, draft_id="orchestrate")
+        except (PromptStoreError, OSError):
+            pass
+        self._refresh_orchestrate_view()
+        self._set_orchestrate_status(f"Session {session.session_id} started")
+
+    def _stop_orchestration(self) -> None:
+        orchestrator = self._active_orchestrator()
+        session = self._selected_session()
+        if orchestrator is None or session is None:
+            self._set_orchestrate_status("No session selected")
+            return
+        if not orchestrator.stop(session.session_id):
+            self._set_orchestrate_status("Session is not running")
+            return
+        self._refresh_orchestrate_view()
+        self._set_orchestrate_status(f"Stopping {session.session_id}")
+
+    def _selected_session(self) -> OrchestrationSession | None:
+        orchestrator = self._orchestrators.get(self._active_project_path.resolve())
+        if orchestrator is None:
+            return None
+        sessions = list(orchestrator.sessions())
+        if not sessions:
+            return None
+        if self._selected_session_id is not None:
+            for session in sessions:
+                if session.session_id == self._selected_session_id:
+                    return session
+        self._selected_session_id = sessions[-1].session_id
+        return sessions[-1]
+
+    def _apply_session_event(self, record, message: str, kind: str) -> None:
+        session_id = getattr(record, "session_id", None)
+        if session_id and self._selected_session_id is None:
+            self._selected_session_id = session_id
+        self._refresh_orchestrate_view()
+        if message and self._orchestrate_view_shown:
+            self._set_orchestrate_status(message)
+
+    def _refresh_orchestrate_view(self) -> None:
+        """Render the session selector, board, planner log, and summary."""
+        if not self.query("#orchestrate-board"):
+            return
+        orchestrator = self._orchestrators.get(self._active_project_path.resolve())
+        sessions = list(orchestrator.sessions()) if orchestrator is not None else []
+        session = self._selected_session()
+        session_select = self.query_one("#orchestrate-session-select", Select)
+        options = [
+            (f"{item.session_id} · {item.status}", item.session_id) for item in reversed(sessions)
+        ]
+        current = tuple(value for _label, value in getattr(session_select, "_options", ()))
+        if current != tuple(value for _, value in options):
+            session_select.set_options(_literal_select_options(options))
+        if session is not None and session_select.value != session.session_id:
+            try:
+                session_select.value = session.session_id
+            except InvalidSelectValueError:
+                pass
+        board = self.query_one("#orchestrate-board", DataTable)
+        board.clear(columns=True)
+        title_width = self.orchestrate_settings.board_title_width
+        for label, width in (
+            ("Card", 5),
+            ("Title", title_width),
+            ("Status", 11),
+            ("Checklist", 9),
+            ("Worker task", 13),
+            ("Tokens", 7),
+        ):
+            board.add_column(label, width=width)
+        self._orchestrate_board_rows = []
+        stop_button = self.query_one("#orchestrate-stop-button", Button)
+        log = self.query_one("#planner-log", TranscriptLog)
+        log.clear()
+        summary = self.query_one("#orchestrate-summary", Static)
+        if session is None:
+            stop_button.disabled = True
+            summary.update("No orchestration session yet.")
+            self.query_one("#orchestrate-status", Static).update("Idle")
+            return
+        for card in session.ordered_cards():
+            board.add_row(
+                card.card_id,
+                self._fit_task_cell(" ".join(card.task.title.split()), title_width),
+                card.status,
+                card.ticks_text,
+                card.worker_task_id or "—",
+                str(card.tokens),
+                key=card.card_id,
+            )
+            self._orchestrate_board_rows.append((card.card_id, card.worker_task_id))
+        stop_button.disabled = not session.active
+        limit = max(1, self.orchestrate_settings.planner_log_lines)
+        lines: list[str] = []
+        for entry in session.log:
+            lines.extend(entry.splitlines() or [""])
+        for line in lines[-limit:]:
+            log.write_message(line or " ")
+        summary.update(
+            f"Planner tokens: {session.tokens_planner}    Worker tokens: {session.tokens_workers}    "
+            f"Total: {session.tokens_total}    "
+            f"Context sent to workers: {session.worker_prompt_chars} chars over {session.dispatched_cards} tasks"
+        )
+        status_text = f"{session.session_id}: {session.status} (round {session.round})"
+        if session.error:
+            status_text += f" — {' '.join(session.error.split())[:160]}"
+        self.query_one("#orchestrate-status", Static).update(status_text)
+        if self._orchestrate_view_shown:
+            self._refresh_orchestrate_viewer(session, orchestrator)
+
+    def _refresh_orchestrate_viewer(self, session: OrchestrationSession, orchestrator) -> None:
+        """Show the session's PLAN.md in the Markdown viewer."""
+        viewer = self._viewer()
+        if viewer is None:
+            return
+        plan_text = getattr(orchestrator, "plan_text", None)
+        text = plan_text(session) if callable(plan_text) else session.summary
+        identity = f"{session.session_id} · {session.status} · round {session.round}"
+        viewer.show_sources(
+            f"{self._active_project_path}::{session.session_id}",
+            [ViewerSource(LATEST_SOURCE, "Plan", text, identity)],
+            final=not session.active,
+        )
+
+    def _focus_board_row(self, card_id: str) -> None:
+        worker_task_id = next(
+            (task_id for item_id, task_id in self._orchestrate_board_rows if item_id == card_id), None
+        )
+        if not worker_task_id:
+            self._set_orchestrate_status(f"{card_id} has no worker task yet")
+            return
+        self._focus_task(self._active_project_path, worker_task_id)
+        self._set_orchestrate_status(f"Selected worker task {worker_task_id} for {card_id}")
+
+    def _set_orchestrate_status(self, status: str) -> None:
+        nodes = self.query("#orchestrate-status")
+        if nodes:
+            nodes.first().update(status)
+
+    def _schedule_orchestrate_draft_save(self) -> None:
+        if self._orchestrate_draft_timer is not None:
+            return
+        delay = self.prompting.draft_autosave_delay_ms / 1000
+        if delay <= 0:
+            self._flush_orchestrate_draft()
+            return
+        self._orchestrate_draft_timer = self.set_timer(delay, self._orchestrate_draft_timer_fired)
+
+    def _orchestrate_draft_timer_fired(self) -> None:
+        self._orchestrate_draft_timer = None
+        self._flush_orchestrate_draft()
+
+    def _flush_orchestrate_draft(self) -> None:
+        """Save the orchestrate prompt under its own draft key."""
+        if self._orchestrate_draft_timer is not None:
+            self._orchestrate_draft_timer.stop()
+            self._orchestrate_draft_timer = None
+        if not self._orchestrate_draft_dirty:
+            return
+        nodes = self.query("#orchestrate-prompt")
+        if not nodes:
+            return
+        text = nodes.first().text
+        try:
+            if text.strip():
+                self.prompt_store.save_draft(self._active_project_path, None, text, draft_id="orchestrate")
+            else:
+                self.prompt_store.delete_draft(self._active_project_path, None, draft_id="orchestrate")
+            self._orchestrate_draft_dirty = False
+        except (PromptStoreError, OSError) as error:
+            self._set_orchestrate_status(f"Draft not saved: {error}")
+
+    def _load_orchestrate_draft(self) -> None:
+        nodes = self.query("#orchestrate-prompt")
+        if not nodes:
+            return
+        try:
+            draft = self.prompt_store.load_draft(self._active_project_path, None, draft_id="orchestrate")
+        except (PromptStoreError, OSError):
+            draft = None
+        self._suppress_orchestrate_draft_events = True
+        try:
+            nodes.first().load_text(draft.text if draft is not None else "")
+        finally:
+            self._suppress_orchestrate_draft_events = False
+        self._orchestrate_draft_dirty = False
 
     def _set_status(self, status: str) -> None:
         self.query_one("#status", Static).update(status)
