@@ -645,6 +645,60 @@ class ScenarioTests(unittest.TestCase):
         self.assertIn("Session 3 prompt.", context)
         self.assertNotIn("Current.", context)
 
+    def test_planner_tool_reference_pattern_targets_tool_usage_not_nouns(self):
+        from tui.orchestrate_coordinator import PLANNER_TOOL_REFERENCE
+
+        for text in (
+            "Use the Sites building skill and its environment reference to propose a stack.",
+            "Skill(sites) returns the supported environments.",
+            "Apply the deployment plugin before writing the doc.",
+            "Consult the hosting plugin docs.",
+        ):
+            self.assertTrue(PLANNER_TOOL_REFERENCE.search(text), text)
+        for text in (
+            "Add a skills section to the profile page.",
+            "List the plugins directory contents.",
+            "Document the required skill level of operators.",
+        ):
+            self.assertFalse(PLANNER_TOOL_REFERENCE.search(text), text)
+
+    def test_card_that_needs_a_planner_skill_is_sent_back_for_correction(self):
+        """The orc-007 failure: a Codex planner told a Claude worker to use the Sites skill."""
+        bad = card("p1", "docs/contracts.md")
+        bad["checklist"] = ["Use the Sites building skill and its environment reference to propose a stack."]
+        runner = ScriptedRunner(
+            [
+                planner_payload("First try.", [bad]),
+                planner_payload("Plain words.", [card("p1", "docs/contracts.md")]),
+                planner_payload("Done.", [], done=True),
+            ]
+        )
+        manager = self.manager()
+        tasks, coordinator = self.build(runner)
+        patches = self.patches(manager)
+        for item in patches:
+            item.start()
+        try:
+            session = coordinator.start(OPERATOR_PROMPT, PLANNER, WORKER, max_workers=1)
+            self.wait_for(session)
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+            for item in patches:
+                item.stop()
+
+        self.assertEqual(session.status, "completed", session.error)
+        self.assertEqual(len(runner.planner_prompts), 3)
+        rejection = runner.planner_prompts[1]
+        self.assertIn("Your previous reply was rejected", rejection)
+        self.assertIn("tells its worker to use a skill or plugin", rejection)
+        self.assertIn("Sites building skill", rejection)
+        self.assertTrue(any(line.startswith("Planner payload rejected:") and "'p1'" in line for line in session.log))
+        # Every planner turn spells out what a worker session has.
+        for prompt in runner.planner_prompts:
+            self.assertIn("Workers run on Claude Code CLI (claude-opus-5)", prompt)
+        self.assertEqual([record.card_id for record in tasks.tasks()], ["p1"])
+
     def test_sessions_restore_as_stopped_after_a_restart(self):
         tasks = TaskCoordinator(self.repository, object(), OrchestrationSettings(), memory_path=self.memory.path)
         coordinator = OrchestrateCoordinator(

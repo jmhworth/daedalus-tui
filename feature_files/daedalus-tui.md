@@ -210,3 +210,4 @@ HACKING
 - 2026-09-05: Removed the blank option from the project selector so direct-child labels are the only displayed project choices.
 - 2026-09-13: Added opt-in personal shared-Supabase schema registration from New Project and the project task bar (file scaffolding only).
 - 2026-09-13: Repaired Textual 8.2 compatibility for responsive styling and compact selector cascades, including delayed event filtering and Scalar-aware resize assertions.
+- 2026-09-18: Installed `SIGINT`/`SIGTERM`/`SIGHUP` handlers before the Textual loop starts (`install_signal_guards`): a stray `SIGINT` used to be caught by asyncio's default handler, which cancelled the event loop and closed the TUI with no return code, no unmount, and no log line; it is now handled like `Ctrl+C`, and the other two exit gracefully with agents paused, all logged with the terminal's signal state.

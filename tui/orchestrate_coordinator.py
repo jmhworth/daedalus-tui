@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import re
 import subprocess
 from threading import Condition, Lock, Thread
 import time
@@ -43,6 +44,7 @@ from .orchestrate_session import (
 )
 from .orchestrator import BUNDLED_PROFILE_ROOT, LocalOrchestrator, OrchestrationSettings
 from .prompts import (
+    describe_worker_environment,
     bounded_digest,
     build_planner_prompt,
     build_planner_round_prompt,
@@ -67,6 +69,18 @@ _CARD_STATUS_FOR_TASK = {
     "integrating": "integrating",
     "resolving": "integrating",
 }
+
+
+#: Card text that hands the worker a tool from the planner's own session: an
+#: explicit skill invocation, "use/apply/invoke ... skill|plugin", or "the X
+#: skill". Ordinary nouns such as "a skills section" do not match.
+PLANNER_TOOL_REFERENCE = re.compile(
+    r"Skill\(|"
+    r"\b(?:use|using|apply|applying|invoke|invoking|run|running|load|loading|consult|consulting|"
+    r"install|installing|call|calling)\b[^.\n]{0,60}?\b(?:skill|plugin)s?\b|"
+    r"\bthe\s+(?:[\w-]+\s+){0,3}(?:skill|plugin)\b(?!\s+(?:level|set|gap|shortage)s?\b)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -317,7 +331,11 @@ class OrchestrateCoordinator:
                 return
             self._log(session, output)
             payload = parse_planner_payload(output, known_ids=session.cards)
-            conflict = self._round_conflict(session, payload) if payload.valid else None
+            conflict = (
+                (self._environment_conflict(payload) or self._round_conflict(session, payload))
+                if payload.valid
+                else None
+            )
             if payload.valid and conflict is None:
                 self.store.write_plan(session, raw_payload=output)
                 self._apply_payload(session, payload)
@@ -358,6 +376,7 @@ class OrchestrateCoordinator:
                     repository_map=self._repository_map(),
                     project_context=self._project_context(session),
                     context_filename=self.orchestrate.context_filename,
+                    worker_environment=describe_worker_environment(session.worker_selection),
                 )
             else:
                 prompt = build_planner_round_prompt(
@@ -368,6 +387,7 @@ class OrchestrateCoordinator:
                     profile_text,
                     session.round,
                     self.orchestrate.planner_round_limit,
+                    worker_environment=describe_worker_environment(session.worker_selection),
                 )
             return prompt + rejected
 
@@ -683,6 +703,29 @@ class OrchestrateCoordinator:
     def _all_promoted(self, session: OrchestrationSession) -> bool:
         promoted = self._promoted_ids(session)
         return bool(session.cards) and all(card.card_id in promoted for card in session.cards.values())
+
+    def _environment_conflict(self, payload: PlannerPayload) -> str | None:
+        """Reject a card that sends its worker after a planner-side skill or plugin.
+
+        The planner and the workers may run on different CLIs, and a card
+        such as "use the Sites building skill" left a worker reporting
+        partial because that skill existed only in the planner's session.
+        The rejection goes back to the planner as a corrective retry.
+        """
+        for task in payload.tasks:
+            for text in (task.title, task.goal, task.interfaces, *task.checklist):
+                match = PLANNER_TOOL_REFERENCE.search(text)
+                if match:
+                    excerpt = " ".join(text.split())
+                    if len(excerpt) > 120:
+                        excerpt = excerpt[:117] + "..."
+                    return (
+                        f"Planner task {task.task_id!r} tells its worker to use a skill or plugin "
+                        f"({excerpt!r}). Workers run in their own agent sessions and have none of "
+                        "your skills, plugins, MCP servers, or reference files; rewrite the item as a "
+                        "plain requirement the worker can meet from the repository and the card alone."
+                    )
+        return None
 
     def _round_conflict(self, session: OrchestrationSession, payload: PlannerPayload) -> str | None:
         """Reject new cards whose scope overlaps a card that is still unsettled."""

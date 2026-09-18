@@ -371,6 +371,35 @@ def planner_round_label(round_number: int, round_limit: int = 0) -> str:
     return label
 
 
+PROVIDER_ENVIRONMENTS: dict[str, str] = {
+    "claude": "Claude Code CLI",
+    "codex": "Codex CLI",
+    "cursor": "Cursor CLI",
+}
+
+
+def describe_worker_environment(worker_selection: tuple[str, str, str] | None) -> str:
+    """One paragraph telling the planner what a worker session does and does not have.
+
+    The planner and its workers can run on different CLIs. A card that says
+    "use the Sites skill" because the planner's CLI ships one sends a worker
+    after a tool it does not have, so the planner is told, in the prompt and
+    not only in the rules, that workers see the repository worktree, their
+    own standard tools, and the card, and nothing from the planner's session.
+    """
+    if not worker_selection:
+        return ""
+    provider, model, _reasoning = worker_selection
+    cli = PROVIDER_ENVIRONMENTS.get(str(provider).strip().lower(), str(provider))
+    return (
+        f"Workers run on {cli} ({model}) in their own agent sessions, each with only its Git "
+        "worktree, that CLI's standard file and shell tools, and its card. They have none of "
+        "your skills, plugins, MCP servers, or files outside the worktree, so a card must never "
+        "tell a worker to invoke a skill or plugin or to read a reference from your session; "
+        "write the requirement itself, in plain words, into the card."
+    )
+
+
 def build_planner_prompt(
     user_prompt: str,
     role_rules: str | None = None,
@@ -381,6 +410,7 @@ def build_planner_prompt(
     repository_map: str = "",
     project_context: str = "",
     context_filename: str = "",
+    worker_environment: str = "",
 ) -> str:
     """Build the first planner turn: decompose one operator prompt into cards.
 
@@ -414,6 +444,7 @@ def build_planner_prompt(
         "between them are dispatched together; size and order the waves accordingly. A task that "
         "declares depends_on is dispatched only after those tasks are promoted, so its worktree "
         f"already contains their changes.{hint}\n\n"
+        f"{_paragraph(worker_environment)}"
         f"{PLANNER_ROUNDS_TEXT}\n\n"
         f"{PLANNER_SPEED_TEXT}{(' ' + PLANNER_MAP_TEXT) if repository_map.strip() else ''}\n\n"
         f"{PLANNER_PAYLOAD_INSTRUCTIONS}\n\n"
@@ -430,6 +461,7 @@ def build_planner_round_prompt(
     profile_text: str | None = None,
     round_number: int = 2,
     round_limit: int = 0,
+    worker_environment: str = "",
 ) -> str:
     """Build a later planner turn from a bounded status digest, not transcripts.
 
@@ -459,6 +491,7 @@ def build_planner_round_prompt(
         "add cards merely to use another round.\n\n"
         "Promoted cards are already merged into the branch this worktree was cut from, so read "
         "only what a new card needs and answer promptly.\n\n"
+        f"{_paragraph(worker_environment)}"
         f"{PLANNER_PAYLOAD_INSTRUCTIONS}\n\n"
         "Inspect the repository as read-only context. Do not modify files or create generated "
         f"artifacts. {ORCHESTRATE_BOUNDARY}"
@@ -556,6 +589,11 @@ def _embedded_topic(topic_text: str | None, mode: str) -> str:
     if topic_text is None:
         return ""
     return embed_topic(topic_text, mode)
+
+
+def _paragraph(text: str) -> str:
+    """Return ``text`` as one prompt paragraph, or nothing when it is empty."""
+    return f"{text.strip()}\n\n" if text.strip() else ""
 
 
 def _embedded_project_context(project_context: str, context_filename: str = "") -> str:

@@ -69,6 +69,16 @@ repository exploration.
   from it, which is what makes "assign the cards you already made" work in a
   fresh session instead of failing on a bare repository. A failed write or
   push is logged on the session and never fails it.
+- **Cards may only use what a worker has**: the planner and workers can run on
+  different CLIs (a Codex planner once told Claude workers to "use the Sites
+  building skill", which only Codex ships). `describe_worker_environment`
+  puts the worker CLI, model, and the rule into every planner turn, the
+  planner rules forbid planner-side skills, plugins, MCP servers, and
+  references in cards, and `_environment_conflict` rejects a payload whose
+  card text matches `PLANNER_TOOL_REFERENCE` (tool-usage phrasing, not nouns
+  like "a skills section") through the same corrective retry as scope
+  conflicts. Workers are told to do such items with their own tools and name
+  the missing dependency in `errors`.
 - **Interface to orchestration**: worktrees, verification, repairs, the
   integration gate, promotion, and the conflict resolver all belong to
   `feature_files/daedalus-tui-orchestration.md`. Orchestrate Mode only selects
@@ -162,3 +172,8 @@ HACKING
   planner turn embeds it bounded by `planner_context_chars`, and the planner
   rules tell the planner to continue from it. Context-file pushes arrive as
   session events and are recorded in the Push log like task pushes.
+- 2026-09-18: Rejected cards that send a worker after a planner-side skill or
+  plugin (`PLANNER_TOOL_REFERENCE`, corrective retry), described the worker
+  environment in every planner turn, and added the matching planner and
+  worker rules, after a Codex planner's "use the Sites building skill" item
+  left a Claude worker partial.

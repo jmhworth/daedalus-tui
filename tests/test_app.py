@@ -1,4 +1,6 @@
 import json
+import os
+import signal
 import tempfile
 import threading
 import unittest
@@ -14,7 +16,10 @@ from vimkeys_input import VimMode
 
 from tui.transcript import TranscriptLog
 from tui.app import (
+    GUARDED_SIGNALS,
     OPEN_DIRECTORY_VALUE,
+    external_signal_plan,
+    install_signal_guards,
     CodingStatisticsScreen,
     DaedalusTuiApp,
     KeyboardShortcutsScreen,
@@ -264,6 +269,51 @@ def prompting_settings():
         data_root=Path(tempfile.mkdtemp(prefix="daedalus-tui-tests-")),
         draft_autosave_delay_ms=0,
     )
+
+
+class SignalGuardTests(unittest.TestCase):
+    """Stray signals reach the app instead of asyncio's task-cancelling handler."""
+
+    def setUp(self):
+        self._saved = {signum: signal.getsignal(signum) for signum in GUARDED_SIGNALS}
+
+    def tearDown(self):
+        for signum, handler in self._saved.items():
+            signal.signal(signum, handler)
+
+    def test_signal_plan_maps_sigint_to_interrupt_and_the_rest_to_exit(self):
+        self.assertEqual(external_signal_plan(signal.SIGINT), ("interrupt", "SIGINT"))
+        self.assertEqual(external_signal_plan(signal.SIGTERM), ("exit", "SIGTERM"))
+        self.assertEqual(external_signal_plan(signal.SIGHUP), ("exit", "SIGHUP"))
+
+    def test_install_replaces_the_default_handler_and_delivers_to_the_app(self):
+        app = Mock()
+        install_signal_guards(app)
+        # asyncio.run installs its own SIGINT handler only over the default one.
+        self.assertIsNot(signal.getsignal(signal.SIGINT), signal.default_int_handler)
+        os.kill(os.getpid(), signal.SIGINT)
+        app._on_external_signal.assert_called_once_with(signal.SIGINT)
+
+    def test_sigint_schedules_the_ctrl_c_interrupt_on_the_loop(self):
+        app = Mock(spec=DaedalusTuiApp)
+        app._loop = Mock()
+        app.is_running = True
+        DaedalusTuiApp._on_external_signal(app, signal.SIGINT)
+        app._loop.call_soon_threadsafe.assert_called_once_with(app._interrupt_from_signal, "SIGINT")
+        app._shutdown_coordinators.assert_not_called()
+
+    def test_sigterm_exits_gracefully_and_pauses_agents_without_a_loop(self):
+        app = Mock(spec=DaedalusTuiApp)
+        app._loop = Mock()
+        app.is_running = True
+        DaedalusTuiApp._on_external_signal(app, signal.SIGTERM)
+        app._loop.call_soon_threadsafe.assert_called_once_with(app._exit_from_signal, "SIGTERM")
+        before_loop = Mock(spec=DaedalusTuiApp)
+        before_loop._loop = None
+        before_loop.is_running = False
+        DaedalusTuiApp._on_external_signal(before_loop, signal.SIGHUP)
+        before_loop._shutdown_coordinators.assert_called_once()
+        self.assertIn("SIGHUP", before_loop._shutdown_coordinators.call_args.args[0])
 
 
 class TuiAppTests(unittest.IsolatedAsyncioTestCase):

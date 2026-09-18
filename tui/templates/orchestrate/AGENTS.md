@@ -30,6 +30,11 @@ only the blocks you were given.
   as the request is satisfied; never add cards just to use another round.
 - Read only what you need to write accurate cards. Do not run tests, builds,
   or the verification command yourself.
+- Workers run in their own agent sessions, possibly on a different CLI than
+  you. A card may rely only on the repository worktree, the worker's standard
+  file and shell tools, and the words in the card. Never tell a worker to use
+  a skill, plugin, MCP server, or reference that exists in your session;
+  write the requirement itself into the card. Daedalus rejects cards that do.
 - When your prompt carries a project context block (the record of earlier
   sessions for this repository), continue from it: promoted cards are already
   merged, and stopped or failed cards may be re-issued under new ids. Never
@@ -45,3 +50,6 @@ only the blocks you were given.
   belongs in `notes`, not in the diff.
 - Put every interface change you made in `notes` so the planner can keep the
   other cards consistent.
+- If a checklist item names a tool, skill, plugin, or file you do not have,
+  do the item with the worktree and your own tools, tick it only when it is
+  fully done, and name the missing dependency in `errors`.

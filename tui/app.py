@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import replace
 from pathlib import Path
 from typing import Callable
+import signal
 import sys
 import threading
 import time
@@ -131,6 +132,62 @@ def _shutdown_apps_before_thread_join() -> None:
             app._shutdown_before_thread_join()
         except BaseException as error:
             log_exception("Pre-thread-shutdown coordinator cleanup failed", error)
+
+
+#: Signals another process can send to the TUI. Textual runs the terminal
+#: with ISIG off, so a keyboard Ctrl+C never becomes SIGINT; one that does
+#: arrive comes from outside (a child, a shell, the OS) and must not be left
+#: to asyncio's default handling.
+GUARDED_SIGNALS: tuple[int, ...] = tuple(
+    getattr(signal, name) for name in ("SIGINT", "SIGTERM", "SIGHUP") if hasattr(signal, name)
+)
+
+
+def external_signal_plan(signum: int) -> tuple[str, str]:
+    """Return ``(action, signal name)`` for a signal delivered to the TUI.
+
+    SIGINT is what Ctrl+C means inside Daedalus, so it becomes the same
+    interrupt action instead of killing the app; SIGTERM and SIGHUP become a
+    graceful exit that pauses the running agents and records their state.
+    """
+    try:
+        name = signal.Signals(signum).name
+    except ValueError:
+        name = str(signum)
+    return ("interrupt" if signum == signal.SIGINT else "exit"), name
+
+
+def install_signal_guards(app: "DaedalusTuiApp") -> None:
+    """Route stray signals through the app instead of asyncio's default handler.
+
+    ``asyncio.run`` installs a SIGINT handler that cancels the main task when
+    it finds the default one in place, and Textual then returns from ``run()``
+    as if nothing happened: no return code, no unmount hook, the session gone.
+    Installing Daedalus' own handlers first keeps that handler out, and the
+    app decides what the signal means. Must be called from the main thread
+    before ``app.run()``; it is a no-op elsewhere.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        return
+
+    def handle(signum: int, _frame: object) -> None:
+        app._on_external_signal(signum)
+
+    for signum in GUARDED_SIGNALS:
+        try:
+            signal.signal(signum, handle)
+        except (OSError, ValueError) as error:
+            LOGGER.warning("Could not install a handler for signal %s: %s", signum, error)
+
+
+def _terminal_isig_enabled() -> bool | None:
+    """Whether the controlling terminal would turn Ctrl+C into SIGINT, if known."""
+    try:
+        import termios
+
+        return bool(termios.tcgetattr(sys.stdin.fileno())[3] & termios.ISIG)
+    except Exception:
+        return None
 
 
 def _register_app_for_thread_exit(app: "DaedalusTuiApp") -> None:
@@ -1893,6 +1950,46 @@ class DaedalusTuiApp(App[None]):
         """Stop agents before an explicit Textual exit begins."""
         self._shutdown_coordinators("explicit Textual exit")
         super().exit(*args, **kwargs)
+
+    def _on_external_signal(self, signum: int) -> None:
+        """Handle a signal from outside the TUI without losing the session.
+
+        Runs inside the signal handler, so it only logs and schedules work on
+        the event loop. A SIGINT is treated exactly like Ctrl+C (stop the
+        selected run, or the orchestrate session); SIGTERM and SIGHUP exit
+        the way Ctrl+Q does, pausing agents first.
+        """
+        action, name = external_signal_plan(signum)
+        LOGGER.error(
+            "Received %s from outside the TUI (terminal ISIG=%s); %s.",
+            name,
+            _terminal_isig_enabled(),
+            "treating it as Ctrl+C" if action == "interrupt" else "exiting gracefully",
+        )
+        loop = getattr(self, "_loop", None)
+        if loop is None or not self.is_running:
+            if action == "exit":
+                self._shutdown_coordinators(f"{name} before the Textual loop was running")
+            return
+        callback = self._interrupt_from_signal if action == "interrupt" else self._exit_from_signal
+        try:
+            loop.call_soon_threadsafe(callback, name)
+        except RuntimeError as error:
+            LOGGER.warning("Could not schedule the %s handler on the Textual loop: %s", name, error)
+
+    def _interrupt_from_signal(self, name: str) -> None:
+        try:
+            self._set_status(f"{name} received; stopping like Ctrl+C")
+            self.action_interrupt_task()
+        except Exception as error:  # A failed interrupt must not become the crash it prevents.
+            log_exception(f"Could not interrupt after {name}", error)
+
+    def _exit_from_signal(self, name: str) -> None:
+        try:
+            self.exit()
+        except Exception as error:
+            log_exception(f"Could not exit cleanly after {name}", error)
+            self._shutdown_coordinators(f"{name} exit failed")
 
     def _handle_exception(self, error: Exception) -> None:
         """Persist Textual failures that would otherwise only flash on screen."""

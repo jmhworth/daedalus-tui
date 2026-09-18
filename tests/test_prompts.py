@@ -264,6 +264,20 @@ class OrchestratePromptTests(unittest.TestCase):
         self.assertLess(prompt.index("END_DAEDALUS_PROJECT_CONTEXT"), prompt.index("Decompose the request above"))
         self.assertNotIn("BEGIN_DAEDALUS_PROJECT_CONTEXT", build_planner_prompt(OPERATOR_PROMPT))
 
+    def test_planner_prompts_describe_the_worker_environment(self):
+        from tui.prompts import build_planner_prompt, build_planner_round_prompt, describe_worker_environment
+
+        environment = describe_worker_environment(("claude", "claude-opus-5", "high"))
+        self.assertTrue(environment.startswith("Workers run on Claude Code CLI (claude-opus-5)"))
+        self.assertIn("none of your skills, plugins, MCP servers", environment)
+        first = build_planner_prompt(OPERATOR_PROMPT, worker_environment=environment)
+        later = build_planner_round_prompt(OPERATOR_PROMPT, "summary", "digest", worker_environment=environment)
+        self.assertIn(environment, first)
+        self.assertIn(environment, later)
+        self.assertNotIn("Workers run on", build_planner_prompt(OPERATOR_PROMPT))
+        self.assertEqual(describe_worker_environment(None), "")
+        self.assertIn("Codex CLI (gpt-6-astra)", describe_worker_environment(("codex", "gpt-6-astra", "medium")))
+
     def test_planner_round_prompt_carries_the_digest_and_its_options(self):
         from tui.orchestrate_protocol import load_role_rules
         from tui.prompts import build_planner_round_prompt

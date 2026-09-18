@@ -224,6 +224,15 @@ archived is not sent. On restart the latest draft returns to the composer, a
 missing archive is regenerated from the task index, and an archived prompt the
 index does not know is offered back as a recovered draft.
 
+Daedalus installs its own handlers for `SIGINT`, `SIGTERM`, and `SIGHUP`
+before the Textual loop starts. Textual runs the terminal with signals off,
+so a `SIGINT` can only come from outside the TUI; left to Python's default
+handling it cancelled the event loop and the app vanished with no return
+code, no unmount, and nothing in the log. A `SIGINT` is now treated exactly
+like `Ctrl+C` (stop the selected run, or the orchestrate session), `SIGTERM`
+and `SIGHUP` exit the way `Ctrl+Q` does with the agents paused, and every
+one of them is logged with the terminal's signal state for diagnosis.
+
 `errors/daedalus.log` replaces the older launch-root `.daedalus-debug.log`
 (existing files are left in place). It records UI exceptions, task/agent
 lifecycle events with project, task, turn, run, phase, and provider, and
@@ -467,3 +476,11 @@ oldest sessions whole), so a prompt such as "continue the plan you made"
 works across sessions, restarts, and machines instead of failing with a
 planner that sees only a bare repository. Set `context_filename = ""` to
 disable the file.
+
+The planner and its workers may run on different CLIs, and a card may rely
+only on what a worker session has: its worktree, the CLI's standard tools,
+and the card itself. Every planner turn says so, naming the worker CLI and
+model, and a card whose text sends the worker after a skill or plugin (such
+as "use the Sites building skill") is rejected and returned to the planner
+for one corrective round rather than dispatched to a worker that will report
+it as partial.
