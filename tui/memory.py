@@ -20,6 +20,7 @@ PROJECT_TOPICS_KEY = "project_topics"
 UI_PREFERENCES_KEY = "ui_preferences"
 TASKS_KEY = "tasks"
 PUSHED_COMMITS_KEY = "pushed_commits"
+ORCHESTRATIONS_KEY = "orchestrations"
 
 
 class TaskMemoryStore:
@@ -416,6 +417,8 @@ class TaskMemoryStore:
         project_key: str | None = None,
         diagnostics_dir: Path | None = None,
         prompts_dir: Path | None = None,
+        session_id: str | None = None,
+        card_id: str | None = None,
     ) -> None:
         """Upsert a task snapshot keyed by its stable logical task key.
 
@@ -479,6 +482,12 @@ class TaskMemoryStore:
             task["diagnostics_dir"] = str(diagnostics_dir)
         if prompts_dir is not None:
             task["prompts_dir"] = str(prompts_dir)
+        # Orchestrate Mode worker tasks carry their session and card so the
+        # inbox can tell them apart from ordinary tasks after a restart.
+        if session_id is not None:
+            task["session_id"] = session_id
+        if card_id is not None:
+            task["card_id"] = card_id
         with self._lock:
             entries = self._read_entries()
             updated_entries: list[dict[str, object]] = []
@@ -499,6 +508,69 @@ class TaskMemoryStore:
             tasks[task_id] = task
             updated_entries.append({TASKS_KEY: tasks})
             self._write_entries(updated_entries)
+
+    def get_orchestrations(self) -> dict[str, dict[str, object]]:
+        """Return persisted Orchestrate Mode sessions keyed by session id."""
+        with self._lock:
+            entries = self._read_entries()
+        sessions: dict[str, dict[str, object]] = {}
+        for entry in entries:
+            value = entry.get(ORCHESTRATIONS_KEY)
+            if not isinstance(value, dict):
+                continue
+            for session_id, session in value.items():
+                if isinstance(session_id, str) and isinstance(session, dict):
+                    sessions[session_id] = dict(session)
+        return sessions
+
+    def record_orchestration(self, session: dict[str, object]) -> None:
+        """Upsert one session snapshot beside the task snapshots.
+
+        The snapshot must carry ``session_id``; a ``schema_version`` is added
+        when missing so a later layout change can migrate old sessions.
+        """
+        session_id = session.get("session_id")
+        if not isinstance(session_id, str) or not session_id:
+            raise ValueError("An orchestration snapshot requires a session_id.")
+        snapshot = dict(session)
+        snapshot.setdefault("schema_version", 1)
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            sessions: dict[str, object] = {}
+            for existing in entries:
+                existing_sessions = existing.get(ORCHESTRATIONS_KEY)
+                if isinstance(existing_sessions, dict):
+                    sessions.update(existing_sessions)
+                    continue
+                if "tokens" in existing:
+                    continue
+                updated_entries.append(existing)
+            sessions[session_id] = snapshot
+            updated_entries.append({ORCHESTRATIONS_KEY: sessions})
+            self._write_entries(updated_entries)
+
+    def delete_orchestration(self, session_id: str) -> bool:
+        """Remove one session snapshot without touching tasks or other entries."""
+        if not session_id:
+            return False
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            sessions: dict[str, object] = {}
+            for existing in entries:
+                existing_sessions = existing.get(ORCHESTRATIONS_KEY)
+                if isinstance(existing_sessions, dict):
+                    sessions.update(existing_sessions)
+                    continue
+                updated_entries.append(existing)
+            if session_id not in sessions:
+                return False
+            sessions.pop(session_id, None)
+            if sessions:
+                updated_entries.append({ORCHESTRATIONS_KEY: sessions})
+            self._write_entries(updated_entries)
+            return True
 
     def _read_entries(self) -> list[dict[str, object]]:
         try:
