@@ -449,10 +449,17 @@ def render_plan(session: OrchestrationSession) -> str:
 
 
 def render_digest(session: OrchestrationSession, round_limit: int, report_budget: int) -> str:
-    """Render the planner-facing status digest described by the protocol."""
+    """Render the planner-facing status digest described by the protocol.
+
+    ``round_limit`` is the optional safety cap; zero leaves the round uncapped
+    in the header because the planner decides when the session ends.
+    """
     busy = sum(1 for card in session.cards.values() if card.active)
+    round_text = f"round {session.round}"
+    if int(round_limit) > 0:
+        round_text += f" of {int(round_limit)}"
     lines = [
-        f"SESSION {session.session_id}  round {session.round} of {round_limit}  "
+        f"SESSION {session.session_id}  {round_text}  "
         f"workers {busy}/{session.max_workers} busy"
     ]
     for card in session.cards.values():

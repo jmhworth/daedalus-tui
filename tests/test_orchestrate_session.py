@@ -133,6 +133,11 @@ class SessionStoreTests(unittest.TestCase):
         digest = render_digest(session, 6, 90)
         lines = digest.splitlines()
         self.assertEqual(lines[0], "SESSION orc-001-abcdef12  round 2 of 6  workers 0/2 busy")
+        # Without a cap the header names the round alone: the planner decides when to stop.
+        self.assertEqual(
+            render_digest(session, 0, 90).splitlines()[0],
+            "SESSION orc-001-abcdef12  round 2  workers 0/2 busy",
+        )
         self.assertTrue(lines[1].startswith("t1  promoted   2/2 checklist  files: tui/parse.py, tests/test_parse.py"))
         self.assertTrue(lines[2].startswith("t2  failed     0/1 checklist  error: Verification failed after 3 attempts. boom"))
         self.assertTrue(lines[3].startswith("    report: status=partial | errors: renderer needs the parser API"))

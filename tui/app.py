@@ -1511,27 +1511,47 @@ class DaedalusTuiApp(App[None]):
         """Orchestrate Mode: role row, prompt, actions, board, planner log, summary."""
         orchestrate = self.orchestrate_settings
         with Horizontal(id="orchestrate-roles"):
-            yield Static("Planner", classes="orchestrate-role-label")
-            yield Select(
-                self._role_model_options(orchestrate.planner_provider, orchestrate.planner_model),
-                value=orchestrate.planner_model,
-                allow_blank=False,
-                id="planner-model-select",
-            )
-            yield Static("Worker", classes="orchestrate-role-label")
-            yield Select(
-                self._role_model_options(orchestrate.worker_provider, orchestrate.worker_model),
-                value=orchestrate.worker_model,
-                allow_blank=False,
-                id="worker-model-select",
-            )
-            yield Static("Workers", classes="orchestrate-role-label")
-            yield Input(
-                value=str(orchestrate.default_max_workers),
-                type="integer",
-                id="max-workers-input",
-                tooltip=f"1 to {orchestrate.max_workers_limit} workers",
-            )
+            # Each role keeps its provider, model, and effort on one line even
+            # when the compact layout stacks the roles vertically.
+            for role, provider, model, reasoning in (
+                ("planner", orchestrate.planner_provider, orchestrate.planner_model, orchestrate.planner_reasoning),
+                ("worker", orchestrate.worker_provider, orchestrate.worker_model, orchestrate.worker_reasoning),
+            ):
+                with Horizontal(classes="orchestrate-role", id=f"{role}-role"):
+                    yield Static(role.capitalize(), classes="orchestrate-role-label")
+                    yield Select(
+                        self._role_provider_options(provider),
+                        value=provider,
+                        allow_blank=False,
+                        id=f"{role}-provider-select",
+                        classes="orchestrate-role-provider",
+                    )
+                    model_options = self._role_model_options(provider, model)
+                    yield Select(
+                        model_options,
+                        value=model,
+                        allow_blank=False,
+                        disabled=len(model_options) < 2,
+                        id=f"{role}-model-select",
+                        classes="orchestrate-role-model",
+                    )
+                    reasoning_options = self._role_reasoning_options(provider, reasoning)
+                    yield Select(
+                        reasoning_options,
+                        value=reasoning_options[0][1] if not self.settings.reasoning_for(provider) else reasoning,
+                        allow_blank=False,
+                        disabled=not self.settings.reasoning_for(provider),
+                        id=f"{role}-reasoning-select",
+                        classes="orchestrate-role-reasoning",
+                    )
+            with Horizontal(classes="orchestrate-role orchestrate-role-workers", id="workers-role"):
+                yield Static("Workers", classes="orchestrate-role-label")
+                yield Input(
+                    value=str(orchestrate.default_max_workers),
+                    type="integer",
+                    id="max-workers-input",
+                    tooltip=f"1 to {orchestrate.max_workers_limit} workers",
+                )
         yield DaedalusVimTextArea(
             id="orchestrate-prompt",
             placeholder="Describe the whole change; the planner splits it into worker cards...",
@@ -1545,12 +1565,60 @@ class DaedalusTuiApp(App[None]):
         yield TranscriptLog(id="planner-log", auto_scroll=True)
         yield Static("", id="orchestrate-summary", markup=False)
 
+    def _role_provider_options(self, default_provider: str) -> list[tuple[str, str]]:
+        """Provider choices for one Orchestrate role: every provider the settings bar offers."""
+        options = [(option.label, option.value) for option in self.settings.providers]
+        if default_provider and default_provider not in {value for _, value in options}:
+            options.insert(0, (default_provider, default_provider))
+        return options
+
     def _role_model_options(self, provider: str, default_model: str) -> list[tuple[str, str]]:
         """Model choices for one Orchestrate role, always including its default."""
         options = [(option.label, option.value) for option in self.settings.models_for(provider)]
         if default_model and default_model not in {value for _, value in options}:
             options.insert(0, (default_model, default_model))
         return options
+
+    def _role_reasoning_options(self, provider: str, default_reasoning: str) -> list[tuple[str, str]]:
+        """Effort choices for one Orchestrate role, or one inert entry for providers without any."""
+        options = [(option.label, option.value) for option in self.settings.reasoning_for(provider)]
+        if not options:
+            return [("Not applicable", "")]
+        if default_reasoning and default_reasoning not in {value for _, value in options}:
+            options.insert(0, (default_reasoning, default_reasoning))
+        return options
+
+    def _role_defaults(self, role: str, provider: str) -> tuple[str, str]:
+        """Model and reasoning preselected when ``role`` switches to ``provider``.
+
+        The parameter file's choice wins for its own provider; any other
+        provider starts from the settings bar defaults for that provider.
+        """
+        orchestrate = self.orchestrate_settings
+        configured_provider, configured_model, configured_reasoning = (
+            orchestrate.planner_selection if role == "planner" else orchestrate.worker_selection
+        )
+        if provider == configured_provider:
+            return configured_model, configured_reasoning
+        return self.settings.default_model_for(provider), self.settings.default_reasoning_for(provider)
+
+    def _apply_role_provider(self, role: str, provider: str) -> None:
+        """Swap one Orchestrate role's model and effort choices to match its provider."""
+        model_select = self.query_one(f"#{role}-model-select", Select)
+        reasoning_select = self.query_one(f"#{role}-reasoning-select", Select)
+        default_model, default_reasoning = self._role_defaults(role, provider)
+        model_options = self._role_model_options(provider, default_model)
+        reasoning_options = self._role_reasoning_options(provider, default_reasoning)
+        has_reasoning = bool(self.settings.reasoning_for(provider))
+        model_select.disabled = len(model_options) < 2
+        reasoning_select.disabled = not has_reasoning
+        self._set_select_options_if_changed(model_select, model_options)
+        if model_select.value != default_model:
+            model_select.value = default_model
+        self._set_select_options_if_changed(reasoning_select, reasoning_options)
+        reasoning_value = default_reasoning if has_reasoning else reasoning_options[0][1]
+        if reasoning_select.value != reasoning_value:
+            reasoning_select.value = reasoning_value
 
     def on_mount(self) -> None:
         if not self._logging_status.available:
@@ -1772,7 +1840,14 @@ class DaedalusTuiApp(App[None]):
             available = container.content_region
             if available.width <= 0:
                 return True
-            for child in container.children:
+            # The orchestrate role row nests each role's selects in a group,
+            # so measure those selects too, not only the direct children.
+            nested = (
+                [widget for widget in container.query(Select) if widget.parent is not container]
+                if selector == "#orchestrate-roles"
+                else []
+            )
+            for child in (*container.children, *nested):
                 region = child.region
                 if region.width <= 0 or region.height <= 0:
                     return True
@@ -2113,7 +2188,17 @@ class DaedalusTuiApp(App[None]):
                 self._selected_session_id = str(event.value)
                 self._refresh_orchestrate_view()
             return
-        if event.select.id in {"planner-model-select", "worker-model-select"}:
+        if event.select.id in {"planner-provider-select", "worker-provider-select"}:
+            if event.value not in _SELECT_EMPTY:
+                role = event.select.id.split("-", 1)[0]
+                self._apply_role_provider(role, str(event.value))
+            return
+        if event.select.id in {
+            "planner-model-select",
+            "planner-reasoning-select",
+            "worker-model-select",
+            "worker-reasoning-select",
+        }:
             return
         if event.select.id == "compact-settings-category":
             if event.value != getattr(event.select, "_latest_value", event.value):
@@ -4599,11 +4684,17 @@ class DaedalusTuiApp(App[None]):
     def _active_orchestrator(self) -> OrchestrateCoordinator | None:
         return self._orchestrator_for(self._active_project_path)
 
+    def _role_selection(self, role: str) -> tuple[str, str, str]:
+        """Read one role's ``(provider, model, reasoning)`` from the role row."""
+        provider = str(self.query_one(f"#{role}-provider-select", Select).value)
+        model = str(self.query_one(f"#{role}-model-select", Select).value)
+        reasoning_value = self.query_one(f"#{role}-reasoning-select", Select).value
+        reasoning = "" if reasoning_value in _SELECT_EMPTY else str(reasoning_value)
+        return provider, model, reasoning
+
     def _orchestrate_selections(self) -> tuple[tuple[str, str, str], tuple[str, str, str], int] | None:
         """Read the role row; report the first invalid control and return None."""
         orchestrate = self.orchestrate_settings
-        planner_model = str(self.query_one("#planner-model-select", Select).value)
-        worker_model = str(self.query_one("#worker-model-select", Select).value)
         workers_text = self.query_one("#max-workers-input", Input).value.strip()
         try:
             workers = int(workers_text)
@@ -4615,9 +4706,7 @@ class DaedalusTuiApp(App[None]):
             )
             self.query_one("#max-workers-input", Input).focus()
             return None
-        planner = (orchestrate.planner_provider, planner_model, orchestrate.planner_reasoning)
-        worker = (orchestrate.worker_provider, worker_model, orchestrate.worker_reasoning)
-        return planner, worker, workers
+        return self._role_selection("planner"), self._role_selection("worker"), workers
 
     def _start_orchestration(self) -> None:
         prompt_widget = self.query_one("#orchestrate-prompt", DaedalusVimTextArea)

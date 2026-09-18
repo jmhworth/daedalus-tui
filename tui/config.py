@@ -223,13 +223,19 @@ class OrchestrateSettings:
 
     planner_provider: str = "claude"
     planner_model: str = "claude-fable-5-1"
-    planner_reasoning: str = "high"
+    planner_reasoning: str = "medium"
     worker_provider: str = "claude"
     worker_model: str = "claude-opus-5"
     worker_reasoning: str = "high"
     default_max_workers: int = 3
     max_workers_limit: int = 8
-    planner_round_limit: int = 6
+    #: Optional safety cap on planner rounds per session. Zero, the default,
+    #: means no cap: the planner decides how many rounds the work needs and
+    #: ends the session by declaring it done.
+    planner_round_limit: int = 0
+    #: Characters of repository file listing handed to the first planner turn
+    #: so it can name ``read_first`` paths without exploring the tree itself.
+    planner_repository_map_chars: int = 8_000
     task_reissue_limit: int = 2
     planner_digest_budget_chars: int = 12_000
     worker_report_budget_chars: int = 4_000
@@ -551,6 +557,9 @@ def load_orchestrate_settings(
         default_max_workers=int(limits.get("default_max_workers", defaults.default_max_workers)),
         max_workers_limit=int(limits.get("max_workers_limit", defaults.max_workers_limit)),
         planner_round_limit=int(limits.get("planner_round_limit", defaults.planner_round_limit)),
+        planner_repository_map_chars=int(
+            limits.get("planner_repository_map_chars", defaults.planner_repository_map_chars)
+        ),
         task_reissue_limit=int(limits.get("task_reissue_limit", defaults.task_reissue_limit)),
         planner_digest_budget_chars=int(
             limits.get("planner_digest_budget_chars", defaults.planner_digest_budget_chars)
@@ -575,7 +584,6 @@ def load_orchestrate_settings(
         for value in (
             settings.default_max_workers,
             settings.max_workers_limit,
-            settings.planner_round_limit,
             settings.planner_digest_budget_chars,
             settings.worker_report_budget_chars,
             settings.worker_card_budget_chars,
@@ -587,6 +595,11 @@ def load_orchestrate_settings(
     # A card may legitimately be forbidden from re-issue, so zero is allowed.
     if settings.task_reissue_limit < 0:
         raise ValueError(f"{path} limits.task_reissue_limit must not be negative.")
+    # Zero rounds means "no cap": the planner decides how many rounds it needs.
+    if settings.planner_round_limit < 0:
+        raise ValueError(f"{path} limits.planner_round_limit must not be negative.")
+    if settings.planner_repository_map_chars < 0:
+        raise ValueError(f"{path} limits.planner_repository_map_chars must not be negative.")
     if settings.default_max_workers > settings.max_workers_limit:
         raise ValueError(
             f"{path} limits.default_max_workers must not exceed limits.max_workers_limit."
@@ -595,15 +608,38 @@ def load_orchestrate_settings(
         raise ValueError(f"{path} files names must not be empty.")
 
     catalogue = tui_settings or load_tui_settings()
-    for role, provider, model in (
-        ("planner", settings.planner_provider, settings.planner_model),
-        ("worker", settings.worker_provider, settings.worker_model),
+    for role, provider, model, reasoning in (
+        ("planner", settings.planner_provider, settings.planner_model, settings.planner_reasoning),
+        ("worker", settings.worker_provider, settings.worker_model, settings.worker_reasoning),
     ):
-        if provider != "claude":
-            continue
-        if not any(option.value == model for option in catalogue.claude_models):
-            raise ValueError(f"{path} roles.{role}_model {model!r} is not one of the claude_models.")
+        validate_role_selection(catalogue, role, provider, model, reasoning, source=str(path))
     return settings
+
+
+def validate_role_selection(
+    catalogue: TuiSettings,
+    role: str,
+    provider: str,
+    model: str,
+    reasoning: str,
+    source: str = "orchestrate settings",
+) -> None:
+    """Reject an Orchestrate role whose provider, model, or reasoning is not in the catalogue.
+
+    Every provider the settings bar offers (Claude Code, Codex, Cursor CLI) may
+    play either role. A provider without an effort scale, such as Cursor,
+    accepts any reasoning value because the runner ignores it.
+    """
+    if not any(option.value == provider for option in catalogue.providers):
+        known = ", ".join(option.value for option in catalogue.providers)
+        raise ValueError(f"{source} roles.{role}_provider {provider!r} is not one of: {known}.")
+    if not any(option.value == model for option in catalogue.models_for(provider)):
+        raise ValueError(f"{source} roles.{role}_model {model!r} is not a {provider} model.")
+    reasoning_options = catalogue.reasoning_for(provider)
+    if reasoning_options and not any(option.value == reasoning for option in reasoning_options):
+        raise ValueError(
+            f"{source} roles.{role}_reasoning {reasoning!r} is not a {provider} reasoning level."
+        )
 
 
 def load_prompting_settings(parameter_path: Path | None = None) -> PromptingSettings:

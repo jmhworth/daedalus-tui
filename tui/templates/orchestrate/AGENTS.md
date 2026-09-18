@@ -26,6 +26,10 @@ only the blocks you were given.
   no dependency path between them may not name the same path.
 - Every checklist item must be verifiable by a command or by reading the diff.
 - Prefer more small tasks over fewer large ones.
+- You decide how many rounds the session takes. Finish (`done=true`) as soon
+  as the request is satisfied; never add cards just to use another round.
+- Read only what you need to write accurate cards. Do not run tests, builds,
+  or the verification command yourself.
 
 ## Worker
 

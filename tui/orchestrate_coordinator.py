@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import subprocess
 from threading import Condition, Lock, Thread
 import time
 from typing import Callable
@@ -40,12 +41,21 @@ from .orchestrate_session import (
     new_session_id,
 )
 from .orchestrator import BUNDLED_PROFILE_ROOT, LocalOrchestrator, OrchestrationSettings
-from .prompts import build_planner_prompt, build_planner_round_prompt, build_worker_prompt
+from .prompts import (
+    bounded_digest,
+    build_planner_prompt,
+    build_planner_round_prompt,
+    build_worker_prompt,
+    planner_round_label,
+)
 from .task_coordinator import TaskCoordinator, TaskEventCallback, TaskRecord
 from .verification import discover_commands
 
 
 ORCHESTRATE_PHASE = "orchestrate"
+#: Longest planner progress line kept in the session log; the full output is
+#: logged once the round ends.
+_PLANNER_PROGRESS_CHARS = 400
 #: Worker record statuses that end a card one way or another.
 _SETTLED_TASK_STATUSES = frozenset({"completed", "failed", "interrupted", "paused", "cancelled"})
 _CARD_STATUS_FOR_TASK = {
@@ -263,9 +273,18 @@ class OrchestrateCoordinator:
                 self._stop_requested.discard(session.session_id)
             self._persist(session)
 
+    def _round_cap_reached(self, session: OrchestrationSession) -> bool:
+        """True when the optional round cap is set and spent; zero means no cap."""
+        limit = self.orchestrate.planner_round_limit
+        return limit > 0 and session.round >= limit
+
     def _plan(self, session: OrchestrationSession, *, first_round: bool) -> None:
-        """Run one planner round (with one corrective retry) and apply its payload."""
-        if session.round >= self.orchestrate.planner_round_limit:
+        """Run one planner round (with one corrective retry) and apply its payload.
+
+        The planner decides how many rounds the work needs; it ends the session
+        by declaring it done. ``planner_round_limit`` is only a safety cap.
+        """
+        if self._round_cap_reached(session):
             digest = self.store.write_digest(session)
             self._finish(
                 session,
@@ -282,7 +301,7 @@ class OrchestrateCoordinator:
             digest = "" if first_round and attempt == 1 else self.store.write_digest(session)
             self._log(
                 session,
-                f"Planner round {session.round} of {self.orchestrate.planner_round_limit}"
+                planner_round_label(session.round, self.orchestrate.planner_round_limit)
                 + (" (corrective retry)" if correction else "") + ".",
             )
             if digest:
@@ -304,7 +323,7 @@ class OrchestrateCoordinator:
                 return
             correction = payload.error or conflict or "Planner payload was rejected."
             self._log(session, f"Planner payload rejected: {correction}")
-            if session.round >= self.orchestrate.planner_round_limit:
+            if self._round_cap_reached(session):
                 break
         self._finish(session, "failed", f"Planner did not return a valid plan: {correction}")
 
@@ -332,6 +351,7 @@ class OrchestrateCoordinator:
                     topic_text,
                     session.max_workers,
                     verification_hint,
+                    repository_map=self._repository_map(),
                 )
             else:
                 prompt = build_planner_round_prompt(
@@ -351,10 +371,19 @@ class OrchestrateCoordinator:
             if session.session_id in self._stop_requested:
                 control.request_interrupt()
         messages: list[str] = []
+        started = time.monotonic()
 
         def on_event(phase: str, message: str, kind: str = "status") -> None:
             if kind == "message" and message:
                 messages.append(message)
+                # Show the planner thinking as it streams so a long round is
+                # visibly alive; the full output is logged when it ends.
+                elapsed = int(time.monotonic() - started)
+                line = " ".join(message.split())
+                if len(line) > _PLANNER_PROGRESS_CHARS:
+                    line = line[: _PLANNER_PROGRESS_CHARS - 1] + "…"
+                self._log(session, f"planner [{elapsed}s]: {line}")
+                self._notify(session, "Planner progress.")
             elif kind == "error" and message:
                 self._log(session, f"planner {phase}: {message}")
 
@@ -383,6 +412,7 @@ class OrchestrateCoordinator:
             self._finish(session, "failed", result.error or "Planner run failed.")
             return None, result.tokens_consumed
         output = result.planner_output or "\n\n".join(messages)
+        self._log(session, f"Planner round {session.round} finished in {int(time.monotonic() - started)}s.")
         return output, result.tokens_consumed
 
     def _apply_payload(self, session: OrchestrationSession, payload: PlannerPayload) -> None:
@@ -694,6 +724,27 @@ class OrchestrateCoordinator:
             ).capture_primary()
         except (GitWorktreeError, OSError):
             return ""
+
+    def _repository_map(self) -> str:
+        """Bounded ``git ls-files`` listing for the first planner turn, or empty."""
+        budget = self.orchestrate.planner_repository_map_chars
+        if budget <= 0:
+            return ""
+        try:
+            process = subprocess.run(
+                ["git", "ls-files"],
+                cwd=self.repository,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            LOGGER.warning("Could not list repository files for the planner error=%s", error)
+            return ""
+        if process.returncode != 0:
+            return ""
+        return bounded_digest(process.stdout.strip(), budget)
 
     def _verification_hint(self) -> str:
         configured = [list(command) for command in self.settings.verification_commands]

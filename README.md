@@ -425,9 +425,16 @@ worktree and returns a JSON plan of small task cards; at most *N* **Workers**
 (Claude Opus by default, *N* set in the max-workers input, capped by the
 parameter file and by `max_concurrent_tasks`) each run one card as an
 ordinary coding task with its own worktree, verification, integration, and
-promotion. After every wave the planner receives a bounded status digest
-and may add cards, re-issue a failed card under a new id, or declare the
-session done. Merge conflicts between worker branches are resolved with the
+promotion. Each role has its own provider, model, and effort selectors in the
+role row, so the planner or the workers may run on Claude Code, Codex
+(ChatGPT), or Cursor CLI in any combination. After every wave the planner
+receives a bounded status digest and may add cards, re-issue a failed card
+under a new id, or declare the session done; the planner decides how many
+rounds the work needs (`planner_round_limit` is an optional safety cap, off
+by default). The first planner turn carries a bounded listing of the
+repository's tracked files so it can write cards without exploring the tree,
+and the planner log shows its streamed messages with elapsed time while a
+round runs. Merge conflicts between worker branches are resolved with the
 planner's model. Each worker prompt carries only the role rules, the coding
 profile, its card, and the worktree boundary, never the operator's prompt or
 other cards, so a session costs fewer tokens than running every task with

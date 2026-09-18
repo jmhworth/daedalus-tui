@@ -2,30 +2,41 @@
 # small task cards and delegates them to several Worker agents. Every value
 # below is tuned by hand here; Orchestrate Mode never reads command-line flags.
 
-# Which agent plays each role. The Planner reads the repository and returns a
-# JSON plan (it never edits files); Workers run the resulting cards as ordinary
-# coding tasks. Both roles are Claude for now; the provider key already exists
-# per role so a non-Claude role can be added without a schema change.
+# Which agent plays each role by default. The Planner reads the repository and
+# returns a JSON plan (it never edits files); Workers run the resulting cards
+# as ordinary coding tasks. Either role may use any provider the settings bar
+# offers: `claude` (Claude Code), `codex` (ChatGPT / Codex CLI), or `cursor`
+# (Cursor CLI). Models and reasoning levels come from the matching catalogue in
+# `daedalus-tui.toml`; Cursor has one fixed model (`cursor`) and no reasoning
+# scale. The orchestrate view lets the operator override all of these per
+# session. The planner defaults to medium effort because decomposition is a
+# reading task and high effort made the first round slow.
 [roles]
 planner_provider = "claude"
 planner_model = "claude-fable-5-1"
-planner_reasoning = "high"
+planner_reasoning = "medium"
 worker_provider = "claude"
 worker_model = "claude-opus-5"
 worker_reasoning = "high"
 
-# Caps that keep a session bounded. Every loop in Orchestrate Mode ends by
-# exhausting one of these rather than by running forever. The character budgets
-# are what keeps a worker's context small: a worker sees one card, and the
-# planner sees a bounded digest instead of worker transcripts.
+# Caps that keep a session bounded. The planner decides how many rounds the
+# work needs and ends the session by declaring it done; a round that adds no
+# runnable card and does not finish fails the session, and each card may be
+# re-issued only so many times. `planner_round_limit` is an optional safety
+# cap on top of that: 0 (the default) means no cap. The character budgets are
+# what keeps a worker's context small: a worker sees one card, and the planner
+# sees a bounded digest instead of worker transcripts. The repository map is a
+# bounded `git ls-files` listing sent with the first planner turn so the
+# planner can name read_first paths without spending tool calls on exploring.
 [limits]
 default_max_workers = 3         # workers preselected in the max-workers control
 max_workers_limit = 8           # upper bound the UI control allows
-planner_round_limit = 6         # planner rounds per session, including the first
+planner_round_limit = 0         # optional cap on planner rounds; 0 = planner decides
 task_reissue_limit = 2          # times one card may be re-issued after failure
 planner_digest_budget_chars = 12000
 worker_report_budget_chars = 4000
 worker_card_budget_chars = 6000
+planner_repository_map_chars = 8000
 
 # Where session artifacts live. Session files (plan, cards, reports, digests)
 # are written under the TUI storage root; the card the worker actually ticks is

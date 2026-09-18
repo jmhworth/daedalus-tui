@@ -156,6 +156,16 @@ Screen {
     align: left middle;
 }
 
+.orchestrate-role {
+    width: 1fr;
+    height: 3;
+    align: left middle;
+}
+
+.orchestrate-role-workers {
+    width: auto;
+}
+
 .orchestrate-role-label {
     width: auto;
     color: $text-muted;
@@ -165,6 +175,17 @@ Screen {
 #orchestrate-roles Select {
     width: 1fr;
     margin-right: 1;
+}
+
+/* Provider and effort names are short and fixed-width so the model name gets
+   the spare width. The select's border, padding, and arrow take 8 columns, so
+   20 fits "Claude Code" and 23 fits "Not applicable" on one line. */
+#orchestrate-roles .orchestrate-role-provider {
+    width: 20;
+}
+
+#orchestrate-roles .orchestrate-role-reasoning {
+    width: 23;
 }
 
 #max-workers-input {
@@ -561,7 +582,7 @@ Screen {
     width: 1fr;
 }
 
-/* Compact mode stacks the orchestrate role row vertically. */
+/* Compact mode stacks the roles vertically; each role stays on one line. */
 #screen.compact-width #orchestrate-roles {
     layout: vertical;
     height: auto;
@@ -574,7 +595,7 @@ Screen {
 }
 
 #screen.compact-width .orchestrate-role-label {
-    height: 1;
+    width: 8;
 }
 
 #screen.compact-width #orchestrate-board {

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from tui.agent_runner import AgentResult
+from tui.agent_runner import AgentLogEvent, AgentResult
 from tui.config import OrchestrateSettings
 from tui.firebase import FirebaseStatus
 from tui.git_worktree import WorktreeContext
@@ -88,8 +88,10 @@ class ScriptedRunner:
             with self.lock:
                 self.planner_prompts.append(prompt)
                 index = len(self.planner_prompts) - 1
+            if on_event is not None:
+                on_event(AgentLogEvent("message", "Reading the repository map."))
             response = self.planner_responses[min(index, len(self.planner_responses) - 1)]
-            return AgentResult("claude", 0, response, tokens_consumed=10)
+            return AgentResult(request.provider, 0, response, tokens_consumed=10, output_streamed=True)
         if "TASK_MODE: integrating" in prompt:
             return AgentResult("claude", 0, "resolved", tokens_consumed=1)
         match = CARD_ID.search(prompt)
@@ -301,8 +303,78 @@ class ScenarioTests(unittest.TestCase):
         self.assertIn("Your previous reply was rejected", runner.planner_prompts[1])
         self.assertEqual(tasks.tasks(), ())
 
+    def test_planner_decides_how_many_rounds_the_session_takes(self):
+        """With no cap the session runs as many rounds as the planner needs, then stops on done."""
+        responses = [planner_payload(f"Round {index}.", [card(f"t{index}", f"src/t{index}.py")]) for index in range(1, 9)]
+        responses.append(planner_payload("Everything promoted.", [], done=True))
+        runner = ScriptedRunner(responses)
+        manager = self.manager()
+        tasks, coordinator = self.build(runner)
+        # The temporary repository is not a Git checkout, so stand in for `git ls-files`.
+        patches = (
+            *self.patches(manager),
+            patch.object(OrchestrateCoordinator, "_repository_map", return_value="tui/app.py\ntests/test_app.py"),
+        )
+        for item in patches:
+            item.start()
+        try:
+            session = coordinator.start(OPERATOR_PROMPT, PLANNER, WORKER, max_workers=2)
+            self.wait_for(session, timeout=30.0)
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+            for item in patches:
+                item.stop()
+        self.assertEqual(session.status, "completed", session.error)
+        self.assertEqual(session.round, 9)
+        self.assertEqual(len(runner.planner_prompts), 9)
+        self.assertIn("Planner round 1.", session.log)
+        self.assertIn("Planner round 9.", session.log)
+        self.assertFalse(any(" of " in line and line.startswith("Planner round") for line in session.log))
+        # Later rounds are told the choice is theirs rather than counted against a cap.
+        self.assertIn("Planner round 2.", runner.planner_prompts[1])
+        self.assertNotIn("capped at", runner.planner_prompts[1])
+        # The first round carries the repository map; later rounds do not repeat it.
+        self.assertIn("BEGIN_DAEDALUS_REPOSITORY_MAP", runner.planner_prompts[0])
+        self.assertIn("tui/app.py\ntests/test_app.py", runner.planner_prompts[0])
+        self.assertNotIn("BEGIN_DAEDALUS_REPOSITORY_MAP", runner.planner_prompts[1])
+        # Streamed planner messages reach the session log while the round runs.
+        self.assertTrue(any(line.startswith("planner [") and "Reading the repository map." in line for line in session.log))
+        self.assertTrue(any(line.startswith("Planner round 1 finished in") for line in session.log))
+
+    def test_non_claude_roles_reach_the_runner_unchanged(self):
+        """A Cursor planner and a Codex worker are launched with their own selections."""
+        requests = []
+
+        class RecordingRunner(ScriptedRunner):
+            def run(self, request, on_event=None):
+                requests.append((request.provider, request.model, request.reasoning, "orchestrate-plan" in request.prompt))
+                return super().run(request, on_event)
+
+        runner = RecordingRunner(
+            [planner_payload("One card.", [card("t1", "src/t1.py")]), planner_payload("Done.", [], done=True)]
+        )
+        manager = self.manager()
+        tasks, coordinator = self.build(runner)
+        patches = self.patches(manager)
+        for item in patches:
+            item.start()
+        try:
+            session = coordinator.start(
+                OPERATOR_PROMPT, ("cursor", "cursor", ""), ("codex", "gpt-6-astra", "medium"), max_workers=1
+            )
+            self.wait_for(session)
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+            for item in patches:
+                item.stop()
+        self.assertEqual(session.status, "completed", session.error)
+        self.assertIn(("cursor", "cursor", "", True), requests)
+        self.assertIn(("codex", "gpt-6-astra", "medium", False), requests)
+
     def test_round_limit_ends_the_session_with_the_digest(self):
-        """A planner that keeps adding cards runs out of rounds."""
+        """An optional round cap still stops a planner that keeps adding cards."""
         responses = [planner_payload(f"Round {index}.", [card(f"t{index}", f"src/t{index}.py")]) for index in range(1, 10)]
         runner = ScriptedRunner(responses)
         manager = self.manager()

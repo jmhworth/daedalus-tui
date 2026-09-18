@@ -3356,8 +3356,12 @@ class OrchestrateViewTests(unittest.IsolatedAsyncioTestCase):
             switcher = app.query_one("#view-switcher", ContentSwitcher)
             self.assertEqual(str(button.label), "Orchestrate Mode")
             self.assertEqual(switcher.current, "tasks-view")
+            self.assertEqual(app.query_one("#planner-provider-select", Select).value, "claude")
             self.assertEqual(app.query_one("#planner-model-select", Select).value, "claude-fable-5-1")
+            self.assertEqual(app.query_one("#planner-reasoning-select", Select).value, "medium")
+            self.assertEqual(app.query_one("#worker-provider-select", Select).value, "claude")
             self.assertEqual(app.query_one("#worker-model-select", Select).value, "claude-opus-5")
+            self.assertEqual(app.query_one("#worker-reasoning-select", Select).value, "high")
             self.assertEqual(app.query_one("#max-workers-input", Input).value, "3")
             self.assertTrue(app.query_one("#orchestrate-stop-button", Button).disabled)
 
@@ -3395,10 +3399,48 @@ class OrchestrateViewTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(orchestrator.starts), 1)
             prompt, planner, worker, max_workers, topic = orchestrator.starts[0]
             self.assertEqual(prompt, "Build the whole feature")
-            self.assertEqual(planner, ("claude", "claude-fable-5-1", "high"))
+            self.assertEqual(planner, ("claude", "claude-fable-5-1", "medium"))
             self.assertEqual(worker, ("claude", "claude-sonnet-5", "high"))
             self.assertEqual(max_workers, 2)
             self.assertIsNone(topic)
+
+    async def test_role_provider_switch_offers_that_providers_models_and_effort(self):
+        """Either role may run on Codex (ChatGPT) or Cursor; the row follows the provider."""
+        app, _, orchestrator = self.make_app()
+        async with app.run_test() as pilot:
+            app._set_orchestrate_view(True)
+            await pilot.pause()
+            app.query_one("#orchestrate-prompt", DaedalusVimTextArea).load_text("Build it with a mixed team")
+
+            app.query_one("#worker-provider-select", Select).value = "codex"
+            await pilot.pause()
+            worker_model = app.query_one("#worker-model-select", Select)
+            self.assertEqual(worker_model.value, "gpt-5.6-luna")
+            self.assertIn("gpt-5.6-terra", {value for _, value in worker_model._options})
+            self.assertEqual(app.query_one("#worker-reasoning-select", Select).value, "medium")
+            worker_model.value = "gpt-5.6-terra"
+            app.query_one("#worker-reasoning-select", Select).value = "high"
+
+            app.query_one("#planner-provider-select", Select).value = "cursor"
+            await pilot.pause()
+            planner_model = app.query_one("#planner-model-select", Select)
+            self.assertEqual(planner_model.value, "cursor")
+            self.assertTrue(planner_model.disabled)
+            planner_reasoning = app.query_one("#planner-reasoning-select", Select)
+            self.assertTrue(planner_reasoning.disabled)
+
+            app._start_orchestration()
+            await pilot.pause()
+            _, planner, worker, _, _ = orchestrator.starts[0]
+            self.assertEqual(planner, ("cursor", "cursor", ""))
+            self.assertEqual(worker, ("codex", "gpt-5.6-terra", "high"))
+
+            # Switching back to the configured provider restores the parameter-file defaults.
+            app.query_one("#planner-provider-select", Select).value = "claude"
+            await pilot.pause()
+            self.assertEqual(app.query_one("#planner-model-select", Select).value, "claude-fable-5-1")
+            self.assertEqual(app.query_one("#planner-reasoning-select", Select).value, "medium")
+            self.assertFalse(app.query_one("#planner-model-select", Select).disabled)
             self.assertEqual(app.query_one("#orchestrate-prompt", DaedalusVimTextArea).text, "")
             self.assertFalse(app.query_one("#orchestrate-stop-button", Button).disabled)
             self.assertIn("orc-001-deadbeef", str(app.query_one("#orchestrate-status", Static).render()))
@@ -3451,7 +3493,7 @@ class OrchestrateViewTests(unittest.IsolatedAsyncioTestCase):
             session.status = "waiting"
             session.tokens_planner = 40
             session.tokens_workers = 12
-            session.log.extend(["Planner round 1 of 6.", "Dispatched t1 as task task-1; 900 characters of context."])
+            session.log.extend(["Planner round 1.", "Dispatched t1 as task task-1; 900 characters of context."])
             t1 = TaskCard(PlannerTask("t1", "Add parser", "Parse.", ("a", "b"), ("tui/parse.py",)))
             t1.status = "running"
             t1.worker_task_id = worker.task_id
@@ -3476,7 +3518,7 @@ class OrchestrateViewTests(unittest.IsolatedAsyncioTestCase):
             self.assertLessEqual(len(str(second[1])), 28)
             self.assertEqual(second[2], "waiting")
             log = app.query_one("#planner-log", TranscriptLog)
-            self.assertIn("Planner round 1 of 6.", log.messages)
+            self.assertIn("Planner round 1.", log.messages)
             summary = str(app.query_one("#orchestrate-summary", Static).render())
             self.assertIn("Planner tokens: 40", summary)
             self.assertIn("Worker tokens: 12", summary)

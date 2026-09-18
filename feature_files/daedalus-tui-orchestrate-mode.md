@@ -2,10 +2,13 @@
 
 ## Summary
 Orchestrate Mode is a second view inside the TUI where the operator writes one
-prompt and a **Planner** agent (Claude Fable) decomposes it into small,
-self-contained task cards, delegates them to at most *N* **Worker** agents
-(Claude Opus, *N* chosen by the operator), watches their reports, re-issues
-failed cards, and resolves merge conflicts. The point of the design is cost:
+prompt and a **Planner** agent (Claude Fable by default) decomposes it into
+small, self-contained task cards, delegates them to at most *N* **Worker**
+agents (Claude Opus by default, *N* chosen by the operator), watches their
+reports, re-issues failed cards, and resolves merge conflicts. Either role may
+run on any provider the settings bar offers (Claude Code, Codex / ChatGPT, or
+Cursor CLI); the orchestrate view has a provider, model, and effort selector
+per role. The point of the design is cost:
 each worker receives the minimum context its card needs, so the same amount of
 work costs fewer tokens than running every task with the full prompt and full
 repository exploration.
@@ -39,9 +42,19 @@ repository exploration.
   operating branch, so its worktree already contains their changes. Cards with
   no dependency between them must have disjoint file scopes; the payload parser
   rejects a plan that violates that.
-- **Bounded loops everywhere**: planner rounds, per-card re-issues, and worker
-  count are all capped in the parameter file. Exhausting a cap ends the session
-  with a clear status; nothing retries forever.
+- **The planner decides how many rounds the work needs**: there is no fixed
+  round count. After each wave the planner is called again and either adds
+  cards, re-issues a failed one, or declares the session done. A round that
+  adds no runnable card and does not finish fails the session, each card may
+  be re-issued only `task_reissue_limit` times, and `planner_round_limit` is
+  an optional safety cap (0, the default, means none). Exhausting a cap ends
+  the session with a clear status; nothing retries forever.
+- **The planner is kept fast and visible**: the first turn embeds a bounded
+  `git ls-files` map (`planner_repository_map_chars`) so the planner can name
+  `read_first` paths without exploring, the prompt tells it not to run tests or
+  builds, the default planner effort is `medium`, and streamed planner
+  messages are written to the session log with elapsed seconds while the
+  round runs.
 - **Interface to orchestration**: worktrees, verification, repairs, the
   integration gate, promotion, and the conflict resolver all belong to
   `feature_files/daedalus-tui-orchestration.md`. Orchestrate Mode only selects
@@ -121,3 +134,9 @@ HACKING
   rows) with one dispatcher per project created beside its task coordinator.
 - 2026-09-17: Added the real-Git end-to-end and conflict tests, the README
   section, and the coding-profile paragraph on worker cards.
+- 2026-09-18: Removed the fixed six-round planner cap (`planner_round_limit`
+  is now an optional safety cap defaulting to 0, and the planner decides when
+  the session is done), added the bounded repository map, medium default
+  planner effort, and live planner progress lines to speed the planner up,
+  and opened both roles to Codex (ChatGPT) and Cursor CLI with provider,
+  model, and effort selectors per role in the orchestrate view.

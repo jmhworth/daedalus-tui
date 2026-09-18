@@ -229,10 +229,22 @@ class OrchestratePromptTests(unittest.TestCase):
         self.assertIn("At most 4 workers run at a time", prompt)
         self.assertIn("pytest", prompt)
         self.assertIn("Do not modify files", prompt)
+        # The planner, not a cap, decides how many rounds the session takes.
+        self.assertIn("You decide how many planning rounds", prompt)
+        self.assertNotIn("BEGIN_DAEDALUS_REPOSITORY_MAP", prompt)
         # The planner gets its own block plus the shared rules, never the worker's.
         self.assertIn("You own decomposition, ordering, and conflict resolution", prompt)
         self.assertIn("Edit only inside your own Git worktree", prompt)
         self.assertNotIn("Do exactly what the card says", prompt)
+
+    def test_planner_prompt_embeds_the_repository_map(self):
+        from tui.prompts import build_planner_prompt
+
+        prompt = build_planner_prompt(OPERATOR_PROMPT, repository_map="tui/app.py\ntui/config.py")
+
+        self.assertIn("BEGIN_DAEDALUS_REPOSITORY_MAP", prompt)
+        self.assertIn("tui/app.py\ntui/config.py", prompt)
+        self.assertIn("END_DAEDALUS_REPOSITORY_MAP", prompt)
 
     def test_planner_round_prompt_carries_the_digest_and_its_options(self):
         from tui.orchestrate_protocol import load_role_rules
@@ -245,14 +257,26 @@ class OrchestratePromptTests(unittest.TestCase):
             digest,
             role_rules=load_role_rules(),
             round_number=2,
-            round_limit=6,
         )
 
-        self.assertIn("Planner round 2 of 6", prompt)
+        self.assertIn("Planner round 2.", prompt)
+        self.assertNotIn("of 6", prompt)
+        self.assertNotIn("capped", prompt)
+        self.assertIn("You decide how many more rounds", prompt)
         self.assertIn(digest, prompt)
         self.assertIn("Split the work in three.", prompt)
         self.assertIn("reissues", prompt)
         self.assertIn("done=true", prompt)
+
+    def test_planner_round_prompt_names_an_optional_round_cap(self):
+        from tui.prompts import build_planner_round_prompt, planner_round_label
+
+        prompt = build_planner_round_prompt(OPERATOR_PROMPT, "", "t1  promoted", round_number=2, round_limit=6)
+
+        self.assertIn("Planner round 2 of 6.", prompt)
+        self.assertIn("capped at 6 rounds", prompt)
+        self.assertEqual(planner_round_label(3), "Planner round 3")
+        self.assertEqual(planner_round_label(3, 5), "Planner round 3 of 5")
 
     def test_worker_prompt_contains_only_the_card(self):
         from tui.orchestrate_protocol import load_role_rules

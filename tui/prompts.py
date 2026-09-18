@@ -345,6 +345,32 @@ WORKER_REPORT_INSTRUCTIONS = (
 )
 
 
+PLANNER_ROUNDS_TEXT = (
+    "You decide how many planning rounds this session takes. After each wave of workers "
+    "finishes you are called again with a status digest and may add cards, re-issue failed "
+    "ones, or finish. Plan only the tasks that can start now plus those that depend on them; "
+    "there is no fixed number of rounds to fill or to save."
+)
+
+PLANNER_SPEED_TEXT = (
+    "Be quick: read only the files you must open to write accurate read_first lists and "
+    "interfaces. Do not run tests, builds, or the verification command yourself; that is the "
+    "workers' job."
+)
+PLANNER_MAP_TEXT = (
+    "The repository map above already lists every tracked path, so do not spend tool calls "
+    "listing directories."
+)
+
+
+def planner_round_label(round_number: int, round_limit: int = 0) -> str:
+    """Return ``Planner round N`` or ``Planner round N of M`` when a cap is set."""
+    label = f"Planner round {int(round_number)}"
+    if int(round_limit) > 0:
+        label += f" of {int(round_limit)}"
+    return label
+
+
 def build_planner_prompt(
     user_prompt: str,
     role_rules: str | None = None,
@@ -352,11 +378,14 @@ def build_planner_prompt(
     topic_text: str | None = None,
     max_workers: int = 3,
     verification_hint: str = "",
+    repository_map: str = "",
 ) -> str:
     """Build the first planner turn: decompose one operator prompt into cards.
 
     The planner reads the repository and answers with JSON; it never edits
     files, so this prompt carries the read-only boundary Plan mode uses.
+    ``repository_map`` is a bounded path listing so the planner can name
+    ``read_first`` entries without spending tool calls on discovering the tree.
     """
     hint = (
         f"\n\nThe project's verification command is: {verification_hint.strip()}"
@@ -369,6 +398,7 @@ def build_planner_prompt(
         f"{_embedded_profile(profile_text)}"
         f"{_embedded_topic(topic_text, 'plan')}"
         f"{_embedded_role_rules(role_rules, 'Planner')}"
+        f"{_embedded_repository_map(repository_map)}"
         "Decompose the request above into small, self-contained tasks. Each task is handed to a "
         "separate worker agent that sees only its own card: the goal, checklist, file scope, "
         "read_first list, interfaces, and verify command you write. A worker that has to explore "
@@ -378,6 +408,8 @@ def build_planner_prompt(
         "between them are dispatched together; size and order the waves accordingly. A task that "
         "declares depends_on is dispatched only after those tasks are promoted, so its worktree "
         f"already contains their changes.{hint}\n\n"
+        f"{PLANNER_ROUNDS_TEXT}\n\n"
+        f"{PLANNER_SPEED_TEXT}{(' ' + PLANNER_MAP_TEXT) if repository_map.strip() else ''}\n\n"
         f"{PLANNER_PAYLOAD_INSTRUCTIONS}\n\n"
         "Inspect the repository as read-only context. Do not modify files or create generated "
         f"artifacts. {ORCHESTRATE_BOUNDARY}"
@@ -391,15 +423,25 @@ def build_planner_round_prompt(
     role_rules: str | None = None,
     profile_text: str | None = None,
     round_number: int = 2,
-    round_limit: int = 6,
+    round_limit: int = 0,
 ) -> str:
-    """Build a later planner turn from a bounded status digest, not transcripts."""
+    """Build a later planner turn from a bounded status digest, not transcripts.
+
+    ``round_limit`` is the optional safety cap; zero means the planner alone
+    decides when the session is finished.
+    """
+    remaining = ""
+    if int(round_limit) > 0:
+        remaining = (
+            f" This session is capped at {int(round_limit)} rounds, after which it fails; "
+            "finish before then."
+        )
     return (
         "TASK_MODE: orchestrate-plan\n\n"
         f"{user_prompt.strip()}\n\n"
         f"{_embedded_profile(profile_text)}"
         f"{_embedded_role_rules(role_rules, 'Planner')}"
-        f"Planner round {round_number} of {round_limit}.\n\n"
+        f"{planner_round_label(round_number, round_limit)}.{remaining}\n\n"
         f"Your current plan summary:\n{summary.strip() or '(none recorded)'}\n\n"
         f"Status of the tasks you dispatched:\n{digest.strip()}\n\n"
         "Decide what happens next. You may add tasks, re-issue a failed task under a new id with "
@@ -407,7 +449,10 @@ def build_planner_round_prompt(
         "when a different card would succeed; a task that is failing for a reason no card can fix "
         "should be abandoned and explained in summary. Send done=true with an empty tasks array "
         "once the request is satisfied. Include only tasks that still need to run — tasks already "
-        "promoted must not be repeated.\n\n"
+        "promoted must not be repeated. You decide how many more rounds the work needs; do not "
+        "add cards merely to use another round.\n\n"
+        "Promoted cards are already merged into the branch this worktree was cut from, so read "
+        "only what a new card needs and answer promptly.\n\n"
         f"{PLANNER_PAYLOAD_INSTRUCTIONS}\n\n"
         "Inspect the repository as read-only context. Do not modify files or create generated "
         f"artifacts. {ORCHESTRATE_BOUNDARY}"
@@ -505,3 +550,15 @@ def _embedded_topic(topic_text: str | None, mode: str) -> str:
     if topic_text is None:
         return ""
     return embed_topic(topic_text, mode)
+
+
+def _embedded_repository_map(repository_map: str) -> str:
+    if not repository_map.strip():
+        return ""
+    return (
+        "BEGIN_DAEDALUS_REPOSITORY_MAP\n"
+        "Tracked paths in this repository, one per line, already supplied so you need not list "
+        "directories yourself:\n"
+        f"{repository_map.strip()}\n"
+        "END_DAEDALUS_REPOSITORY_MAP\n\n"
+    )

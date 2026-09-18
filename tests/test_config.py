@@ -342,12 +342,14 @@ class OrchestrateSettingsTests(unittest.TestCase):
             root / "parameter_files" / "daedalus-tui-orchestrate-mode.toml"
         )
 
-        self.assertEqual(settings.planner_selection, ("claude", "claude-fable-5-1", "high"))
+        self.assertEqual(settings.planner_selection, ("claude", "claude-fable-5-1", "medium"))
         self.assertEqual(settings.worker_selection, ("claude", "claude-opus-5", "high"))
         self.assertEqual(settings.default_max_workers, 3)
         self.assertEqual(settings.max_workers_limit, 8)
-        self.assertEqual(settings.planner_round_limit, 6)
+        # No round cap: the planner decides how many rounds the work needs.
+        self.assertEqual(settings.planner_round_limit, 0)
         self.assertEqual(settings.task_reissue_limit, 2)
+        self.assertEqual(settings.planner_repository_map_chars, 8_000)
         self.assertEqual(settings.planner_digest_budget_chars, 12_000)
         self.assertEqual(settings.worker_report_budget_chars, 4_000)
         self.assertEqual(settings.worker_card_budget_chars, 6_000)
@@ -388,11 +390,47 @@ class OrchestrateSettingsTests(unittest.TestCase):
         self.assertIn("max_workers_limit", str(error.exception))
 
     def test_non_positive_limits_are_rejected(self):
-        path = self.parameter_file("[limits]\nplanner_round_limit = 0\n")
+        path = self.parameter_file("[limits]\nplanner_digest_budget_chars = 0\n")
 
         with self.assertRaises(ValueError) as error:
             load_orchestrate_settings(path)
         self.assertIn("must be positive", str(error.exception))
+
+    def test_round_cap_is_optional_and_may_not_be_negative(self):
+        self.assertEqual(
+            load_orchestrate_settings(self.parameter_file("[limits]\nplanner_round_limit = 4\n")).planner_round_limit,
+            4,
+        )
+        self.assertEqual(
+            load_orchestrate_settings(self.parameter_file("[limits]\nplanner_round_limit = 0\n")).planner_round_limit,
+            0,
+        )
+        with self.assertRaises(ValueError) as error:
+            load_orchestrate_settings(self.parameter_file("[limits]\nplanner_round_limit = -1\n"))
+        self.assertIn("planner_round_limit", str(error.exception))
+
+    def test_cursor_and_codex_may_play_either_role(self):
+        path = self.parameter_file(
+            '[roles]\nplanner_provider = "cursor"\nplanner_model = "cursor"\nplanner_reasoning = ""\n'
+            'worker_provider = "codex"\nworker_model = "gpt-6-astra"\nworker_reasoning = "medium"\n'
+        )
+
+        settings = load_orchestrate_settings(path)
+
+        self.assertEqual(settings.planner_selection, ("cursor", "cursor", ""))
+        self.assertEqual(settings.worker_selection, ("codex", "gpt-6-astra", "medium"))
+
+    def test_unknown_provider_model_and_reasoning_are_rejected(self):
+        cases = (
+            ('[roles]\nplanner_provider = "gemini"\n', "planner_provider"),
+            ('[roles]\nworker_provider = "codex"\nworker_model = "gpt-0"\n', "worker_model"),
+            ('[roles]\nworker_reasoning = "turbo"\n', "worker_reasoning"),
+        )
+        for body, field in cases:
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError) as error:
+                    load_orchestrate_settings(self.parameter_file(body))
+                self.assertIn(field, str(error.exception))
 
     def test_forbidding_reissues_is_allowed(self):
         path = self.parameter_file("[limits]\ntask_reissue_limit = 0\n")
