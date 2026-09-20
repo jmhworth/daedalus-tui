@@ -78,8 +78,9 @@ class CommandMenuSettings:
     create_topic_label: str = "Create Topic"
     personal_supabase_label: str = "Activate personal Supabase"
     remove_personal_supabase_label: str = "Remove personal Supabase"
-    push_branch_label: str = "Push to GitHub"
+    push_branch_label: str = "Sync to GitHub"
     keyboard_shortcuts_label: str = "Keyboard Shortcuts"
+    pull_before_push: bool = True
 
 
 def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
@@ -226,8 +227,9 @@ def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMen
         remove_personal_supabase_label=str(
             labels.get("remove_personal_supabase", "Remove personal Supabase")
         ),
-        push_branch_label=str(labels.get("push_branch", "Push to GitHub")),
+        push_branch_label=str(labels.get("push_branch", "Sync to GitHub")),
         keyboard_shortcuts_label=str(labels.get("keyboard_shortcuts", "Keyboard Shortcuts")),
+        pull_before_push=bool(values.get("pull_before_push", True)),
     )
 
 
