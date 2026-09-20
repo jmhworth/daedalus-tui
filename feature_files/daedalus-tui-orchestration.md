@@ -48,6 +48,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-09-19: Updated coordinator test doubles to accept sync-recovery orchestrator kwargs so normal submit paths stay compatible.
 - 2026-09-19: Added operator Sync conflict recovery that plans in a preserved isolated sync worktree, auto-implements when questions clear, finalizes under the integration gate, and pushes without stock implement_plan worktree discard.
 - 2026-09-19: Cursor agent runs now inherit non-empty `CURSOR_API_KEY` from the launch-root and TUI package `.env` when the target project omits it, without sharing Supabase credentials across projects.
 - 2026-09-19: Noted that the operator Command Menu Sync action pulls then pushes the operating branch; automated orchestration still never owns Git remotes.

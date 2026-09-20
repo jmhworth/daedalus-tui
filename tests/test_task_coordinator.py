@@ -25,7 +25,7 @@ class FakeOrchestrator:
         self.on_event = on_event
         self.integration_gate = integration_gate
 
-    def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None):
+    def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None, **_kwargs):
         with self.lock:
             type(self).active += 1
             type(self).maximum = max(type(self).maximum, type(self).active)
@@ -222,7 +222,7 @@ class TaskCoordinatorTests(unittest.TestCase):
 
     def test_failed_task_does_not_block_later_task(self):
         class FailingOrchestrator(FakeOrchestrator):
-            def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None):
+            def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None, **_kwargs):
                 if prompt == "bad":
                     self.on_event("failed", "Task failed but worktree is preserved.", "error")
                     return OrchestrationResult(False, task_id, f"agent/task-{task_id}", Path(f"/tmp/{task_id}"), "preserved")
@@ -531,7 +531,7 @@ class TaskCoordinatorTests(unittest.TestCase):
             def __init__(self, repository, _runner, _settings, _on_event, integration_gate=None):
                 self.repository = repository
 
-            def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None):
+            def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None, **_kwargs):
                 type(self).calls.append((existing_context, resume_notes, resume_from))
                 type(self).started.set()
                 context = existing_context or WorktreeContext(
