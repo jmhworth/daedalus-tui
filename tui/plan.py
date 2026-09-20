@@ -81,60 +81,31 @@ def is_valid_plan_answer(question: PlanQuestion, answer: str | None) -> bool:
 
 def parse_plan_response(response: str) -> PlanResult:
     """Extract the agent's plan payload without exposing protocol text in the UI."""
-    payload_text = _payload_text(response)
-    if payload_text is None:
-        return PlanResult(response.strip(), (), False, valid=False, error="Plan response was not in the required format.")
-    try:
-        payload = json.loads(payload_text)
-    except json.JSONDecodeError as error:
+    candidates = _plan_payload_candidates(response)
+    if not candidates:
         return PlanResult(
             response.strip(),
             (),
             False,
             valid=False,
-            error=f"Plan response was not valid JSON: {error.msg}.",
-        )
-    if not isinstance(payload, dict):
-        return PlanResult(response.strip(), (), False, valid=False, error="Plan payload must be a JSON object.")
-
-    plan = payload.get("plan")
-    raw_questions = payload.get("questions", [])
-    no_more_questions = payload.get("no_more_questions")
-    if not isinstance(plan, str) or not plan.strip():
-        return PlanResult(response.strip(), (), False, valid=False, error="Plan payload is missing a plan.")
-    if not isinstance(raw_questions, list) or not isinstance(no_more_questions, bool):
-        return PlanResult(
-            plan.strip(),
-            (),
-            False,
-            valid=False,
-            error="Plan payload must include questions and no_more_questions.",
+            error="Plan response was not in the required format.",
         )
 
-    questions: list[PlanQuestion] = []
-    try:
-        for raw_question in raw_questions:
-            questions.append(_parse_question(raw_question))
-    except ValueError as error:
-        return PlanResult(plan.strip(), (), False, valid=False, error=str(error))
-    question_ids = [question.question_id for question in questions]
-    if len(question_ids) != len(set(question_ids)):
-        return PlanResult(
-            plan.strip(),
-            (),
-            False,
-            valid=False,
-            error="Plan questions must use unique ids.",
-        )
-    if no_more_questions and questions:
-        return PlanResult(
-            plan.strip(),
-            (),
-            False,
-            valid=False,
-            error="A confirmed plan cannot include unanswered questions.",
-        )
-    return PlanResult(plan.strip(), tuple(questions), no_more_questions)
+    # Agents often revise in one turn (prose + multiple BEGIN/END blocks). Prefer
+    # the latest valid payload so an earlier broken draft cannot hide questions.
+    last_failure: PlanResult | None = None
+    for payload_text in reversed(candidates):
+        parsed = _parse_plan_payload(payload_text, response)
+        if parsed.valid:
+            return parsed
+        last_failure = parsed
+    return last_failure or PlanResult(
+        response.strip(),
+        (),
+        False,
+        valid=False,
+        error="Plan response was not in the required format.",
+    )
 
 
 def build_plan_clarification_prompt(
@@ -214,23 +185,155 @@ def build_implementation_prompt(
     )
 
 
-def _payload_text(response: str) -> str | None:
-    start = response.find(PLAN_START)
-    if start >= 0:
-        start += len(PLAN_START)
-        end = response.find(PLAN_END, start)
-        return response[start:end if end >= 0 else len(response)].strip()
+def _parse_plan_payload(payload_text: str, raw_response: str) -> PlanResult:
+    try:
+        payload = _loads_plan_json(payload_text)
+    except json.JSONDecodeError as error:
+        return PlanResult(
+            raw_response.strip(),
+            (),
+            False,
+            valid=False,
+            error=f"Plan response was not valid JSON: {error.msg}.",
+        )
+    if not isinstance(payload, dict):
+        return PlanResult(
+            raw_response.strip(),
+            (),
+            False,
+            valid=False,
+            error="Plan payload must be a JSON object.",
+        )
+
+    plan = payload.get("plan")
+    raw_questions = payload.get("questions", [])
+    no_more_questions = payload.get("no_more_questions")
+    if not isinstance(plan, str) or not plan.strip():
+        return PlanResult(
+            raw_response.strip(),
+            (),
+            False,
+            valid=False,
+            error="Plan payload is missing a plan.",
+        )
+    if not isinstance(raw_questions, list) or not isinstance(no_more_questions, bool):
+        return PlanResult(
+            plan.strip(),
+            (),
+            False,
+            valid=False,
+            error="Plan payload must include questions and no_more_questions.",
+        )
+
+    questions: list[PlanQuestion] = []
+    try:
+        for raw_question in raw_questions:
+            questions.append(_parse_question(raw_question))
+    except ValueError as error:
+        return PlanResult(plan.strip(), (), False, valid=False, error=str(error))
+    question_ids = [question.question_id for question in questions]
+    if len(question_ids) != len(set(question_ids)):
+        return PlanResult(
+            plan.strip(),
+            (),
+            False,
+            valid=False,
+            error="Plan questions must use unique ids.",
+        )
+    if no_more_questions and questions:
+        return PlanResult(
+            plan.strip(),
+            (),
+            False,
+            valid=False,
+            error="A confirmed plan cannot include unanswered questions.",
+        )
+    return PlanResult(plan.strip(), tuple(questions), no_more_questions)
+
+
+def _loads_plan_json(payload_text: str) -> Any:
+    """Parse plan JSON, tolerating raw control characters inside string values."""
+    try:
+        return json.loads(payload_text)
+    except json.JSONDecodeError:
+        return json.loads(_escape_unescaped_controls_in_json_strings(payload_text))
+
+
+def _escape_unescaped_controls_in_json_strings(text: str) -> str:
+    """Escape raw newlines/tabs inside JSON strings (common LLM soft-wrap damage)."""
+    result: list[str] = []
+    in_string = False
+    escape = False
+    for character in text:
+        if in_string:
+            if escape:
+                result.append(character)
+                escape = False
+                continue
+            if character == "\\":
+                result.append(character)
+                escape = True
+                continue
+            if character == '"':
+                result.append(character)
+                in_string = False
+                continue
+            if character == "\n":
+                result.append("\\n")
+                continue
+            if character == "\r":
+                result.append("\\r")
+                continue
+            if character == "\t":
+                result.append("\\t")
+                continue
+            if ord(character) < 0x20:
+                result.append(f"\\u{ord(character):04x}")
+                continue
+            result.append(character)
+            continue
+        if character == '"':
+            in_string = True
+        result.append(character)
+    return "".join(result)
+
+
+def _plan_payload_candidates(response: str) -> list[str]:
+    """Return every BEGIN/END plan blob, then fence/bare-object fallbacks."""
+    payloads: list[str] = []
+    search_from = 0
+    while True:
+        start = response.find(PLAN_START, search_from)
+        if start < 0:
+            break
+        content_start = start + len(PLAN_START)
+        end = response.find(PLAN_END, content_start)
+        if end < 0:
+            payloads.append(response[content_start:].strip())
+            break
+        payloads.append(response[content_start:end].strip())
+        search_from = end + len(PLAN_END)
+    if payloads:
+        return payloads
+
     fenced_start = response.find("```")
     if fenced_start >= 0:
         content_start = response.find("\n", fenced_start)
         fenced_end = response.find("```", content_start + 1) if content_start >= 0 else -1
         if content_start >= 0 and fenced_end >= 0:
-            return response[content_start + 1 : fenced_end].strip()
+            return [response[content_start + 1 : fenced_end].strip()]
+
     object_start = response.find("{")
     object_end = response.rfind("}")
     if object_start >= 0 and object_end > object_start:
-        return response[object_start : object_end + 1].strip()
-    return None
+        return [response[object_start : object_end + 1].strip()]
+    return []
+
+
+def _payload_text(response: str) -> str | None:
+    """Compatibility helper: first plan payload candidate, if any."""
+    candidates = _plan_payload_candidates(response)
+    return candidates[0] if candidates else None
 
 
 def _parse_question(raw_question: Any) -> PlanQuestion:

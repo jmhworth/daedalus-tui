@@ -41,6 +41,68 @@ class PlanTests(unittest.TestCase):
         self.assertFalse(result.no_more_questions)
         self.assertFalse(parse_plan_response("plain markdown plan").valid)
 
+    def test_parser_prefers_latest_valid_plan_block(self):
+        first = (
+            '{"plan":"Draft one.","questions":[{"id":"q1","question":"Which store?",'
+            '"options":[{"id":"a","label":"SQLite"},{"id":"b","label":"JSON"}]}],'
+            '"no_more_questions":false}'
+        )
+        second = (
+            '{"plan":"Draft two.","questions":[{"id":"q1","question":"Which host?",'
+            '"options":[{"id":"cloud","label":"Cloud (Recommended)"},'
+            '{"id":"local","label":"Local"}]}],"no_more_questions":false}'
+        )
+        response = (
+            "I'll inspect the repo.\n"
+            f"{PLAN_START}\n{first}\n{PLAN_END}\n"
+            "Revised after checking coverage.\n"
+            f"{PLAN_START}\n{second}\n{PLAN_END}\n"
+            "Continuing with recommended answers."
+        )
+
+        result = parse_plan_response(response)
+
+        self.assertTrue(result.valid)
+        self.assertEqual(result.plan, "Draft two.")
+        self.assertEqual(result.questions[0].text, "Which host?")
+        self.assertEqual(result.questions[0].options[0].label, "Cloud (Recommended)")
+
+    def test_parser_skips_broken_earlier_block_for_later_valid_one(self):
+        broken = '{"plan":"Truncated draft without closing quotes or questions'
+        valid = (
+            '{"plan":"Recovered plan.","questions":[{"id":"q1","question":"Which?",'
+            '"options":[{"id":"a","label":"KXHIGHLAX only (Recommended)"},'
+            '{"id":"b","label":"All series"}]}],"no_more_questions":false}'
+        )
+        response = f"{PLAN_START}\n{broken}\n{PLAN_END}\n{PLAN_START}\n{valid}\n{PLAN_END}"
+
+        result = parse_plan_response(response)
+
+        self.assertTrue(result.valid)
+        self.assertEqual(result.plan, "Recovered plan.")
+        self.assertEqual(len(result.questions), 1)
+
+    def test_parser_accepts_raw_newlines_inside_json_strings(self):
+        response = (
+            f"{PLAN_START}\n"
+            '{"plan":"Use regime ACF.\\n\\n## Goal\\nPull Kalshi Los Angeles daily high-temperature\n'
+            '**trade-by-trade** data.",'
+            '"questions":[{"id":"q1","question":"Which universe?",'
+            '"options":[{"id":"a","label":"KXHIGHLAX only (Recommended)"},'
+            '{"id":"b","label":"All\nClimate and Weather series already discoverable"}],'
+            '"required":true}],"no_more_questions":false}\n'
+            f"{PLAN_END}"
+        )
+
+        result = parse_plan_response(response)
+
+        self.assertTrue(result.valid)
+        self.assertIn("trade-by-trade", result.plan)
+        self.assertEqual(
+            result.questions[0].options[1].label,
+            "All\nClimate and Weather series already discoverable",
+        )
+
     def test_parser_rejects_ambiguous_question_and_option_ids(self):
         duplicate_questions = (
             '{"plan":"Do it.","questions":[{"id":"q1","question":"First?","options":['

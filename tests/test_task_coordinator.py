@@ -125,6 +125,48 @@ class TaskCoordinatorTests(unittest.TestCase):
             self.assertIn("What about the API boundary?", PlanningOrchestrator.calls[1][2])
             coordinator.shutdown()
 
+    def test_multi_block_soft_wrapped_plan_reaches_awaiting_answers(self):
+        class PlanOrchestrator:
+            def __init__(self, _repository, _runner, _settings, on_event, integration_gate=None):
+                self.on_event = on_event
+
+            def run(self, _prompt, _provider, _model, _reasoning, task_id=None, **_kwargs):
+                # Mimic a planning agent that streams prose, a soft-wrapped first
+                # draft, then a revised second BEGIN/END payload in one turn.
+                self.on_event("agent", "I'll inspect the repo first.", "message")
+                self.on_event(
+                    "agent",
+                    'BEGIN_DAEDALUS_PLAN\n{"plan":"Draft one.","questions":[{"id":"q1",'
+                    '"question":"Which universe?","options":[{"id":"a","label":"All\n'
+                    'Climate series"},{"id":"b","label":"One"}]}],'
+                    '"no_more_questions":false}\nEND_DAEDALUS_PLAN',
+                    "message",
+                )
+                self.on_event(
+                    "agent",
+                    'BEGIN_DAEDALUS_PLAN\n{"plan":"Draft two with regimes.","questions":['
+                    '{"id":"q1","question":"Which universe?","required":true,"options":['
+                    '{"id":"a","label":"KXHIGHLAX only (Recommended)"},'
+                    '{"id":"b","label":"All Climate and Weather series"}]}],'
+                    '"no_more_questions":false}\nEND_DAEDALUS_PLAN'
+                    "Resuming with recommended answers.",
+                    "message",
+                )
+                return OrchestrationResult(True, task_id, awaiting_plan=True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            coordinator = TaskCoordinator(Path(directory), object(), OrchestrationSettings(max_concurrent_tasks=1))
+            with patch("tui.task_coordinator.LocalOrchestrator", PlanOrchestrator):
+                record = coordinator.submit("Kalshi ACF plan", "codex", "luna", "medium", mode="plan")
+                record.future.result(timeout=5)
+
+            self.assertEqual(record.status, "awaiting_answers")
+            self.assertEqual(record.plan_text, "Draft two with regimes.")
+            self.assertEqual(len(record.plan_questions), 1)
+            self.assertEqual(record.plan_questions[0].options[0].option_id, "a")
+            self.assertIsNone(record.plan_error)
+            coordinator.shutdown()
+
     def test_first_ready_integration_is_serialized(self):
         coordinator = IntegrationCoordinator()
         started = threading.Event()

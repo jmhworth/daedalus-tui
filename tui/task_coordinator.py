@@ -832,8 +832,7 @@ class TaskCoordinator:
         LOGGER.info("Task worker finished task=%s status=%s", record.task_id, record.status)
 
     def _update_plan_state(self, record: TaskRecord, new_messages: list[str]) -> bool:
-        response = "\n\n".join(new_messages).strip()
-        parsed = parse_plan_response(response)
+        parsed = self._parse_plan_messages(new_messages)
         if not parsed.valid:
             # A protocol error after the user answered questions must not erase
             # the last usable plan or make the choices impossible to resubmit.
@@ -841,9 +840,9 @@ class TaskCoordinator:
             record.plan_error = parsed.error
             record.error = parsed.error
             LOGGER.warning(
-                "Rejected invalid plan payload task=%s response_length=%d error=%s",
+                "Rejected invalid plan payload task=%s message_count=%d error=%s",
                 record.task_id,
-                len(response),
+                len(new_messages),
                 parsed.error,
             )
             return False
@@ -867,6 +866,35 @@ class TaskCoordinator:
             if question_id in valid_question_ids
         }
         return True
+
+    @staticmethod
+    def _parse_plan_messages(new_messages: list[str]):
+        """Parse plan JSON from one turn without letting join separators break it.
+
+        Non-Cursor providers store discrete agent_message chunks. Joining them
+        with blank lines is fine between complete payloads, but inserting
+        ``\\n\\n`` in the middle of a string value corrupts JSON. Try contiguous
+        concatenation and each chunk alone after the blank-line join.
+        """
+        candidates: list[str] = []
+        blank_joined = "\n\n".join(new_messages).strip()
+        contiguous = "".join(new_messages).strip()
+        if blank_joined:
+            candidates.append(blank_joined)
+        if contiguous and contiguous not in candidates:
+            candidates.append(contiguous)
+        for message in reversed(new_messages):
+            cleaned = message.strip()
+            if cleaned and cleaned not in candidates:
+                candidates.append(cleaned)
+
+        last_failure = None
+        for response in candidates:
+            parsed = parse_plan_response(response)
+            if parsed.valid:
+                return parsed
+            last_failure = parsed
+        return last_failure or parse_plan_response("")
 
     def _discard_plan_worktree(self, record: TaskRecord) -> None:
         """Remove the clean, read-only planning worktree after coding is queued."""
