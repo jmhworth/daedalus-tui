@@ -121,23 +121,47 @@ skipped_directory_names = [
 width = "95%"
 
 # Usage bar (bottom left). Every `interval_seconds` the TUI reads each
-# provider's usage and refreshes the bar. Neither CLI offers a non-interactive
-# `usage` subcommand (Claude Code waits for a terminal; Codex refuses without
-# one), so by default the bar reads the same local data their own /usage and
-# /status views show: Codex rate-limit windows from its session logs, and
-# Claude Code's per-day token statistics cache, including any `rate_limits`
+# provider's usage and refreshes the bar.
+#
+# The percentages each provider's own /usage view reports are the only ones
+# that know the operator's real plan limits, so the bar asks the CLIs for them
+# first, via the `commands` listed per provider below. Neither CLI is built to
+# be scripted -- Claude Code waits for a terminal, Codex refuses without one,
+# and both stop on a permission prompt when run headless -- so those commands
+# carry each CLI's documented permission override and run attached to a
+# pseudo-terminal (`use_pty`). A CLI that draws its usage panel and then waits
+# is killed at `command_timeout_seconds` and whatever it printed is still
+# scraped, because the percentages are already in that text. Only percentages
+# whose wording names a known window (session/5h, week/7d, opus, context,
+# spend) become bars, so a stray number in the output cannot invent one.
+#
+# When no command yields percentages, the bar falls back to the same local data
+# those views are drawn from: Codex rate-limit windows from its session logs,
+# and Claude Code's per-day token statistics cache, including any `rate_limits`
 # payload it provides. The Claude cache is only a derived summary and can be
 # missing or stale, so its session transcripts are counted as well and the
-# larger figure from the two sources is shown. Set `command` for a provider to
-# run any program instead; it runs with stdin closed and a timeout, and its
-# JSON or first output line is shown. JSON rate-limit fields and Claude
-# `context_window` percentages produce the same progress bars for Claude, and
-# when Claude Code publishes none, its bars are measured from transcript
-# tokens over the rolling windows configured below.
+# larger figure from the two sources is shown; when Claude Code publishes no
+# rate limits, its bars are measured from transcript tokens over the rolling
+# windows configured below. Those fall-back bars are calibrated against this
+# machine's busiest window rather than a real quota, which is why the CLIs are
+# asked first. Set `fallback_to_local = false` for a provider to show nothing
+# rather than an approximation. Why each command failed is recorded in the
+# usage bar's tooltip.
+#
+# Note that these commands start a real CLI session. If a CLI does not treat
+# the slash command as a built-in it will send it to the model as a prompt,
+# which costs a small number of tokens each time it runs -- capped by
+# `command_interval_seconds` below. Clear a provider's `commands` to stop
+# asking that CLI entirely and read only local files.
 [usage]
 enabled = true
 interval_seconds = 60
 command_timeout_seconds = 20
+# How often the provider CLIs are actually asked. The bar still refreshes every
+# `interval_seconds`; between command runs it redraws the last reading. Starting
+# a CLI is far more expensive than reading a local file and these windows move
+# over hours, so asking every minute would buy nothing.
+command_interval_seconds = 300
 codex_sessions_dir = "~/.codex/sessions"
 claude_stats_file = "~/.claude/stats-cache.json"
 # Claude Code appends one JSON line per turn to a session transcript here.
@@ -169,14 +193,46 @@ session_tail_bytes = 262144
 # Cells used by each percentage progress bar in the usage panel. The panel
 # lives in the fixed-width task sidebar, so keep this well under its width.
 bar_width = 12
+# Size of the pseudo-terminal a usage command runs in. A CLI lays its usage
+# panel out against the terminal width, so a narrow terminal wraps or truncates
+# the very percentages being read.
+pty_columns = 200
+pty_lines = 60
+# How long to wait after a usage command starts before typing `input_text` into
+# its terminal, so an interactive CLI has finished starting up first.
+input_delay_seconds = 1.5
 
+# Candidate usage commands per provider, tried in order until one produces
+# percentages. These subcommands are not a stable scripting interface, so
+# listing more than one means a rename does not blank the bar; a candidate that
+# does not exist fails immediately and costs nothing. Each carries the CLI's
+# own permission override so it cannot stop at a prompt. `input_text` is typed
+# into the terminal once the CLI has started, for a CLI whose usage view is
+# only reachable as a slash command typed into a running session; `env` adds
+# environment variables (never put API keys here).
 [usage.claude]
 label = "Claude"
 command = []
+commands = [
+  ["claude", "--permission-mode", "bypassPermissions", "-p", "/usage"],
+  ["claude", "--permission-mode", "bypassPermissions", "-p", "/status"],
+]
+use_pty = true
+input_text = ""
+fallback_to_local = true
+env = {}
 
 [usage.codex]
 label = "Codex"
 command = []
+commands = [
+  ["codex", "exec", "--ask-for-approval", "never", "--sandbox", "read-only", "--skip-git-repo-check", "/status"],
+  ["codex", "exec", "--ask-for-approval", "never", "--sandbox", "read-only", "--skip-git-repo-check", "/usage"],
+]
+use_pty = true
+input_text = ""
+fallback_to_local = true
+env = {}
 
 # Responsive safety guard and compact dimensions. Above the guard, the TUI
 # measures the wide controls' laid-out regions; a clipped toolbar first wraps

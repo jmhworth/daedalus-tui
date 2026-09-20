@@ -1,19 +1,32 @@
 """Periodic provider usage readings for the usage bar.
 
-Neither provider CLI exposes a non-interactive ``usage`` subcommand (Claude
-Code 2.1 hangs waiting for a terminal and Codex 0.154 refuses without one), so
-by default the monitor reads the same local data those CLIs display in their
-own ``/usage`` and ``/status`` views: Codex writes rate-limit windows into its
-session logs after every turn (a snapshot, so a window whose recorded reset
-time has passed is reported as refilled rather than redrawn at its last
-percentage), and Claude Code maintains a per-day token
-statistics cache that may also include its status-line rate-limit windows.
-Claude Code's cache is only a derived summary, so its session transcripts are
-read as the raw record of what was actually spent, and when Claude Code
-publishes no rate-limit payload those transcripts also supply the rolling 5h
-and 7d windows its progress bars are drawn from. A command can be configured
-per provider instead; it runs with stdin closed, a bounded timeout, and
-process-group termination.
+The percentages each provider's own ``/usage`` view reports are the only
+numbers that are actually right, so the monitor asks the provider CLIs for
+them first and only falls back to reading local files.
+
+Asking is awkward because neither CLI is built to be scripted: Claude Code
+hangs waiting for a terminal, Codex refuses without one, and both stop on a
+permission prompt when run headless. So a provider's usage commands run
+attached to a pseudo-terminal, with permission prompts overridden on the
+command line, and their rendered output is scraped for labelled percentages.
+A CLI that draws a panel and then waits is handled by the timeout: whatever it
+printed before being killed is still parsed, because that text already holds
+the numbers. Several candidate commands can be listed per provider and are
+tried in order until one yields windows, so a CLI that renamed its usage
+command does not silently blank the bar.
+
+When no command yields usable windows, the monitor reads the same local data
+those views are drawn from: Codex writes rate-limit windows into its session
+logs after every turn (a snapshot, so a window whose recorded reset time has
+passed is reported as refilled rather than redrawn at its last percentage),
+and Claude Code maintains a per-day token statistics cache that may also
+include its status-line rate-limit windows. Claude Code's cache is only a
+derived summary, so its session transcripts are read as the raw record of what
+was actually spent, and when Claude Code publishes no rate-limit payload those
+transcripts also supply the rolling 5h and 7d windows its progress bars are
+drawn from. Those transcript-derived bars are calibrated against the operator's
+own busiest window rather than a real quota, which is exactly why the CLIs are
+asked first.
 """
 
 from __future__ import annotations
@@ -23,6 +36,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import threading
@@ -33,6 +47,11 @@ from .debug_log import LOGGER, scrub_credentials
 
 DEFAULT_INTERVAL_SECONDS = 60
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 20
+# How often the provider CLIs are actually asked for their usage. The bar still
+# refreshes every ``interval_seconds``; between command runs it redraws the last
+# reading. Rate-limit windows move over hours, so five minutes is far finer than
+# the numbers being shown.
+DEFAULT_COMMAND_INTERVAL_SECONDS = 300.0
 DEFAULT_SESSION_SCAN_LIMIT = 12
 DEFAULT_SESSION_TAIL_BYTES = 262_144
 DEFAULT_BAR_WIDTH = 12
@@ -62,13 +81,105 @@ _CLAUDE_WINDOW_KEYS = (
 )
 _CLAUDE_CONTEXT_KEYS = (("used_percentage", "context"),)
 
+# Size the pseudo-terminal is opened at. A CLI that draws a usage panel lays it
+# out against the terminal width, so a narrow terminal wraps or truncates the
+# very percentages being scraped.
+DEFAULT_PTY_COLUMNS = 200
+DEFAULT_PTY_LINES = 60
+# How long to wait after a command starts before typing into its terminal, so
+# an interactive CLI has finished starting up and is listening for input.
+DEFAULT_INPUT_DELAY_SECONDS = 1.5
+
+# Both CLIs stop on a permission prompt when run headless, so the usage
+# commands carry each CLI's documented permission override. Without it the
+# command sits at a prompt until the timeout and the bar stays empty.
+CLAUDE_PERMISSION_FLAGS = ("--permission-mode", "bypassPermissions")
+CODEX_PERMISSION_FLAGS = ("--ask-for-approval", "never", "--sandbox", "read-only")
+
+# Candidate usage commands, tried in order until one produces percentages.
+# Listing more than one is deliberate: these subcommands are not a stable
+# scripting interface, and a candidate that does not exist fails immediately
+# and costs nothing.
+DEFAULT_CLAUDE_USAGE_COMMANDS: tuple[tuple[str, ...], ...] = (
+    ("claude", *CLAUDE_PERMISSION_FLAGS, "-p", "/usage"),
+    ("claude", *CLAUDE_PERMISSION_FLAGS, "-p", "/status"),
+)
+DEFAULT_CODEX_USAGE_COMMANDS: tuple[tuple[str, ...], ...] = (
+    ("codex", "exec", *CODEX_PERMISSION_FLAGS, "--skip-git-repo-check", "/status"),
+    ("codex", "exec", *CODEX_PERMISSION_FLAGS, "--skip-git-repo-check", "/usage"),
+)
+
+# Escape sequences a CLI emits to colour and position its usage panel. They sit
+# between the label and the percentage, so they have to go before the text is
+# read.
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-Z\\-_]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+# A percentage anywhere in a line, with the text that precedes it on the line.
+_PERCENT = re.compile(r"(?P<before>.*?)(?P<percent>\d{1,3}(?:\.\d+)?)\s*%")
+# "Resets 3:45pm", "resets in 2h 10m", "Resets Nov 5 (UTC)" -- the phrase a
+# usage view prints beside a window, kept verbatim rather than re-derived. It
+# runs to the end of its line or to a separator, so a parenthesised time zone
+# stays part of it.
+_RESET_PHRASE = re.compile(r"(resets?(?:\s+in)?\b[^.|\]]*)", re.IGNORECASE)
+# Phrases a provider uses for a window, mapped onto the short labels the panel
+# draws. Checked in order, so the more specific phrases come first.
+_TEXT_WINDOW_LABELS: tuple[tuple[str, str], ...] = (
+    ("context", "context"),
+    ("opus", "opus"),
+    ("sonnet", "sonnet"),
+    ("spend", "spend"),
+    ("credit", "spend"),
+    ("current session", "5h"),
+    ("5-hour", "5h"),
+    ("5 hour", "5h"),
+    ("five-hour", "5h"),
+    ("session", "5h"),
+    ("hourly", "5h"),
+    ("weekly", "7d"),
+    ("this week", "7d"),
+    ("current week", "7d"),
+    ("7-day", "7d"),
+    ("7 day", "7d"),
+    ("week", "7d"),
+    ("daily", "1d"),
+    ("today", "1d"),
+    ("monthly", "30d"),
+)
+
 
 @dataclass(frozen=True)
 class UsageProviderSettings:
-    """How one provider's usage is read: a command, or the default local reader."""
+    """How one provider's usage is read: its CLI commands, then the local reader.
+
+    ``command`` is the single-command spelling kept for existing configs;
+    ``commands`` lists candidates tried in order. ``use_pty`` runs them under a
+    pseudo-terminal, which is what makes a CLI that refuses or hangs without a
+    terminal produce output at all, and ``input_text`` is typed into that
+    terminal once the CLI has started, for a CLI whose usage view is only
+    reachable as a slash command. ``fallback_to_local`` keeps the bar drawn
+    from local files when no command works, so adding a command can never make
+    the panel worse than not having one.
+    """
 
     label: str
     command: tuple[str, ...] = ()
+    commands: tuple[tuple[str, ...], ...] = ()
+    use_pty: bool = False
+    input_text: str = ""
+    env: dict[str, str] = field(default_factory=dict)
+    fallback_to_local: bool = True
+
+    def resolved_commands(self) -> tuple[tuple[str, ...], ...]:
+        """Every command to try, the single-command spelling first."""
+        candidates = ([tuple(self.command)] if self.command else []) + [
+            tuple(entry) for entry in self.commands if entry
+        ]
+        seen: set[tuple[str, ...]] = set()
+        ordered: list[tuple[str, ...]] = []
+        for candidate in candidates:
+            if candidate not in seen:
+                seen.add(candidate)
+                ordered.append(candidate)
+        return tuple(ordered)
 
 
 @dataclass(frozen=True)
@@ -76,6 +187,11 @@ class UsageSettings:
     enabled: bool = True
     interval_seconds: int = DEFAULT_INTERVAL_SECONDS
     command_timeout_seconds: float = DEFAULT_COMMAND_TIMEOUT_SECONDS
+    # Starting a provider CLI is far more expensive than reading a local file,
+    # and these are rate-limit windows measured in hours, so the commands run
+    # on their own slower cadence and the bar reuses the last reading in
+    # between. Without this the panel would launch two CLIs a minute.
+    command_interval_seconds: float = DEFAULT_COMMAND_INTERVAL_SECONDS
     codex_sessions_dir: str = "~/.codex/sessions"
     claude_stats_file: str = "~/.claude/stats-cache.json"
     # Claude Code appends one JSON line per turn to a session transcript under
@@ -104,10 +220,23 @@ class UsageSettings:
     session_tail_bytes: int = DEFAULT_SESSION_TAIL_BYTES
     # Cells used by each percentage bar in the usage panel.
     bar_width: int = DEFAULT_BAR_WIDTH
+    # Terminal geometry and typing delay used when a usage command runs under a
+    # pseudo-terminal.
+    pty_columns: int = DEFAULT_PTY_COLUMNS
+    pty_lines: int = DEFAULT_PTY_LINES
+    input_delay_seconds: float = DEFAULT_INPUT_DELAY_SECONDS
     providers: dict[str, UsageProviderSettings] = field(
         default_factory=lambda: {
-            "claude": UsageProviderSettings("Claude"),
-            "codex": UsageProviderSettings("Codex"),
+            "claude": UsageProviderSettings(
+                "Claude",
+                commands=DEFAULT_CLAUDE_USAGE_COMMANDS,
+                use_pty=True,
+            ),
+            "codex": UsageProviderSettings(
+                "Codex",
+                commands=DEFAULT_CODEX_USAGE_COMMANDS,
+                use_pty=True,
+            ),
         }
     )
 
@@ -119,6 +248,21 @@ class UsageWindow:
     label: str
     used_percent: float
     reset_text: str = ""
+
+
+@dataclass(frozen=True)
+class _CommandResult:
+    """What one usage command printed, and how it ended.
+
+    ``timed_out`` is not by itself a failure: a CLI that draws its usage panel
+    and then waits for a keypress always ends this way, and the output captured
+    before it was killed is exactly what needs parsing.
+    """
+
+    output: str = ""
+    returncode: int | None = None
+    timed_out: bool = False
+    error: str = ""
 
 
 @dataclass(frozen=True)
@@ -296,6 +440,78 @@ def _window_label(window_minutes: object, fallback: str = "window") -> str:
     if minutes % 60 == 0:
         return f"{minutes // 60}h"
     return f"{minutes}m"
+
+
+# Block and box drawing runs make up the progress bars a usage view draws; they
+# sit between a window's name and its percentage.
+_BAR_CHARS = re.compile(r"[─-◿]+")
+
+
+def _text_window_label(text: str) -> str:
+    """Map a provider's wording for a window onto the label the panel draws."""
+    lowered = text.lower()
+    for phrase, label in _TEXT_WINDOW_LABELS:
+        if phrase in lowered:
+            return label
+    return ""
+
+
+def _text_reset(tail: str, following: str) -> str:
+    """Find the reset phrase a usage view prints beside a window.
+
+    The phrase is kept as the provider worded it rather than recomputed: it is
+    already correct, and the panel only has to repeat it. The line after the
+    percentage is consulted too, because a usage view commonly puts the reset
+    time on its own line -- but only when that line is not itself another
+    window, whose reset time belongs to that window instead.
+    """
+    candidates = [tail]
+    if following and not _PERCENT.search(following):
+        candidates.append(following)
+    for candidate in candidates:
+        match = _RESET_PHRASE.search(candidate)
+        if match:
+            return " ".join(match.group(1).split())[:48]
+    return ""
+
+
+def _windows_from_text(output: str) -> tuple[UsageWindow, ...]:
+    """Scrape labelled percentages out of a usage view's rendered output.
+
+    Only percentages whose wording names a window this panel knows become bars.
+    A usage view prints plenty of other numbers, and a bar built from an
+    unrecognised one would be worse than no bar at all.
+
+    A CLI drawing into a terminal repaints the same lines, so carriage returns
+    are treated as line breaks and a later reading of a window replaces an
+    earlier one: the last frame on screen is the current one.
+    """
+    lines = [
+        " ".join(_BAR_CHARS.sub(" ", raw).split())
+        for raw in _ANSI.sub("", output).replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    ]
+    found: dict[str, UsageWindow] = {}
+    previous = ""
+    for index, line in enumerate(lines):
+        if not line:
+            continue
+        matched = False
+        for match in _PERCENT.finditer(line):
+            percent = float(match.group("percent"))
+            if percent > 100.0:
+                continue
+            before = match.group("before").strip(" .:·|-")
+            # The window's name usually precedes its percentage; a view that
+            # puts the name on its own line above the bar is read from there.
+            label = _text_window_label(before) or _text_window_label(line) or _text_window_label(previous)
+            if not label:
+                continue
+            following = lines[index + 1] if index + 1 < len(lines) else ""
+            found[label] = UsageWindow(label, percent, _text_reset(line[match.end():], following))
+            matched = True
+        if not matched:
+            previous = line
+    return tuple(found.values())
 
 
 @dataclass
@@ -592,6 +808,11 @@ class UsageMonitor:
         # statistics scan never redefines what the usage bar's recent window
         # means, and so each reader only re-parses bytes it has not seen.
         self._claude_account_transcripts: ClaudeTranscriptUsage | None = None
+        # provider -> (when the commands last ran, that run's reading, its notes)
+        self._command_cache: dict[str, tuple[float, ProviderUsage | None, list[str]]] = {}
+        # provider -> the command that last produced windows, tried first next
+        # time so a working setup stops paying for the candidates before it.
+        self._winning_command: dict[str, tuple[str, ...]] = {}
 
     # --- public -------------------------------------------------------------------
 
@@ -617,8 +838,44 @@ class UsageMonitor:
         return tuple(readings)
 
     def read(self, provider: str, provider_settings: UsageProviderSettings, now: float) -> ProviderUsage:
-        if provider_settings.command:
-            return self._read_command(provider, provider_settings, now)
+        """Ask the provider CLI for its own percentages, then fall back locally.
+
+        The CLI's ``/usage`` view is the only source that knows the operator's
+        real plan limits, so it wins whenever it yields windows. Anything else
+        -- a missing CLI, a renamed subcommand, a permission prompt, a panel
+        that never exits -- falls through to the local readers, and the reason
+        each command failed is carried into the fallback's detail so the panel
+        tooltip explains itself instead of silently showing worse numbers.
+        """
+        commands = self._ordered_commands(provider, provider_settings)
+        command_reading: ProviderUsage | None = None
+        notes: list[str] = []
+        if commands:
+            command_reading, notes = self._cached_commands(provider, provider_settings, commands, now)
+            if command_reading is not None and command_reading.windows:
+                return self._restamp(command_reading, now)
+
+        local = self._read_local(provider, provider_settings, now)
+        if local.ok:
+            return self._with_notes(local, notes)
+        # Neither source worked. A command that actually ran and failed says
+        # more about why than "no usage data yet" does.
+        if command_reading is not None:
+            return self._with_notes(self._restamp(command_reading, now), [])
+        if local.detail or local.summary:
+            return self._with_notes(local, notes)
+        return local
+
+    def _read_local(self, provider: str, provider_settings: UsageProviderSettings, now: float) -> ProviderUsage:
+        if not provider_settings.fallback_to_local:
+            return ProviderUsage(
+                provider,
+                provider_settings.label,
+                f"{provider_settings.label}: no usage data yet",
+                "local fallback is disabled for this provider",
+                False,
+                now,
+            )
         if provider == "codex":
             return self.read_codex(provider_settings.label, now)
         if provider == "claude":
@@ -629,6 +886,71 @@ class UsageMonitor:
             f"{provider_settings.label}: no usage source configured",
             ok=False,
             checked_at=now,
+        )
+
+    def _ordered_commands(
+        self,
+        provider: str,
+        provider_settings: UsageProviderSettings,
+    ) -> tuple[tuple[str, ...], ...]:
+        """Candidate commands with the last one that worked moved to the front."""
+        commands = provider_settings.resolved_commands()
+        winner = self._winning_command.get(provider)
+        if winner is None or winner not in commands:
+            return commands
+        return (winner,) + tuple(command for command in commands if command != winner)
+
+    def _cached_commands(
+        self,
+        provider: str,
+        provider_settings: UsageProviderSettings,
+        commands: tuple[tuple[str, ...], ...],
+        now: float,
+    ) -> tuple[ProviderUsage | None, list[str]]:
+        """Run the usage commands at most once per ``command_interval_seconds``.
+
+        The bar refreshes every minute, but starting a provider CLI a minute is
+        both slow and wasteful for windows that move over hours, so the previous
+        run's reading is redrawn until the slower cadence comes round again.
+        """
+        cached = self._command_cache.get(provider)
+        if cached is not None and now - cached[0] < self.settings.command_interval_seconds:
+            return cached[1], list(cached[2])
+        reading, notes = self._read_commands(provider, provider_settings, commands, now)
+        self._command_cache[provider] = (now, reading, list(notes))
+        return reading, notes
+
+    @staticmethod
+    def _restamp(reading: ProviderUsage, now: float) -> ProviderUsage:
+        """Date a reused command reading to this poll, so the bar's clock moves."""
+        if reading.checked_at == now:
+            return reading
+        return ProviderUsage(
+            reading.provider,
+            reading.label,
+            reading.summary,
+            reading.detail,
+            reading.ok,
+            now,
+            reading.source,
+            reading.windows,
+        )
+
+    @staticmethod
+    def _with_notes(reading: ProviderUsage, notes: list[str]) -> ProviderUsage:
+        """Append the usage-command diagnostics to a reading's tooltip detail."""
+        if not notes:
+            return reading
+        detail = "\n".join([text for text in (reading.detail,) if text] + notes)
+        return ProviderUsage(
+            reading.provider,
+            reading.label,
+            reading.summary,
+            detail,
+            reading.ok,
+            reading.checked_at,
+            reading.source,
+            reading.windows,
         )
 
     # --- default readers ---------------------------------------------------------------
@@ -1019,42 +1341,100 @@ class UsageMonitor:
 
     # --- configured commands -----------------------------------------------------------
 
-    def _read_command(self, provider: str, provider_settings: UsageProviderSettings, now: float) -> ProviderUsage:
-        command = list(provider_settings.command)
+    def _read_commands(
+        self,
+        provider: str,
+        provider_settings: UsageProviderSettings,
+        commands: tuple[tuple[str, ...], ...],
+        now: float,
+    ) -> tuple[ProviderUsage | None, list[str]]:
+        """Try each candidate command, stopping at the first that yields windows.
+
+        Returns the best reading and a note per command that did not work. The
+        notes are what make a misconfigured command diagnosable: without them a
+        renamed subcommand looks identical to a provider with no usage at all.
+        """
+        notes: list[str] = []
+        best: ProviderUsage | None = None
+        for command in commands:
+            reading = self._read_command(provider, provider_settings, command, now)
+            if reading.windows:
+                self._winning_command[provider] = command
+                return reading, notes
+            notes.append(f"{' '.join(command)}: {reading.detail or reading.summary}")
+            if best is None or (reading.ok and not best.ok):
+                best = reading
+        self._winning_command.pop(provider, None)
+        return best, notes
+
+    def _read_command(
+        self,
+        provider: str,
+        provider_settings: UsageProviderSettings,
+        command: tuple[str, ...],
+        now: float,
+    ) -> ProviderUsage:
         source = " ".join(command)
-        try:
-            process = subprocess.Popen(
-                command,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                start_new_session=os.name == "posix",
-            )
-        except OSError as error:
-            return ProviderUsage(provider, provider_settings.label, f"{provider_settings.label}: unavailable", f"{source}: {error}", False, now, source)
-        try:
-            stdout, stderr = process.communicate(timeout=self.settings.command_timeout_seconds)
-        except subprocess.TimeoutExpired:
-            self._terminate(process)
-            stdout, stderr = process.communicate()
+        result = self._capture(command, provider_settings)
+        if result.error:
             return ProviderUsage(
                 provider,
                 provider_settings.label,
-                f"{provider_settings.label}: usage command timed out",
-                f"{source} produced no result within {self.settings.command_timeout_seconds:g}s",
+                f"{provider_settings.label}: unavailable",
+                f"{source}: {scrub_credentials(result.error)}",
                 False,
                 now,
                 source,
             )
-        if process.returncode != 0:
-            reason = scrub_credentials((stderr or stdout).strip().splitlines()[-1] if (stderr or stdout).strip() else f"exit {process.returncode}")
-            return ProviderUsage(provider, provider_settings.label, f"{provider_settings.label}: unavailable", f"{source}: {reason}", False, now, source)
-        summary, detail = self._summarize_output(provider_settings.label, stdout)
-        windows: tuple[UsageWindow, ...] = ()
+        output = result.output
+        windows = self._windows_from_output(provider, output, now)
+        if result.timed_out and not windows:
+            return ProviderUsage(
+                provider,
+                provider_settings.label,
+                f"{provider_settings.label}: usage command timed out",
+                f"{source} produced no percentages within {self.settings.command_timeout_seconds:g}s",
+                False,
+                now,
+                source,
+            )
+        # A CLI that renders a panel and then waits is killed at the timeout, so
+        # a non-zero exit is expected whenever the output already holds the
+        # numbers; only treat it as a failure when nothing was parsed.
+        if not windows and result.returncode not in (0, None):
+            text = output.strip()
+            reason = scrub_credentials(text.splitlines()[-1] if text else f"exit {result.returncode}")
+            return ProviderUsage(
+                provider,
+                provider_settings.label,
+                f"{provider_settings.label}: unavailable",
+                f"{source}: {reason}",
+                False,
+                now,
+                source,
+            )
+        summary, detail = self._summarize_output(provider_settings.label, output)
+        if windows:
+            # The scraped percentages are the point of running the command, so
+            # they lead the summary; the CLI's own first line stays in detail.
+            summary = f"{provider_settings.label} " + " · ".join(
+                f"{window.label} {window.used_percent:.0f}%" for window in windows
+            )
+            detail = "\n".join(
+                [
+                    f"{window.label}: {window.used_percent:.0f}% used"
+                    + (f", {window.reset_text}" if window.reset_text else "")
+                    for window in windows
+                ]
+                + [f"from `{source}`"]
+            )
+        return ProviderUsage(provider, provider_settings.label, summary, detail, True, now, source, windows)
+
+    def _windows_from_output(self, provider: str, output: str, now: float) -> tuple[UsageWindow, ...]:
+        """Read windows from a command's output, JSON first and then rendered text."""
         try:
-            payload = json.loads(stdout.strip())
-        except json.JSONDecodeError:
+            payload = json.loads(output.strip())
+        except (json.JSONDecodeError, ValueError):
             payload = None
         if isinstance(payload, dict):
             windows = self._windows_from_payload(payload, now, _CLAUDE_WINDOW_KEYS)
@@ -1074,7 +1454,147 @@ class UsageMonitor:
                         ("used_percentage", "usage"),
                     ),
                 )
-        return ProviderUsage(provider, provider_settings.label, summary, detail, True, now, source, windows)
+            if windows:
+                return windows
+        return _windows_from_text(output)
+
+    # --- running a usage command -------------------------------------------------------
+
+    def _command_env(self, provider_settings: UsageProviderSettings) -> dict[str, str]:
+        """The environment a usage command runs in.
+
+        ``TERM`` is set because a CLI that finds no terminal type falls back to
+        a dumb terminal and may refuse to draw the panel being scraped.
+        """
+        env = dict(os.environ)
+        env.setdefault("TERM", "xterm-256color")
+        env.update(provider_settings.env)
+        return env
+
+    def _capture(self, command: tuple[str, ...], provider_settings: UsageProviderSettings) -> _CommandResult:
+        """Run one usage command and return whatever it managed to print."""
+        if provider_settings.use_pty and os.name == "posix":
+            return self._capture_pty(command, provider_settings)
+        return self._capture_pipe(command, provider_settings)
+
+    def _capture_pipe(self, command: tuple[str, ...], provider_settings: UsageProviderSettings) -> _CommandResult:
+        """Run a command on plain pipes with stdin closed."""
+        try:
+            process = subprocess.Popen(
+                list(command),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=self._command_env(provider_settings),
+                start_new_session=os.name == "posix",
+            )
+        except OSError as error:
+            return _CommandResult(error=str(error))
+        try:
+            stdout, _ = process.communicate(timeout=self.settings.command_timeout_seconds)
+            return _CommandResult(output=stdout or "", returncode=process.returncode)
+        except subprocess.TimeoutExpired:
+            self._terminate(process)
+            stdout, _ = process.communicate()
+            return _CommandResult(output=stdout or "", returncode=process.returncode, timed_out=True)
+
+    def _capture_pty(self, command: tuple[str, ...], provider_settings: UsageProviderSettings) -> _CommandResult:
+        """Run a command attached to a pseudo-terminal and read what it draws.
+
+        This is what lets a CLI that refuses or hangs without a terminal be read
+        at all. The panel is often drawn and then left on screen while the CLI
+        waits for a keypress, so reaching the timeout is a normal outcome, not a
+        failure: the text captured up to that point already contains the
+        percentages and is returned for parsing.
+        """
+        import fcntl
+        import pty
+        import select
+        import struct
+        import termios
+
+        try:
+            pid, master = pty.fork()
+        except OSError as error:
+            return _CommandResult(error=str(error))
+        if pid == 0:  # pragma: no cover - replaced by the CLI immediately
+            try:
+                os.execvpe(command[0], list(command), self._command_env(provider_settings))
+            except BaseException:
+                pass
+            os._exit(127)
+
+        try:
+            fcntl.ioctl(
+                master,
+                termios.TIOCSWINSZ,
+                struct.pack("HHHH", self.settings.pty_lines, self.settings.pty_columns, 0, 0),
+            )
+        except OSError:
+            # A terminal that will not be resized still produces output.
+            pass
+
+        deadline = time.monotonic() + self.settings.command_timeout_seconds
+        typed = not provider_settings.input_text
+        type_at = time.monotonic() + max(0.0, self.settings.input_delay_seconds)
+        chunks: list[bytes] = []
+        timed_out = False
+        try:
+            os.set_blocking(master, False)
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    timed_out = True
+                    break
+                if not typed and time.monotonic() >= type_at:
+                    typed = True
+                    try:
+                        os.write(master, provider_settings.input_text.encode("utf-8"))
+                    except OSError:
+                        pass
+                wait = min(0.2, remaining) if not typed else min(0.5, remaining)
+                readable, _, _ = select.select([master], [], [], wait)
+                if not readable:
+                    continue
+                try:
+                    data = os.read(master, 65_536)
+                except OSError:
+                    # The child exited and closed its side of the terminal.
+                    break
+                if not data:
+                    break
+                chunks.append(data)
+        finally:
+            returncode = self._reap(pid, master, timed_out)
+        return _CommandResult(
+            output=b"".join(chunks).decode("utf-8", errors="replace"),
+            returncode=returncode,
+            timed_out=timed_out,
+        )
+
+    @staticmethod
+    def _reap(pid: int, master: int, timed_out: bool) -> int | None:
+        """Close the terminal and stop the child, returning its exit status."""
+        if timed_out:
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+            except OSError:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
+                    pass
+        try:
+            os.close(master)
+        except OSError:
+            pass
+        try:
+            _, status = os.waitpid(pid, 0)
+        except OSError:
+            return None
+        if os.WIFEXITED(status):
+            return os.WEXITSTATUS(status)
+        return None
 
     @staticmethod
     def _windows_from_payload(
@@ -1166,8 +1686,16 @@ def format_usage_bar(
 
 
 __all__ = [
+    "CLAUDE_PERMISSION_FLAGS",
+    "CODEX_PERMISSION_FLAGS",
     "ROLLING_BUCKET_SECONDS",
     "DEFAULT_BAR_WIDTH",
+    "DEFAULT_CLAUDE_USAGE_COMMANDS",
+    "DEFAULT_CODEX_USAGE_COMMANDS",
+    "DEFAULT_COMMAND_INTERVAL_SECONDS",
+    "DEFAULT_INPUT_DELAY_SECONDS",
+    "DEFAULT_PTY_COLUMNS",
+    "DEFAULT_PTY_LINES",
     "DEFAULT_CLAUDE_ACCOUNT_SCAN_DAYS",
     "DEFAULT_CLAUDE_TRANSCRIPT_DAYS",
     "DEFAULT_COMMAND_TIMEOUT_SECONDS",

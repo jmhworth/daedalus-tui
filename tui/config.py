@@ -418,6 +418,15 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
             f"{path} usage.session_scan_limit, usage.session_tail_bytes, usage.bar_width, "
             "usage.claude_transcript_days, and usage.claude_account_scan_days must be positive."
         )
+    pty_columns = int(values.get("pty_columns", defaults.pty_columns))
+    pty_lines = int(values.get("pty_lines", defaults.pty_lines))
+    input_delay = float(values.get("input_delay_seconds", defaults.input_delay_seconds))
+    command_interval = float(values.get("command_interval_seconds", defaults.command_interval_seconds))
+    if pty_columns < 1 or pty_lines < 1 or input_delay < 0 or command_interval < 0:
+        raise ValueError(
+            f"{path} usage.pty_columns and usage.pty_lines must be positive and "
+            "usage.input_delay_seconds and usage.command_interval_seconds must not be negative."
+        )
     # 0 keeps the Claude progress bars calibrated against the operator's own
     # busiest window; a negative budget would silently invert them.
     five_hour_limit = int(values.get("claude_five_hour_token_limit", defaults.claude_five_hour_token_limit))
@@ -436,11 +445,17 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
         providers[name] = UsageProviderSettings(
             label=str(table.get("label", default.label)),
             command=_string_tuple(table.get("command", list(default.command)), path, f"usage.{name}.command"),
+            commands=_usage_commands(table, default, path, name),
+            use_pty=bool(table.get("use_pty", default.use_pty)),
+            input_text=str(table.get("input_text", default.input_text)),
+            env=_usage_command_env(table.get("env", dict(default.env)), path, name),
+            fallback_to_local=bool(table.get("fallback_to_local", default.fallback_to_local)),
         )
     return UsageSettings(
         enabled=bool(values.get("enabled", True)),
         interval_seconds=interval,
         command_timeout_seconds=timeout,
+        command_interval_seconds=command_interval,
         codex_sessions_dir=str(values.get("codex_sessions_dir", defaults.codex_sessions_dir)),
         claude_stats_file=str(values.get("claude_stats_file", defaults.claude_stats_file)),
         claude_projects_dir=str(values.get("claude_projects_dir", defaults.claude_projects_dir)),
@@ -451,8 +466,36 @@ def _usage_settings(values: object, path: Path) -> UsageSettings:
         session_scan_limit=scan_limit,
         session_tail_bytes=tail_bytes,
         bar_width=bar_width,
+        pty_columns=pty_columns,
+        pty_lines=pty_lines,
+        input_delay_seconds=input_delay,
         providers=providers,
     )
+
+
+def _usage_commands(
+    table: dict,
+    default: UsageProviderSettings,
+    path: Path,
+    name: str,
+) -> tuple[tuple[str, ...], ...]:
+    """Read a provider's candidate usage commands, each an argv list."""
+    values = table.get("commands")
+    if values is None:
+        return default.commands
+    if not isinstance(values, list):
+        raise ValueError(f"{path} usage.{name}.commands must be a list of argument lists.")
+    return tuple(
+        _string_tuple(entry, path, f"usage.{name}.commands[{index}]")
+        for index, entry in enumerate(values)
+    )
+
+
+def _usage_command_env(values: object, path: Path, name: str) -> dict[str, str]:
+    """Read the extra environment a provider's usage commands run with."""
+    if not isinstance(values, dict):
+        raise ValueError(f"{path} usage.{name}.env must be a table of strings.")
+    return {str(key): str(value) for key, value in values.items()}
 
 
 def _project_discovery_settings(values: object, path: Path) -> ProjectDiscoverySettings:

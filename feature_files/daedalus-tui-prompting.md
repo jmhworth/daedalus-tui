@@ -149,14 +149,44 @@ provider usage every minute.
   Requested interruptions are lifecycle events; failed stops or cleanups stay
   errors. Legacy `.daedalus-debug.log` files are left in place.
 - **Usage bar**: `tui/usage_monitor.py` refreshes the bottom-left usage bar
-  every `[usage] interval_seconds` (default 60). Neither provider CLI has a
-  non-interactive `usage` subcommand (Claude Code 2.1 waits for a terminal,
-  Codex 0.154 refuses without one), so the default readers use the same local
-  data those CLIs show in `/usage` and `/status`: Codex rate-limit windows from
-  its session logs and Claude Code's per-day token statistics cache, including
-  Claude's `five_hour`, `seven_day`, and `spend_limit` windows when present. A
-  `command` per provider runs any program instead (stdin closed, timeout,
-  process-group kill) and shows its JSON usage fields or first line.
+  every `[usage] interval_seconds` (default 60). Only each provider's own
+  `/usage` view knows the operator's real plan limits, so the bar asks the CLIs
+  first and treats the local readers as a fallback.
+- **Asking the CLIs for their usage**: Neither CLI is built to be scripted --
+  Claude Code waits for a terminal, Codex refuses without one, and both stop on
+  a permission prompt when run headless -- so the commands in
+  `[usage.<provider>] commands` carry each CLI's documented permission override
+  (`--permission-mode bypassPermissions` for Claude, `--ask-for-approval never
+  --sandbox read-only` for Codex) and run attached to a pseudo-terminal when
+  `use_pty` is set. Reaching `command_timeout_seconds` is a normal outcome, not
+  a failure: a CLI that draws its usage panel and then waits has already printed
+  the percentages, so the process group is killed and the captured text is
+  parsed anyway. Candidates are tried in order until one yields windows, the one
+  that worked is tried first next time, and these subcommands are not a stable
+  interface, which is why more than one is listed. Because starting a CLI is far
+  more expensive than reading a file and rate-limit windows move over hours, the
+  commands run only every `[usage] command_interval_seconds` (default 300) and
+  the bar redraws the last reading in between.
+- **Reading a rendered usage panel**: `_windows_from_text` strips ANSI escapes
+  and block-drawing runs, treats carriage returns as line breaks so a repainted
+  panel reports its latest frame, and turns labelled percentages into
+  `UsageWindow` values. Only wording that names a known window (session/5h,
+  week/7d, opus, sonnet, context, spend) becomes a bar; a usage view prints many
+  other numbers and a bar built from an unrecognised one would be worse than no
+  bar. The provider's own reset phrase is kept verbatim, including one taken
+  from the following line when that line is not itself another window. JSON
+  output is still parsed first, so a CLI that gains a machine-readable mode
+  needs no change here.
+- **Falling back to local data**: When no command yields windows, the readers
+  use the same local data those views are drawn from -- Codex rate-limit windows
+  from its session logs and Claude Code's per-day token statistics cache,
+  including Claude's `five_hour`, `seven_day`, and `spend_limit` windows when
+  present. Those fall-back Claude bars are calibrated against this machine's
+  busiest window rather than a real quota, which is exactly why the CLIs are
+  asked first. Why each command failed is appended to the reading's detail and
+  so reaches the usage bar's tooltip, because a renamed subcommand would
+  otherwise look identical to a provider with no usage at all. Setting
+  `fallback_to_local = false` shows nothing instead of an approximation.
 - **Claude token and message reading**: Claude Code's statistics cache is a
   derived summary that can be absent, stale, or written under keys the reader
   does not know, each of which showed a flat `0 tok · 0 msgs` after a heavy
@@ -254,19 +284,28 @@ provider usage every minute.
 - `tui/prompts.py`: Bounded conversation context for follow-up turns.
 - `tui/output_viewer.py`: Rendered/Raw Markdown viewer, source selection, hard line breaks, action-item extraction.
 - `tui/debug_log.py`: Rotating runtime log, fault log, redaction, per-run diagnostics.
-- `tui/usage_monitor.py`: Provider usage readers, rate-limit windows, and progress-bar rendering.
+- `tui/usage_monitor.py`: Provider usage commands (pseudo-terminal execution, permission overrides, rendered-panel scraping), local usage readers, rate-limit windows, and progress-bar rendering.
 - `tui/vim_text_area.py`: Completed Vim cut/copy/paste, registers, key routing.
 - `tui/app.py`, `tui/app.tcss`: Composer drafts, interruption, follow-ups, viewer layout, history toggle, usage bar.
 - `tui/memory.py`, `tui/token_usage.py`: Conversation snapshot fields, UI
   preferences, prompt/attempt accounting, and shared push-history storage.
 - `parameter_files/daedalus-tui-prompting.toml`: Storage root, autosave delay, clear-on-exit, title length, viewer widths, line breaks, action-item header, context budget, error rotation.
-- `parameter_files/daedalus-tui.toml`: `[usage]` cadence, per-provider sources, session scan depth and tail size, transcript and account scan windows, bar width, Claude rolling-window token budgets.
-- `tests/test_vim_text_area.py`, `tests/test_prompt_store.py`, `tests/test_debug_log.py`, `tests/test_output_viewer.py`, `tests/test_usage_monitor.py`, plus extended `tests/test_app.py`, `tests/test_task_coordinator.py`, `tests/test_orchestrator.py`, `tests/test_agent_runner.py`, `tests/test_prompts.py`, `tests/test_token_usage.py`, `tests/test_memory.py`, `tests/test_config.py`.
+- `parameter_files/daedalus-tui.toml`: `[usage]` cadence, command cadence and timeout, pseudo-terminal geometry, per-provider usage commands with their permission overrides and local fallback switch, session scan depth and tail size, transcript and account scan windows, bar width, Claude rolling-window token budgets.
+- `tests/test_vim_text_area.py`, `tests/test_prompt_store.py`, `tests/test_debug_log.py`, `tests/test_output_viewer.py`, `tests/test_usage_monitor.py`, `tests/test_usage_command_settings.py`, plus extended `tests/test_app.py`, `tests/test_task_coordinator.py`, `tests/test_orchestrator.py`, `tests/test_agent_runner.py`, `tests/test_prompts.py`, `tests/test_token_usage.py`, `tests/test_memory.py`, `tests/test_config.py`.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-09-19: Made the usage bar ask the provider CLIs for their own
+  percentages instead of only approximating them locally: usage commands now
+  run attached to a pseudo-terminal with each CLI's permission prompt overridden
+  (`--permission-mode bypassPermissions`, `--ask-for-approval never`), a panel
+  that draws and then waits is killed at the timeout and its captured output
+  scraped for labelled percentages anyway, candidates are tried in order with
+  the winner remembered, the commands run on a slower `command_interval_seconds`
+  cadence than the bar refreshes, and anything that fails falls back to the
+  previous local readers with the reason recorded in the bar's tooltip.
 - 2026-09-16: Made the composer's close hook final, so the forced draft flush
   that shutdown performs after it can no longer rewrite the prompt the close
   just cleared.

@@ -17,6 +17,7 @@ from tui.usage_monitor import (
     UsageProviderSettings,
     UsageSettings,
     UsageWindow,
+    _windows_from_text,
     format_bar,
     format_usage_bar,
 )
@@ -25,6 +26,14 @@ from tui.usage_monitor import (
 def _stamp(moment: float) -> str:
     """Render an epoch time the way Claude Code timestamps a transcript turn."""
     return datetime.fromtimestamp(moment, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _local_only_providers() -> dict[str, UsageProviderSettings]:
+    """Provider settings with no usage commands, so a test reads only local files."""
+    return {
+        "claude": UsageProviderSettings("Claude"),
+        "codex": UsageProviderSettings("Codex"),
+    }
 
 
 class UsageMonitorTests(unittest.TestCase):
@@ -359,7 +368,7 @@ class UsageMonitorTests(unittest.TestCase):
         self.assertEqual(reading.windows[0].reset_text, "resets in 1h 00m")
 
     def test_missing_data_is_reported_without_raising(self):
-        monitor = UsageMonitor(UsageSettings(), home=self.home)
+        monitor = UsageMonitor(UsageSettings(providers=_local_only_providers()), home=self.home)
         readings = monitor.poll(now=1_800_000_000.0)
         self.assertEqual([reading.provider for reading in readings], ["claude", "codex"])
         self.assertFalse(any(reading.ok for reading in readings))
@@ -383,8 +392,11 @@ class UsageMonitorTests(unittest.TestCase):
         readings = UsageMonitor(settings, home=self.home).poll(now=1_800_000_000.0)
         by_provider = {reading.provider: reading for reading in readings}
         self.assertTrue(by_provider["codex"].ok)
-        self.assertEqual(by_provider["codex"].summary, "Codex used 42% of weekly limit")
-        self.assertEqual(by_provider["claude"].summary, "Claude usage_percent=12")
+        # The scraped percentage leads the summary; the wording it came from
+        # names the weekly window, so it is drawn as the 7d bar.
+        self.assertEqual(by_provider["codex"].summary, "Codex 7d 42%")
+        self.assertEqual(by_provider["codex"].windows, (UsageWindow("7d", 42.0),))
+        self.assertEqual(by_provider["claude"].summary, "Claude usage 12%")
 
     def test_timed_out_and_failing_commands_are_reported(self):
         settings = UsageSettings(
@@ -400,6 +412,207 @@ class UsageMonitorTests(unittest.TestCase):
         self.assertIn("timed out", by_provider["codex"].summary)
         self.assertFalse(by_provider["claude"].ok)
         self.assertIn("stdin is not a terminal", by_provider["claude"].detail)
+
+    def test_a_usage_command_runs_attached_to_a_terminal(self):
+        """The CLIs refuse or hang without a terminal, so one has to be provided."""
+        settings = UsageSettings(
+            command_timeout_seconds=10,
+            providers={
+                "claude": UsageProviderSettings(
+                    "Claude",
+                    command=(
+                        sys.executable,
+                        "-c",
+                        "import sys; print('stdin tty:', sys.stdin.isatty());"
+                        " print('Current session 33% used')",
+                    ),
+                    use_pty=True,
+                ),
+            },
+        )
+        reading = UsageMonitor(settings, home=self.home).poll(now=1_800_000_000.0)[0]
+        self.assertTrue(reading.ok)
+        self.assertEqual(reading.windows, (UsageWindow("5h", 33.0),))
+        self.assertIn("from `", reading.detail)
+
+    def test_a_panel_that_never_exits_is_killed_and_still_read(self):
+        """A CLI that draws its usage view and waits has already printed the numbers."""
+        settings = UsageSettings(
+            command_timeout_seconds=1.5,
+            providers={
+                "codex": UsageProviderSettings(
+                    "Codex",
+                    command=(
+                        sys.executable,
+                        "-c",
+                        "import time; print('Current week 77% used', flush=True); time.sleep(60)",
+                    ),
+                    use_pty=True,
+                ),
+            },
+        )
+        reading = UsageMonitor(settings, home=self.home).poll(now=1_800_000_000.0)[0]
+        self.assertTrue(reading.ok)
+        self.assertEqual(reading.windows, (UsageWindow("7d", 77.0),))
+
+    def test_candidate_commands_are_tried_until_one_reports_percentages(self):
+        settings = UsageSettings(
+            command_timeout_seconds=10,
+            providers={
+                "claude": UsageProviderSettings(
+                    "Claude",
+                    commands=(
+                        (sys.executable, "-c", "import sys; sys.exit('unknown command: /usage')"),
+                        (sys.executable, "-c", "print('Current session 18% used')"),
+                    ),
+                ),
+            },
+        )
+        reading = UsageMonitor(settings, home=self.home).poll(now=1_800_000_000.0)[0]
+        self.assertTrue(reading.ok)
+        self.assertEqual(reading.windows, (UsageWindow("5h", 18.0),))
+
+    def test_cli_percentages_replace_the_transcript_calibrated_bars(self):
+        """The CLI knows the real plan limits; the local reader only approximates them."""
+        now = 1_800_000_000.0
+        self.write_claude_transcript(
+            "session-1.jsonl",
+            [self.transcript_turn("a", _stamp(now - 600), tokens=900)],
+            now,
+        )
+        settings = UsageSettings(
+            command_timeout_seconds=10,
+            providers={
+                "claude": UsageProviderSettings(
+                    "Claude",
+                    command=(sys.executable, "-c", "print('Current session 4% used')"),
+                ),
+            },
+        )
+        reading = UsageMonitor(settings, home=self.home).read(
+            "claude", settings.providers["claude"], now
+        )
+        self.assertEqual(reading.windows, (UsageWindow("5h", 4.0),))
+
+    def test_a_failing_command_falls_back_to_local_data_and_says_why(self):
+        now = 1_800_000_000.0
+        self.write_codex_session("rollout.jsonl", 30, 46, now)
+        settings = UsageSettings(
+            command_timeout_seconds=10,
+            providers={
+                "codex": UsageProviderSettings(
+                    "Codex",
+                    command=(sys.executable, "-c", "import sys; sys.exit('codex: unknown flag')"),
+                ),
+            },
+        )
+        reading = UsageMonitor(settings, home=self.home).read(
+            "codex", settings.providers["codex"], now
+        )
+        self.assertTrue(reading.ok)
+        self.assertEqual([window.used_percent for window in reading.windows], [30.0, 46.0])
+        self.assertIn("codex: unknown flag", reading.detail)
+
+    def test_local_fallback_can_be_switched_off(self):
+        now = 1_800_000_000.0
+        self.write_codex_session("rollout.jsonl", 30, 46, now)
+        settings = UsageSettings(
+            command_timeout_seconds=10,
+            providers={
+                "codex": UsageProviderSettings(
+                    "Codex",
+                    command=(sys.executable, "-c", "import sys; sys.exit('codex: unknown flag')"),
+                    fallback_to_local=False,
+                ),
+            },
+        )
+        reading = UsageMonitor(settings, home=self.home).read(
+            "codex", settings.providers["codex"], now
+        )
+        self.assertFalse(reading.ok)
+        self.assertEqual(reading.windows, ())
+
+    def test_usage_commands_run_on_their_own_slower_cadence(self):
+        """The bar refreshes every minute; starting a CLI that often is waste."""
+        marker = self.home / "runs.txt"
+        settings = UsageSettings(
+            command_timeout_seconds=10,
+            command_interval_seconds=300,
+            providers={
+                "claude": UsageProviderSettings(
+                    "Claude",
+                    command=(
+                        sys.executable,
+                        "-c",
+                        f"open({str(marker)!r}, 'a').write('x'); print('Current session 9% used')",
+                    ),
+                ),
+            },
+        )
+        monitor = UsageMonitor(settings, home=self.home)
+        provider = settings.providers["claude"]
+        first = monitor.read("claude", provider, 1_800_000_000.0)
+        again = monitor.read("claude", provider, 1_800_000_060.0)
+        self.assertEqual(marker.read_text(), "x")
+        self.assertEqual(first.windows, again.windows)
+        # The reused reading is re-dated, so the panel's clock keeps moving.
+        self.assertEqual(again.checked_at, 1_800_000_060.0)
+
+        monitor.read("claude", provider, 1_800_000_400.0)
+        self.assertEqual(marker.read_text(), "xx")
+
+    def test_the_command_that_worked_is_tried_first_next_time(self):
+        settings = UsageSettings(
+            command_timeout_seconds=10,
+            providers={
+                "claude": UsageProviderSettings(
+                    "Claude",
+                    commands=(
+                        (sys.executable, "-c", "import sys; sys.exit('no such command')"),
+                        (sys.executable, "-c", "print('Current session 21% used')"),
+                    ),
+                ),
+            },
+        )
+        monitor = UsageMonitor(settings, home=self.home)
+        provider = settings.providers["claude"]
+        monitor.read("claude", provider, 1_800_000_000.0)
+        self.assertEqual(
+            monitor._ordered_commands("claude", provider)[0],
+            (sys.executable, "-c", "print('Current session 21% used')"),
+        )
+
+    def test_a_rendered_usage_panel_is_scraped_into_windows(self):
+        panel = (
+            "\x1b[1mClaude usage\x1b[0m\r\n"
+            "\r\n"
+            "Current session   \x1b[32m████████░░░░░░░░\x1b[0m  47% used\r\n"
+            "Resets 3:00pm (America/Los_Angeles)\r\n"
+            "\r\n"
+            "Current week (all models)  ██░░░░░░░░░░░░  12% used\r\n"
+            "Resets Nov 5\r\n"
+            "\r\n"
+            "Current week (Opus)  ░░░░░░░░░░░░░░  3% used\r\n"
+        )
+        self.assertEqual(
+            _windows_from_text(panel),
+            (
+                UsageWindow("5h", 47.0, "Resets 3:00pm (America/Los_Angeles)"),
+                UsageWindow("7d", 12.0, "Resets Nov 5"),
+                UsageWindow("opus", 3.0),
+            ),
+        )
+
+    def test_scraping_ignores_numbers_that_do_not_name_a_known_window(self):
+        """A stray percentage must not invent a bar the operator cannot interpret."""
+        self.assertEqual(_windows_from_text("Cache hit rate 91%\nCompacted 40% of history\n"), ())
+
+    def test_a_repainted_panel_reports_its_latest_frame(self):
+        """A CLI drawing into a terminal overwrites the same line as numbers change."""
+        self.assertEqual(
+            _windows_from_text("Current session 40% used\rCurrent session 55% used\r\n"),
+            (UsageWindow("5h", 55.0),),
+        )
 
     def test_format_usage_bar_lists_each_summary_with_a_timestamp(self):
         readings = (
