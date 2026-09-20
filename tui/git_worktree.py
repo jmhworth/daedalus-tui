@@ -44,11 +44,196 @@ def remote_exists(repository: Path, remote: str = "origin") -> bool:
     return process.returncode == 0
 
 
-def push_branch(repository: Path, branch: str, remote: str = "origin") -> None:
+def _worktree_path_for_branch(repository: Path, branch: str) -> Path | None:
+    """Return the worktree path that has ``branch`` checked out, if any."""
+    try:
+        process = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=repository,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if process.returncode != 0:
+        return None
+    current_path: Path | None = None
+    expected = f"branch refs/heads/{branch}"
+    for line in process.stdout.splitlines():
+        if line.startswith("worktree "):
+            current_path = Path(line.removeprefix("worktree "))
+        elif line.strip() == expected:
+            return current_path
+        elif not line.strip():
+            current_path = None
+    return None
+
+
+def _is_ancestor(repository: Path, ancestor: str, descendant: str) -> bool:
+    process = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+    )
+    return process.returncode == 0
+
+
+def _remote_ref_missing(stderr: str) -> bool:
+    lowered = stderr.lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "couldn't find remote ref",
+            "could not find remote ref",
+            "does not exist",
+            "couldn't find remote",
+            "not found",
+        )
+    )
+
+
+def pull_branch(repository: Path, branch: str, remote: str = "origin") -> None:
+    """Integrate ``remote/branch`` into the local branch without switching checkout.
+
+    Fast-forwards when the local tip is behind, no-ops when ahead or equal, and
+    merges via the existing checkout (or a temporary worktree) when histories
+    have diverged. Missing remote branches are ignored so a first push can
+    still publish the local branch.
+    """
+    branch = branch.strip()
+    if not branch:
+        raise GitWorktreeError("Branch name cannot be empty.")
+    remote_tracking = f"refs/remotes/{remote}/{branch}"
+    fetch_command = [
+        "git",
+        "fetch",
+        remote,
+        f"refs/heads/{branch}:{remote_tracking}",
+    ]
+    try:
+        fetch = subprocess.run(
+            fetch_command,
+            cwd=repository,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:
+        raise GitWorktreeError(f"Failed to run git fetch: {error}") from error
+    if fetch.returncode != 0:
+        if _remote_ref_missing(fetch.stderr):
+            return
+        raise GitWorktreeError(GitWorktreeManager.format_failure(fetch_command, fetch))
+
+    local_tip = subprocess.run(
+        ["git", "rev-parse", f"refs/heads/{branch}"],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+    )
+    if local_tip.returncode != 0:
+        raise GitWorktreeError(f"Local branch {branch!r} does not exist.")
+    remote_tip = subprocess.run(
+        ["git", "rev-parse", remote_tracking],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+    )
+    if remote_tip.returncode != 0:
+        return
+    local_sha = local_tip.stdout.strip()
+    remote_sha = remote_tip.stdout.strip()
+    if local_sha == remote_sha or _is_ancestor(repository, remote_sha, local_sha):
+        return
+
+    checkout = _worktree_path_for_branch(repository, branch)
+    can_fast_forward = _is_ancestor(repository, local_sha, remote_sha)
+    if can_fast_forward and checkout is None:
+        update_command = ["git", "update-ref", f"refs/heads/{branch}", remote_sha]
+        try:
+            updated = subprocess.run(
+                update_command,
+                cwd=repository,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as error:
+            raise GitWorktreeError(f"Failed to fast-forward branch: {error}") from error
+        if updated.returncode != 0:
+            raise GitWorktreeError(GitWorktreeManager.format_failure(update_command, updated))
+        return
+
+    temporary: Path | None = None
+    merge_directory = checkout
+    if merge_directory is None:
+        temporary = (
+            repository.parent
+            / ".daedalus-worktrees"
+            / repository.name
+            / f".sync-pull-{uuid.uuid4().hex[:8]}"
+        )
+        temporary.parent.mkdir(parents=True, exist_ok=True)
+        add_command = ["git", "worktree", "add", str(temporary), branch]
+        try:
+            added = subprocess.run(
+                add_command,
+                cwd=repository,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as error:
+            raise GitWorktreeError(f"Failed to create sync worktree: {error}") from error
+        if added.returncode != 0:
+            raise GitWorktreeError(GitWorktreeManager.format_failure(add_command, added))
+        merge_directory = temporary
+
+    merge_command = (
+        ["git", "merge", "--ff-only", f"{remote}/{branch}"]
+        if can_fast_forward
+        else ["git", "merge", "--no-edit", f"{remote}/{branch}"]
+    )
+    try:
+        try:
+            merged = subprocess.run(
+                merge_command,
+                cwd=merge_directory,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as error:
+            raise GitWorktreeError(f"Failed to run git merge: {error}") from error
+        if merged.returncode != 0:
+            raise GitWorktreeError(GitWorktreeManager.format_failure(merge_command, merged))
+    finally:
+        if temporary is not None:
+            remove = subprocess.run(
+                ["git", "worktree", "remove", "--force", str(temporary)],
+                cwd=repository,
+                capture_output=True,
+                text=True,
+            )
+            if remove.returncode != 0:
+                subprocess.run(
+                    ["git", "worktree", "prune"],
+                    cwd=repository,
+                    capture_output=True,
+                    text=True,
+                )
+
+
+def push_branch(
+    repository: Path,
+    branch: str,
+    remote: str = "origin",
+    *,
+    pull_first: bool = True,
+) -> None:
     """Push a local branch to ``remote``, setting upstream with ``-u`` when needed.
 
-    Never force-pushes. Raises ``GitWorktreeError`` when the remote or branch is
-    missing, or when ``git push`` fails (including auth errors).
+    By default pulls remote commits into the local branch first (sync-style),
+    then pushes. Never force-pushes. Raises ``GitWorktreeError`` when the remote
+    or branch is missing, or when ``git pull`` / ``git push`` fails (including
+    auth errors).
     """
     branch = branch.strip()
     if not branch:
@@ -63,6 +248,8 @@ def push_branch(repository: Path, branch: str, remote: str = "origin") -> None:
     )
     if verify.returncode != 0:
         raise GitWorktreeError(f"Local branch {branch!r} does not exist.")
+    if pull_first:
+        pull_branch(repository, branch, remote)
     command = ["git", "push", "-u", remote, branch]
     try:
         process = subprocess.run(
@@ -75,7 +262,6 @@ def push_branch(repository: Path, branch: str, remote: str = "origin") -> None:
         raise GitWorktreeError(f"Failed to run git push: {error}") from error
     if process.returncode != 0:
         raise GitWorktreeError(GitWorktreeManager.format_failure(command, process))
-
 
 @dataclass(frozen=True)
 class WorktreeContext:

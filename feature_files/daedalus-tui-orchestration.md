@@ -26,7 +26,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Profile prompt boundary**: The orchestrator reloads the selected repository profile from the active task worktree and embeds it inline before each task, repair, follow-up planning, or resolver prompt; agents apply supplied profile content directly without reopening the file, while the mode and orchestration constraints that follow remain authoritative.
 - **Topic prompt boundary**: When a task carries a topic slug, the orchestrator reloads that topic markdown from the task worktree and embeds it with mode-specific instructions before task, repair, and resolver prompts; missing topics emit a non-fatal diagnostic and omit the embed.
 - **Graph refresh boundary**: Graphify runs only after successful primary promotion, and a failed refresh is cleaned up and reported without starting a resolver.
-- **Local-only boundary**: No persistence or daemon communications. Each project's ignored `.env` is its canonical Supabase environment and is threaded into that project's task agents and CLI pushes; Daedalus does not copy Supabase credentials between projects. Cursor operator auth (`CURSOR_API_KEY`) is filled from the launch-root `.env` and the TUI package `.env` when a project omits it, so target projects do not need a copied API key. Orchestration may push Supabase migrations via the CLI; agents still do not own DB push. Automated orchestration never pushes Git remotes; an explicit operator Push in the TUI may publish the selected operating branch.
+- **Local-only boundary**: No persistence or daemon communications. Each project's ignored `.env` is its canonical Supabase environment and is threaded into that project's task agents and CLI pushes; Daedalus does not copy Supabase credentials between projects. Cursor operator auth (`CURSOR_API_KEY`) is filled from the launch-root `.env` and the TUI package `.env` when a project omits it, so target projects do not need a copied API key. Orchestration may push Supabase migrations via the CLI; agents still do not own DB push. Automated orchestration never pushes Git remotes; an explicit operator Sync in the TUI may pull then push the selected operating branch.
 - **Project discovery boundary**: The TUI discovers only immediate launch-root child directories containing `feature_files`; nested paths are excluded, with the launch root used only when no eligible child exists.
 - **Project-scoped execution**: The TUI creates one coordinator per discovered `feature_files` project, so task numbering, worktrees, branches, and integration gates stay scoped to the selected repository.
 - **Shutdown diagnostics**: A rotating project-local debug log records agent process IDs, task transitions, Textual exceptions, worker shutdown, and on-demand all-thread stack dumps.
@@ -34,7 +34,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 ## Relevant Files
 - `tui/orchestrator.py`: Single-task lifecycle, verification repair, migration push repair, integration, and resolver loops.
 - `tui/task_coordinator.py`: Concurrent task records, executor limit, and serialized integration gate.
-- `tui/git_worktree.py`: Git validation, worktree, branch listing, operator push helper, merge, and cleanup operations.
+- `tui/git_worktree.py`: Git validation, worktree, branch listing, operator pull-then-push sync helper, merge, and cleanup operations.
 - `tui/project_config.py`: Target-project `.daedalus` worktree provisioning settings.
 - `tui/memory.py`: Atomic task snapshots, worktree identity, restart metadata, and per-project target branches.
 - `tui/topics.py`: Topic discovery and embed helpers used at prompt-build time.
@@ -48,6 +48,7 @@ HACKING
 
 ## State Log
 - 2026-09-19: Cursor agent runs now inherit non-empty `CURSOR_API_KEY` from the launch-root and TUI package `.env` when the target project omits it, without sharing Supabase credentials across projects.
+- 2026-09-19: Noted that the operator Command Menu Sync action pulls then pushes the operating branch; automated orchestration still never owns Git remotes.
 - 2026-09-16: Orchestration now loads each project's ignored `.env` for agent and Supabase subprocesses instead of sharing launch-root credentials.
 - 2026-09-16: Noted that personal Supabase no longer syncs credentials into project `.env` files; launch-root validation remains read-only.
 - 2026-09-16: Auto-commit dirty primary files on task start/resume so send is not blocked, while promotion still requires a clean primary.

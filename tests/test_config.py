@@ -70,7 +70,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(command_menu.create_topic_label, "Create Topic")
         self.assertEqual(command_menu.personal_supabase_label, "Activate personal Supabase")
         self.assertEqual(command_menu.remove_personal_supabase_label, "Remove personal Supabase")
-        self.assertEqual(command_menu.push_branch_label, "Push to GitHub")
+        self.assertEqual(command_menu.push_branch_label, "Sync to GitHub")
+        self.assertTrue(command_menu.pull_before_push)
 
     def test_rejects_non_positive_layout_settings(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -691,8 +691,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(len(workers), 1)
             self.assertTrue(workers[0][1].get("thread"))
-            push_branch.assert_called_once_with(app._active_project_path, "main")
-            self.assertEqual(str(app.query_one("#status", Static).render()), "Pushed main to origin")
+            push_branch.assert_called_once_with(app._active_project_path, "main", pull_first=True)
+            self.assertEqual(str(app.query_one("#status", Static).render()), "Synced main to origin")
             self.assertFalse(app._push_in_flight)
             await pilot.pause()
 
@@ -714,11 +714,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 app.screen.query_one("#command-push-branch-button", Button).press()
                 await pilot.pause()
 
-            self.assertEqual(str(app.query_one("#status", Static).render()), "Push failed")
+            self.assertEqual(str(app.query_one("#status", Static).render()), "Sync failed")
             self.assertIn("auth failed", "\n".join(app.query_one("#task-error", Log)._lines))
             self.assertFalse(app._push_in_flight)
             await pilot.pause()
-
     async def test_output_and_error_logs_toggle_as_full_size_selectable_views(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:

@@ -2698,12 +2698,12 @@ class DaedalusTuiApp(App[None]):
         button.disabled = not branch or not remote_exists(self._active_project_path)
 
     def _push_selected_branch(self) -> None:
-        """Push the Branch Select value for the active project to origin."""
+        """Sync the Branch Select value for the active project with origin."""
         if self._push_in_flight:
             return
         branch = self._selected_operating_branch()
         if not branch:
-            self._set_error("Select a branch before pushing.")
+            self._set_error("Select a branch before syncing.")
             self._set_status("Error")
             return
         project_path = self._active_project_path
@@ -2713,14 +2713,15 @@ class DaedalusTuiApp(App[None]):
             self._refresh_push_button()
             return
 
+        pull_first = self.command_menu_settings.pull_before_push
         self._push_in_flight = True
         self._refresh_push_button()
         self._set_error("")
-        self._set_status(f"Pushing {branch}…")
+        self._set_status(f"{'Syncing' if pull_first else 'Pushing'} {branch}…")
 
         def work() -> None:
             try:
-                push_branch(project_path, branch)
+                push_branch(project_path, branch, pull_first=pull_first)
             except GitWorktreeError as error:
                 self.call_from_thread(self._on_push_finished, False, str(error), branch)
             except Exception as error:  # pragma: no cover - defensive UI boundary
@@ -2739,12 +2740,14 @@ class DaedalusTuiApp(App[None]):
     def _on_push_finished(self, succeeded: bool, error: str, branch: str) -> None:
         self._push_in_flight = False
         self._refresh_push_button()
+        pull_first = self.command_menu_settings.pull_before_push
         if succeeded:
             self._set_error("")
-            self._set_status(f"Pushed {branch} to origin")
+            verb = "Synced" if pull_first else "Pushed"
+            self._set_status(f"{verb} {branch} to origin")
             return
-        self._set_error(error or "Push failed.")
-        self._set_status("Push failed")
+        self._set_error(error or ("Sync failed." if pull_first else "Push failed."))
+        self._set_status("Sync failed" if pull_first else "Push failed")
 
     def _refresh_topic_select(self) -> None:
         """Refresh topics and restore the active project's remembered default."""

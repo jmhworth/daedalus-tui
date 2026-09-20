@@ -2,11 +2,15 @@
 title = "Command Menu"
 subtitle = "Choose an action, or press Esc / Ctrl+K to close"
 
+# When true, Command Menu Push pulls remote commits into the operating branch
+# before pushing (sync-style). Set false for push-only publishing.
+pull_before_push = true
+
 [labels]
 new_task = "New Task"
 new_project = "New Project"
 create_topic = "Create Topic"
 personal_supabase = "Activate personal Supabase"
 remove_personal_supabase = "Remove personal Supabase"
-push_branch = "Push to GitHub"
+push_branch = "Sync to GitHub"
 keyboard_shortcuts = "Keyboard Shortcuts"

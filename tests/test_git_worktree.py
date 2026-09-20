@@ -310,7 +310,7 @@ class GitWorktreeTests(unittest.TestCase):
             ]
             from tui.git_worktree import push_branch
 
-            push_branch(Path("/repo"), "james")
+            push_branch(Path("/repo"), "james", pull_first=False)
             self.assertEqual(
                 [call.args[0] for call in run.call_args_list],
                 [
@@ -320,13 +320,60 @@ class GitWorktreeTests(unittest.TestCase):
                 ],
             )
 
+    def test_push_branch_pulls_before_push_by_default(self):
+        with patch("tui.git_worktree.pull_branch") as pull, patch("tui.git_worktree.subprocess.run") as run:
+            run.side_effect = [
+                type("Process", (), {"returncode": 0, "stdout": "git@example.com:repo.git\n", "stderr": ""})(),
+                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+                type("Process", (), {"returncode": 0, "stdout": "ok\n", "stderr": ""})(),
+            ]
+            from tui.git_worktree import push_branch
+
+            push_branch(Path("/repo"), "james")
+            pull.assert_called_once_with(Path("/repo"), "james", "origin")
+            self.assertEqual(run.call_args_list[-1].args[0], ["git", "push", "-u", "origin", "james"])
+
+    def test_pull_branch_fast_forwards_unchecked_branch(self):
+        with patch("tui.git_worktree.subprocess.run") as run:
+            run.side_effect = [
+                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),  # fetch
+                type("Process", (), {"returncode": 0, "stdout": "aaa\n", "stderr": ""})(),  # local tip
+                type("Process", (), {"returncode": 0, "stdout": "bbb\n", "stderr": ""})(),  # remote tip
+                type("Process", (), {"returncode": 1, "stdout": "", "stderr": ""})(),  # remote not ancestor of local
+                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),  # worktree list empty
+                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),  # local is ancestor of remote
+                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),  # update-ref
+            ]
+            from tui.git_worktree import pull_branch
+
+            pull_branch(Path("/repo"), "main")
+            self.assertEqual(
+                run.call_args_list[-1].args[0],
+                ["git", "update-ref", "refs/heads/main", "bbb"],
+            )
+
+    def test_pull_branch_ignores_missing_remote_branch(self):
+        with patch("tui.git_worktree.subprocess.run") as run:
+            run.return_value = type(
+                "Process",
+                (),
+                {"returncode": 1, "stdout": "", "stderr": "fatal: couldn't find remote ref main"},
+            )()
+            from tui.git_worktree import pull_branch
+
+            pull_branch(Path("/repo"), "main")
+            self.assertEqual(
+                run.call_args.args[0],
+                ["git", "fetch", "origin", "refs/heads/main:refs/remotes/origin/main"],
+            )
+
     def test_push_branch_rejects_missing_remote(self):
         with patch("tui.git_worktree.subprocess.run") as run:
             run.return_value = type("Process", (), {"returncode": 2, "stdout": "", "stderr": "missing"})()
             from tui.git_worktree import push_branch
 
             with self.assertRaisesRegex(GitWorktreeError, "not configured"):
-                push_branch(Path("/repo"), "main")
+                push_branch(Path("/repo"), "main", pull_first=False)
 
     def test_push_branch_rejects_blank_branch(self):
         from tui.git_worktree import push_branch
@@ -344,8 +391,7 @@ class GitWorktreeTests(unittest.TestCase):
             from tui.git_worktree import push_branch
 
             with self.assertRaisesRegex(GitWorktreeError, "Authentication failed"):
-                push_branch(Path("/repo"), "main")
-
+                push_branch(Path("/repo"), "main", pull_first=False)
 
 if __name__ == "__main__":
     unittest.main()
