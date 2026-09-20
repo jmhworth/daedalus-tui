@@ -142,6 +142,29 @@ class PromptTests(unittest.TestCase):
             self.assertNotIn("BEGIN_DAEDALUS_TOPIC", prompt)
             self.assertNotIn("topic_files", prompt)
 
+    def test_sync_conflict_prompts_include_paths_and_forbid_git(self):
+        from tui.prompts import build_sync_conflict_coding_prompt, build_sync_conflict_plan_prompt
+
+        plan_prompt = build_sync_conflict_plan_prompt(
+            "main",
+            ("a.txt", "b.txt"),
+            "CONFLICT (content): Merge conflict in a.txt",
+        )
+        self.assertIn("a.txt", plan_prompt)
+        self.assertIn("b.txt", plan_prompt)
+        self.assertIn("main", plan_prompt)
+
+        coding = build_sync_conflict_coding_prompt(
+            "Keep remote for a.txt",
+            {"q1": "a"},
+            leftover_unmerged=("a.txt",),
+            attempt=2,
+            limit=3,
+        )
+        self.assertIn("Keep remote for a.txt", coding)
+        self.assertIn("a.txt", coding)
+        self.assertIn("attempt 2/3", coding)
+
 
 if __name__ == "__main__":
     unittest.main()

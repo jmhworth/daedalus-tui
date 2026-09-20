@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 
+from .plan import custom_answer_text
 from .topics import embed_topic
 
 
@@ -165,6 +166,64 @@ def build_resolver_prompt(
         f"Task goal:\n{original}\n\n"
         f"Resolver attempt: {attempt}/{limit}\n\n"
         f"Failure details:\n{failure}"
+    )
+
+
+def build_sync_conflict_plan_prompt(
+    operating_branch: str,
+    conflicted_paths: Sequence[str],
+    merge_failure: str,
+) -> str:
+    """Ask a plan-mode agent to propose resolutions for Sync merge conflicts."""
+    paths = "\n".join(f"- {path}" for path in conflicted_paths) or "- (none listed)"
+    excerpt = merge_failure.strip() or "(no merge failure text)"
+    return (
+        f"Operator Sync to GitHub hit merge conflicts while integrating origin into "
+        f"`{operating_branch}`.\n\n"
+        "Conflicted files:\n"
+        f"{paths}\n\n"
+        "Merge failure excerpt:\n"
+        f"{excerpt}\n\n"
+        "Inspect the conflict markers in this preserved sync worktree and produce a clear "
+        "resolution plan. Ask the human operator only for decisions that materially change "
+        "how conflicts should be resolved. Prefer a complete plan with "
+        "no_more_questions=true and an empty questions array when the safe resolution is clear."
+    )
+
+
+def build_sync_conflict_coding_prompt(
+    plan: str,
+    answers: dict[str, str] | None = None,
+    answer_details: dict[str, str] | None = None,
+    *,
+    attempt: int = 1,
+    limit: int = 1,
+    leftover_unmerged: Sequence[str] = (),
+) -> str:
+    """Ask a coding agent to apply an approved Sync conflict resolution plan."""
+    answers = answers or {}
+    answer_details = answer_details or {}
+    answer_text = "\n".join(
+        f"- {question_id}: {custom_answer_text(answer) or answer}"
+        + (f" ({answer_details[question_id]})" if question_id in answer_details else "")
+        for question_id, answer in answers.items()
+    )
+    leftover = "\n".join(f"- {path}" for path in leftover_unmerged)
+    retry_note = ""
+    if leftover:
+        retry_note = (
+            f"\n\nPrevious attempt left unmerged paths (attempt {attempt}/{limit}):\n"
+            f"{leftover}\n"
+            "Finish resolving every conflict marker and leave clean file contents."
+        )
+    return (
+        "Implement the approved Sync conflict resolution plan in this preserved conflicted "
+        "worktree. Resolve every conflict marker. Leave resolutions unstaged for the "
+        "orchestration layer to stage, finalize the merge commit, and push.\n\n"
+        f"Approved conflict plan:\n{plan}\n\n"
+        "Decisions confirmed during plan review:\n"
+        f"{answer_text or '- No additional decisions were required.'}"
+        f"{retry_note}"
     )
 
 

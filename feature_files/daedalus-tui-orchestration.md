@@ -23,6 +23,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Concurrent integration**: Up to four task agents and their verification runs execute concurrently, then ready tasks pass through a first-ready serialized integration gate before promotion.
 - **Connectivity recovery**: Agent subprocesses have a bounded timeout, report actionable offline/service diagnostics, and failed requests can be retried without losing their task context.
 - **Agent Git boundary**: Task, repair, and resolver agents edit files only; the orchestration layer owns staging, commits, merges, migration pushes, and cleanup.
+- **Sync conflict recovery**: Operator Sync pull/merge conflicts that leave unmerged paths preserve an isolated `.sync-pull-*` / `.sync-resolve-*` worktree (temp `daedalus/sync-resolve-*` branch when the operating branch is already checked out elsewhere). A plan-mode agent reviews conflicts; questions go to the operator; when `no_more_questions` with an empty questions array, coding auto-starts in the same worktree, then orchestration finalizes the merge under the project integration gate and pushes with `pull_first=False`. Stock `implement_plan` / worktree discard is not used. First cut skips verify→promote→graphify.
 - **Profile prompt boundary**: The orchestrator reloads the selected repository profile from the active task worktree and embeds it inline before each task, repair, follow-up planning, or resolver prompt; agents apply supplied profile content directly without reopening the file, while the mode and orchestration constraints that follow remain authoritative.
 - **Topic prompt boundary**: When a task carries a topic slug, the orchestrator reloads that topic markdown from the task worktree and embeds it with mode-specific instructions before task, repair, and resolver prompts; missing topics emit a non-fatal diagnostic and omit the embed.
 - **Graph refresh boundary**: Graphify runs only after successful primary promotion, and a failed refresh is cleaned up and reported without starting a resolver.
@@ -47,6 +48,8 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-09-19: Updated coordinator test doubles to accept sync-recovery orchestrator kwargs so normal submit paths stay compatible.
+- 2026-09-19: Added operator Sync conflict recovery that plans in a preserved isolated sync worktree, auto-implements when questions clear, finalizes under the integration gate, and pushes without stock implement_plan worktree discard.
 - 2026-09-19: Cursor agent runs now inherit non-empty `CURSOR_API_KEY` from the launch-root and TUI package `.env` when the target project omits it, without sharing Supabase credentials across projects.
 - 2026-09-19: Noted that the operator Command Menu Sync action pulls then pushes the operating branch; automated orchestration still never owns Git remotes.
 - 2026-09-16: Orchestration now loads each project's ignored `.env` for agent and Supabase subprocesses instead of sharing launch-root credentials.

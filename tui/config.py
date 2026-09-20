@@ -81,6 +81,8 @@ class CommandMenuSettings:
     push_branch_label: str = "Sync to GitHub"
     keyboard_shortcuts_label: str = "Keyboard Shortcuts"
     pull_before_push: bool = True
+    sync_conflict_recovery_enabled: bool = True
+    sync_conflict_attempt_limit: int = 3
 
 
 def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
@@ -213,6 +215,9 @@ def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMen
     with path.open("rb") as source:
         values = tomllib.load(source)
     labels = values.get("labels", {})
+    attempt_limit = int(values.get("sync_conflict_attempt_limit", 3))
+    if attempt_limit < 1:
+        raise ValueError(f"{path} sync_conflict_attempt_limit must be positive.")
     return CommandMenuSettings(
         title=str(values.get("title", "Command Menu")),
         subtitle=str(
@@ -230,6 +235,8 @@ def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMen
         push_branch_label=str(labels.get("push_branch", "Sync to GitHub")),
         keyboard_shortcuts_label=str(labels.get("keyboard_shortcuts", "Keyboard Shortcuts")),
         pull_before_push=bool(values.get("pull_before_push", True)),
+        sync_conflict_recovery_enabled=bool(values.get("sync_conflict_recovery_enabled", True)),
+        sync_conflict_attempt_limit=attempt_limit,
     )
 
 

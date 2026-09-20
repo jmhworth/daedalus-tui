@@ -13,7 +13,12 @@ from typing import Callable
 
 from .agent_runner import AgentControl, AgentRunner
 from .debug_log import LOGGER, log_exception
-from .git_worktree import GitWorktreeError, GitWorktreeManager, WorktreeContext
+from .git_worktree import (
+    GitWorktreeError,
+    GitWorktreeManager,
+    WorktreeContext,
+    abort_sync_merge,
+)
 from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
 from .orchestrator import LocalOrchestrator, OrchestrationResult, OrchestrationSettings
 from .plan import (
@@ -26,6 +31,7 @@ from .plan import (
     is_valid_plan_answer,
     parse_plan_response,
 )
+from .prompts import build_sync_conflict_plan_prompt
 
 
 TaskEventCallback = Callable[["TaskRecord", str, str, str], None]
@@ -148,6 +154,14 @@ class TaskRecord:
     retry_output_context: str | None = field(default=None, repr=False, compare=False)
     # When coding and verification already succeeded, retries resume at integration.
     resume_from: str | None = None
+    # Operator Sync conflict recovery: plan/code in a preserved sync worktree.
+    sync_recovery: bool = False
+    sync_operating_branch: str = ""
+    sync_remote: str = "origin"
+    sync_used_temp_branch: bool = False
+    sync_temp_branch_name: str | None = None
+    sync_conflict_attempt_limit: int = 3
+    sync_conflicted_paths: tuple[str, ...] = ()
 
 
 class IntegrationCoordinator:
@@ -266,6 +280,122 @@ class TaskCoordinator:
         self._notify(record, "queued", "Task queued.", "status")
         return record
 
+    def has_active_sync_recovery(self, branch: str | None = None) -> bool:
+        """Return whether a Sync conflict recovery is still in flight for this project."""
+        with self._lock:
+            return self._has_active_sync_recovery_locked(branch)
+
+    def _has_active_sync_recovery_locked(self, branch: str | None = None) -> bool:
+        terminal = {"completed", "failed", "cancelled", "blocked"}
+        for record in self._tasks.values():
+            if not record.sync_recovery or record.status in terminal:
+                continue
+            if branch is not None and record.sync_operating_branch != branch:
+                continue
+            return True
+        return False
+
+    def _cleanup_orphaned_sync_recoveries_locked(self, branch: str) -> None:
+        """Force-remove leftover sync worktrees from interrupted recoveries for ``branch``."""
+        for record in list(self._tasks.values()):
+            if (
+                not record.sync_recovery
+                or record.sync_operating_branch != branch
+                or record.status not in {"failed", "cancelled"}
+            ):
+                continue
+            worktree = record.worktree_path or (record.context.path if record.context else None)
+            if worktree is None or not worktree.exists():
+                continue
+            try:
+                abort_sync_merge(
+                    self.repository,
+                    worktree,
+                    temp_branch_name=record.sync_temp_branch_name,
+                )
+            except Exception as error:
+                LOGGER.warning(
+                    "Could not clean orphaned sync worktree task=%s error=%s",
+                    record.task_id,
+                    error,
+                )
+            record.context = None
+            record.worktree_path = None
+            self._persist_task(record)
+
+    def submit_sync_recovery(
+        self,
+        *,
+        provider: str,
+        model: str,
+        reasoning: str,
+        operating_branch: str,
+        remote: str,
+        worktree_path: Path,
+        conflicted_paths: tuple[str, ...],
+        used_temp_branch: bool,
+        temp_branch_name: str | None,
+        merge_failure: str,
+        attempt_limit: int = 3,
+        base_commit: str = "",
+    ) -> TaskRecord:
+        """Attach plan-mode recovery to a preserved Sync conflict worktree."""
+        prompt = build_sync_conflict_plan_prompt(operating_branch, conflicted_paths, merge_failure)
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("Task coordinator is shut down.")
+            if self._has_active_sync_recovery_locked(operating_branch):
+                raise RuntimeError(
+                    f"Sync conflict recovery is already active for {operating_branch}."
+                )
+            self._cleanup_orphaned_sync_recoveries_locked(operating_branch)
+            sequence = self._next_sequence
+            self._next_sequence += 1
+            task_id = f"{sequence:03d}-{uuid.uuid4().hex[:8]}"
+            branch_name = temp_branch_name or operating_branch
+            if not base_commit:
+                try:
+                    base_commit = GitWorktreeManager(
+                        self.repository,
+                        self.settings.primary_branch,
+                        self.settings.worktree_root,
+                    ).git_output(["rev-parse", f"refs/heads/{operating_branch}"])
+                except GitWorktreeError:
+                    base_commit = ""
+            context = WorktreeContext(
+                self.repository,
+                task_id,
+                base_commit,
+                branch_name,
+                worktree_path,
+            )
+            record = TaskRecord(
+                task_id,
+                sequence,
+                prompt,
+                provider,
+                model,
+                reasoning,
+                mode="plan",
+                branch_name=branch_name,
+                worktree_path=worktree_path,
+                context=context,
+                sync_recovery=True,
+                sync_operating_branch=operating_branch,
+                sync_remote=remote,
+                sync_used_temp_branch=used_temp_branch,
+                sync_temp_branch_name=temp_branch_name,
+                sync_conflict_attempt_limit=max(1, attempt_limit),
+                sync_conflicted_paths=conflicted_paths,
+            )
+            record.prompt_history = [prompt]
+            record.memory_task_id = worktree_path.name
+            self._tasks[task_id] = record
+            self._persist_task(record)
+            record.future = self.executor.submit(self._run, record)
+        self._notify(record, "queued", "Sync conflict recovery queued.", "status")
+        return record
+
     def answer_plan(self, task_id: str, answers: dict[str, str]) -> bool:
         """Send selected plan answers back to the planning agent for confirmation."""
         with self._lock:
@@ -362,6 +492,7 @@ class TaskCoordinator:
                 or record.status != "completed"
                 or not record.plan_confirmed
                 or record.plan_implemented
+                or record.sync_recovery
             ):
                 return None
             if any(question.question_id not in record.plan_answers for question in record.plan_questions):
@@ -389,6 +520,28 @@ class TaskCoordinator:
             raise
         self._discard_plan_worktree(record)
         return coding_record
+
+    def _queue_sync_conflict_coding(self, record: TaskRecord) -> bool:
+        """Auto-start coding in the same conflict worktree after a confirmed sync plan."""
+        with self._lock:
+            if (
+                not record.sync_recovery
+                or not record.plan_confirmed
+                or record.plan_implemented
+                or record.context is None
+                or self._closed
+            ):
+                return False
+            record.plan_implemented = True
+            record.mode = "coding"
+            record.status = "queued"
+            record.phase = "Queued (resolving sync conflicts)"
+            record.error = None
+            record.finished_at = None
+            self._persist_task(record)
+            record.future = self.executor.submit(self._run, record)
+        self._notify(record, "queued", "Sync conflict coding queued in the preserved worktree.", "status")
+        return True
 
     def tasks(self) -> tuple[TaskRecord, ...]:
         with self._lock:
@@ -532,8 +685,27 @@ class TaskCoordinator:
 
     def cancel(self, task_id: str) -> bool:
         record = self.get(task_id)
-        if record is None or record.status in {"completed", "failed", "blocked", "cancelled"}:
+        if record is None or record.status in {"blocked", "cancelled"}:
             return False
+        if record.sync_recovery and record.status == "failed":
+            return self._cancel_sync_recovery(record)
+        if record.status == "failed":
+            return False
+        if (
+            record.sync_recovery
+            and record.status == "completed"
+            and not record.plan_implemented
+        ):
+            return self._cancel_sync_recovery(record)
+        if record.status == "completed":
+            return False
+        if record.sync_recovery and record.status in {
+            "paused",
+            "questioning",
+            "awaiting_answers",
+            "queued",
+        }:
+            return self._cancel_sync_recovery(record)
         if record.status == "paused":
             if record.context is not None:
                 try:
@@ -579,6 +751,8 @@ class TaskCoordinator:
             self._notify(record, "cancelled", record.error, "error")
             return True
         if record.status == "queued" and record.future is not None and record.future.cancel():
+            if record.sync_recovery:
+                return self._cancel_sync_recovery(record)
             record.status = "cancelled"
             record.phase = "Cancelled"
             record.error = "Task cancelled before execution."
@@ -589,6 +763,37 @@ class TaskCoordinator:
         record.control.request_cancel()
         record.phase = "Cancelling"
         self._notify(record, "cancelling", "Stopping the active agent and removing its worktree.", "status")
+        return True
+
+    def _cancel_sync_recovery(self, record: TaskRecord) -> bool:
+        """Abort the preserved sync merge and remove its worktree/temp branch."""
+        if record.future is not None and not record.future.done():
+            record.control.request_cancel()
+            if record.status == "queued":
+                record.future.cancel()
+        worktree = record.worktree_path or (record.context.path if record.context else None)
+        if worktree is not None:
+            try:
+                abort_sync_merge(
+                    self.repository,
+                    worktree,
+                    temp_branch_name=record.sync_temp_branch_name,
+                )
+            except Exception as error:  # Keep cancel path resilient for inspectable leftovers.
+                record.status = "failed"
+                record.phase = "Failed"
+                record.error = f"Sync recovery cancel cleanup failed: {error}"
+                self._persist_task(record)
+                self._notify(record, "failed", record.error, "error")
+                return False
+        record.context = None
+        record.worktree_path = None
+        record.status = "cancelled"
+        record.phase = "Cancelled"
+        record.error = "Sync conflict recovery cancelled; merge aborted."
+        record.finished_at = time.time()
+        self._persist_task(record)
+        self._notify(record, "cancelled", record.error, "error")
         return True
 
     def _run_clarification(self, task_id: str, clarification_id: str) -> None:
@@ -746,6 +951,15 @@ class TaskCoordinator:
                 resume_notes=resume_notes,
                 resume_from=record.resume_from,
                 topic_slug=record.topic,
+                sync_recovery=record.sync_recovery,
+                sync_operating_branch=record.sync_operating_branch or None,
+                sync_remote=record.sync_remote,
+                sync_used_temp_branch=record.sync_used_temp_branch,
+                sync_temp_branch_name=record.sync_temp_branch_name,
+                sync_conflict_attempt_limit=record.sync_conflict_attempt_limit,
+                sync_plan_text=record.plan_text,
+                sync_plan_answers=dict(record.plan_answers),
+                sync_plan_answer_details=dict(record.plan_answer_details),
             )
         except Exception as error:  # Keep one unexpected task failure isolated from the pool.
             log_exception(f"Task worker crashed task={record.task_id}", error)
@@ -791,6 +1005,8 @@ class TaskCoordinator:
                 "status",
             )
             LOGGER.info("Task worker finished task=%s status=%s", record.task_id, record.status)
+            if record.sync_recovery and record.plan_confirmed and not record.plan_implemented:
+                self._queue_sync_conflict_coding(record)
             return
         if result.paused:
             record.status = "paused"
@@ -804,6 +1020,9 @@ class TaskCoordinator:
             record.status = "cancelled"
             record.phase = "Cancelled"
             record.error = result.error or "Task cancelled."
+            if record.sync_recovery:
+                record.context = None
+                record.worktree_path = None
             self._persist_task(record)
             self._notify(record, "cancelled", record.error, "error")
             LOGGER.info("Task worker finished task=%s status=%s", record.task_id, record.status)
@@ -822,6 +1041,9 @@ class TaskCoordinator:
                 record.status = "completed"
                 record.phase = "Completed"
                 record.resume_from = None
+                if record.sync_recovery and record.mode == "coding":
+                    record.context = None
+                    record.worktree_path = None
         else:
             record.status = "failed"
             record.phase = "Failed"
@@ -835,6 +1057,14 @@ class TaskCoordinator:
             "status",
         )
         LOGGER.info("Task worker finished task=%s status=%s", record.task_id, record.status)
+        if (
+            result.succeeded
+            and record.sync_recovery
+            and record.mode == "plan"
+            and record.plan_confirmed
+            and not record.plan_implemented
+        ):
+            self._queue_sync_conflict_coding(record)
 
     def _update_plan_state(self, record: TaskRecord, new_messages: list[str]) -> bool:
         parsed = self._parse_plan_messages(new_messages, record.plan_final_output)
@@ -999,6 +1229,12 @@ class TaskCoordinator:
                 base_commit=record.context.base_commit if record.context is not None else None,
                 resume_from=record.resume_from,
                 topic=record.topic,
+                sync_recovery=record.sync_recovery,
+                sync_operating_branch=record.sync_operating_branch or None,
+                sync_remote=record.sync_remote or None,
+                sync_used_temp_branch=record.sync_used_temp_branch,
+                sync_temp_branch_name=record.sync_temp_branch_name,
+                sync_conflict_attempt_limit=record.sync_conflict_attempt_limit,
             )
         except (OSError, ValueError) as error:
             # Persistent task history must never change orchestration behavior.
@@ -1040,6 +1276,14 @@ class TaskCoordinator:
             if status in INTERRUPTIBLE_STATUSES:
                 status = "paused"
                 error = error or "Daedalus was closed while this task was active; resume to continue."
+            sync_recovery = bool(snapshot.get("sync_recovery"))
+            if sync_recovery and status not in {"completed", "failed", "cancelled", "blocked"}:
+                # Cross-session auto-resume of mid-merge sync worktrees is out of scope.
+                status = "failed"
+                error = (
+                    error
+                    or "Sync conflict recovery was interrupted; cancel or start Sync again to clean up."
+                )
             topic_value = snapshot.get("topic")
             topic = topic_value.strip() if isinstance(topic_value, str) and topic_value.strip() else None
             branch_name = snapshot.get("branch_name")
@@ -1067,6 +1311,20 @@ class TaskCoordinator:
                     branch_name,
                     worktree_path,
                 )
+            sync_operating_branch = snapshot.get("sync_operating_branch")
+            if not isinstance(sync_operating_branch, str):
+                sync_operating_branch = ""
+            sync_remote = snapshot.get("sync_remote")
+            if not isinstance(sync_remote, str) or not sync_remote:
+                sync_remote = "origin"
+            sync_temp_branch_name = snapshot.get("sync_temp_branch_name")
+            if not isinstance(sync_temp_branch_name, str) or not sync_temp_branch_name:
+                sync_temp_branch_name = None
+            attempt_limit = snapshot.get("sync_conflict_attempt_limit")
+            try:
+                sync_attempt_limit = max(1, int(attempt_limit)) if attempt_limit is not None else 3
+            except (TypeError, ValueError):
+                sync_attempt_limit = 3
             record = TaskRecord(
                 task_id=task_id,
                 submission_sequence=sequence,
@@ -1088,6 +1346,12 @@ class TaskCoordinator:
                 memory_task_id=memory_task_id,
                 prompt_history=_string_list(snapshot.get("prompt_history")) or [prompt],
                 resume_from=resume_from,
+                sync_recovery=sync_recovery,
+                sync_operating_branch=sync_operating_branch,
+                sync_remote=sync_remote,
+                sync_used_temp_branch=bool(snapshot.get("sync_used_temp_branch")),
+                sync_temp_branch_name=sync_temp_branch_name,
+                sync_conflict_attempt_limit=sync_attempt_limit,
             )
             if record.mode == "plan":
                 self._restore_plan_state(record)

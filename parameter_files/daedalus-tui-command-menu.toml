@@ -6,6 +6,12 @@ subtitle = "Choose an action, or press Esc / Ctrl+K to close"
 # before pushing (sync-style). Set false for push-only publishing.
 pull_before_push = true
 
+# When true, Sync merge conflicts launch plan-mode recovery in the preserved
+# sync worktree (questions to the operator, then auto resolve + push).
+sync_conflict_recovery_enabled = true
+# Bounded coding attempts when conflict resolutions still leave unmerged paths.
+sync_conflict_attempt_limit = 3
+
 [labels]
 new_task = "New Task"
 new_project = "New Project"

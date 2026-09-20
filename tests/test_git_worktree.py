@@ -393,5 +393,342 @@ class GitWorktreeTests(unittest.TestCase):
             with self.assertRaisesRegex(GitWorktreeError, "Authentication failed"):
                 push_branch(Path("/repo"), "main", pull_first=False)
 
-if __name__ == "__main__":
-    unittest.main()
+    def _init_repo(self, path: Path) -> None:
+        import subprocess
+
+        path.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init", "-b", "main"], cwd=path, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=path, check=True, capture_output=True)
+
+    def _commit_file(self, path: Path, relative: str, content: str, message: str) -> None:
+        import subprocess
+
+        target = path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        subprocess.run(["git", "add", relative], cwd=path, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", message], cwd=path, check=True, capture_output=True)
+
+    def test_pull_branch_conflict_preserves_isolated_worktree(self):
+        import subprocess
+
+        from tui.git_worktree import SyncMergeConflictError, list_unmerged_paths, pull_branch
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote.git"
+            local = root / "local"
+            subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+            self._init_repo(local)
+            self._commit_file(local, "shared.txt", "base\n", "base")
+            subprocess.run(
+                ["git", "remote", "add", "origin", str(remote)],
+                cwd=local,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(["git", "push", "-u", "origin", "main"], cwd=local, check=True, capture_output=True)
+
+            other = root / "other"
+            subprocess.run(["git", "clone", str(remote), str(other)], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            self._commit_file(other, "shared.txt", "remote\n", "remote change")
+            subprocess.run(["git", "push", "origin", "main"], cwd=other, check=True, capture_output=True)
+
+            self._commit_file(local, "shared.txt", "local\n", "local change")
+            with self.assertRaises(SyncMergeConflictError) as raised:
+                pull_branch(local, "main")
+            error = raised.exception
+            self.assertTrue(error.worktree_path.exists())
+            self.assertIn("shared.txt", error.conflicted_paths)
+            self.assertTrue(list_unmerged_paths(error.worktree_path))
+            # Primary still has main checked out, so recovery attaches via temp branch.
+            self.assertTrue(error.used_temp_branch)
+            # Operating checkout must not be mid-merge.
+            porcelain = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=local,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            self.assertNotIn("UU", porcelain)
+
+    def test_pull_branch_uses_temp_branch_when_operating_checkout_exists(self):
+        import subprocess
+
+        from tui.git_worktree import SyncMergeConflictError, pull_branch
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote.git"
+            local = root / "local"
+            subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+            self._init_repo(local)
+            self._commit_file(local, "shared.txt", "base\n", "base")
+            subprocess.run(
+                ["git", "remote", "add", "origin", str(remote)],
+                cwd=local,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(["git", "push", "-u", "origin", "main"], cwd=local, check=True, capture_output=True)
+
+            other = root / "other"
+            subprocess.run(["git", "clone", str(remote), str(other)], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            self._commit_file(other, "shared.txt", "remote\n", "remote change")
+            subprocess.run(["git", "push", "origin", "main"], cwd=other, check=True, capture_output=True)
+            self._commit_file(local, "shared.txt", "local\n", "local change")
+
+            # Keep main checked out in primary so sync must use a temp branch.
+            current = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=local,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self.assertEqual(current, "main")
+            with self.assertRaises(SyncMergeConflictError) as raised:
+                pull_branch(local, "main")
+            error = raised.exception
+            self.assertTrue(error.used_temp_branch)
+            self.assertIsNotNone(error.temp_branch_name)
+            self.assertTrue(str(error.temp_branch_name).startswith("daedalus/sync-resolve-"))
+            self.assertTrue(error.worktree_path.name.startswith(".sync-resolve-"))
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "branch", "--show-current"],
+                    cwd=local,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.strip(),
+                "main",
+            )
+
+    def test_finalize_and_abort_sync_merge(self):
+        import subprocess
+
+        from tui.git_worktree import (
+            SyncMergeConflictError,
+            abort_sync_merge,
+            finalize_sync_merge,
+            pull_branch,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote.git"
+            local = root / "local"
+            subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+            self._init_repo(local)
+            self._commit_file(local, "shared.txt", "base\n", "base")
+            subprocess.run(
+                ["git", "remote", "add", "origin", str(remote)],
+                cwd=local,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(["git", "push", "-u", "origin", "main"], cwd=local, check=True, capture_output=True)
+
+            other = root / "other"
+            subprocess.run(["git", "clone", str(remote), str(other)], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            self._commit_file(other, "shared.txt", "remote\n", "remote change")
+            subprocess.run(["git", "push", "origin", "main"], cwd=other, check=True, capture_output=True)
+            self._commit_file(local, "shared.txt", "local\n", "local change")
+
+            with self.assertRaises(SyncMergeConflictError) as raised:
+                pull_branch(local, "main")
+            conflict = raised.exception
+            (conflict.worktree_path / "shared.txt").write_text("resolved\n", encoding="utf-8")
+            tip_before = subprocess.run(
+                ["git", "rev-parse", "refs/heads/main"],
+                cwd=local,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            finalize_sync_merge(
+                local,
+                conflict.worktree_path,
+                "main",
+                used_temp_branch=conflict.used_temp_branch,
+                temp_branch_name=conflict.temp_branch_name,
+            )
+            tip_after = subprocess.run(
+                ["git", "rev-parse", "refs/heads/main"],
+                cwd=local,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self.assertNotEqual(tip_before, tip_after)
+            self.assertFalse(conflict.worktree_path.exists())
+
+            # Abort path for a fresh conflict.
+            self._commit_file(local, "shared.txt", "local2\n", "local2")
+            self._commit_file(other, "shared.txt", "remote2\n", "remote2")
+            subprocess.run(["git", "push", "origin", "main"], cwd=other, check=True, capture_output=True)
+            with self.assertRaises(SyncMergeConflictError) as raised_again:
+                pull_branch(local, "main")
+            second = raised_again.exception
+            abort_sync_merge(local, second.worktree_path, temp_branch_name=second.temp_branch_name)
+            self.assertFalse(second.worktree_path.exists())
+
+    def test_successful_pull_removes_temp_worktree(self):
+        import subprocess
+
+        from tui.git_worktree import pull_branch
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote.git"
+            local = root / "local"
+            subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+            self._init_repo(local)
+            self._commit_file(local, "file.txt", "base\n", "base")
+            subprocess.run(
+                ["git", "remote", "add", "origin", str(remote)],
+                cwd=local,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(["git", "push", "-u", "origin", "main"], cwd=local, check=True, capture_output=True)
+
+            other = root / "other"
+            subprocess.run(["git", "clone", str(remote), str(other)], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            self._commit_file(other, "remote-only.txt", "ok\n", "remote only")
+            subprocess.run(["git", "push", "origin", "main"], cwd=other, check=True, capture_output=True)
+
+            # Diverged non-conflicting histories force a merge worktree (not update-ref).
+            self._commit_file(local, "local-only.txt", "ok\n", "local only")
+            subprocess.run(["git", "checkout", "--detach"], cwd=local, check=True, capture_output=True)
+            pull_branch(local, "main")
+            worktree_root = local.parent / ".daedalus-worktrees" / local.name
+            leftovers = list(worktree_root.glob(".sync-*")) if worktree_root.exists() else []
+            self.assertEqual(leftovers, [])
+            tip = subprocess.run(
+                ["git", "rev-parse", "refs/heads/main"],
+                cwd=local,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            remote_tip = subprocess.run(
+                ["git", "rev-parse", "refs/remotes/origin/main"],
+                cwd=local,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            # Local tip advanced past remote via merge commit.
+            self.assertNotEqual(tip, remote_tip)
+            contains = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", remote_tip, tip],
+                cwd=local,
+                capture_output=True,
+            )
+            self.assertEqual(contains.returncode, 0)
+
+    def test_free_branch_sync_worktree_checks_out_operating_branch(self):
+        import subprocess
+
+        from tui.git_worktree import SyncMergeConflictError, pull_branch
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote.git"
+            local = root / "local"
+            subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+            self._init_repo(local)
+            self._commit_file(local, "shared.txt", "base\n", "base")
+            subprocess.run(
+                ["git", "remote", "add", "origin", str(remote)],
+                cwd=local,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(["git", "push", "-u", "origin", "main"], cwd=local, check=True, capture_output=True)
+
+            other = root / "other"
+            subprocess.run(["git", "clone", str(remote), str(other)], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test"],
+                cwd=other,
+                check=True,
+                capture_output=True,
+            )
+            self._commit_file(other, "shared.txt", "remote\n", "remote change")
+            subprocess.run(["git", "push", "origin", "main"], cwd=other, check=True, capture_output=True)
+            self._commit_file(local, "shared.txt", "local\n", "local change")
+            subprocess.run(["git", "checkout", "--detach"], cwd=local, check=True, capture_output=True)
+
+            with self.assertRaises(SyncMergeConflictError) as raised:
+                pull_branch(local, "main")
+            error = raised.exception
+            self.assertFalse(error.used_temp_branch)
+            self.assertIsNone(error.temp_branch_name)
+            self.assertTrue(error.worktree_path.name.startswith(".sync-pull-"))
+            branch = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=error.worktree_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self.assertEqual(branch, "main")

@@ -25,7 +25,7 @@ class FakeOrchestrator:
         self.on_event = on_event
         self.integration_gate = integration_gate
 
-    def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None):
+    def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None, **_kwargs):
         with self.lock:
             type(self).active += 1
             type(self).maximum = max(type(self).maximum, type(self).active)
@@ -257,7 +257,7 @@ class TaskCoordinatorTests(unittest.TestCase):
 
     def test_failed_task_does_not_block_later_task(self):
         class FailingOrchestrator(FakeOrchestrator):
-            def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None):
+            def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None, **_kwargs):
                 if prompt == "bad":
                     self.on_event("failed", "Task failed but worktree is preserved.", "error")
                     return OrchestrationResult(False, task_id, f"agent/task-{task_id}", Path(f"/tmp/{task_id}"), "preserved")
@@ -566,7 +566,7 @@ class TaskCoordinatorTests(unittest.TestCase):
             def __init__(self, repository, _runner, _settings, _on_event, integration_gate=None):
                 self.repository = repository
 
-            def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None):
+            def run(self, prompt, provider, model, reasoning, task_id=None, submission_sequence=0, mode="coding", control=None, existing_context=None, resume_notes=(), resume_from=None, topic_slug=None, **_kwargs):
                 type(self).calls.append((existing_context, resume_notes, resume_from))
                 type(self).started.set()
                 context = existing_context or WorktreeContext(
@@ -1003,6 +1003,191 @@ class TaskCoordinatorTests(unittest.TestCase):
                 self.assertEqual(coding_record.topic, "mvp")
                 coding_record.future.result(timeout=5)
                 self.assertEqual(TrackingOrchestrator.topic_slugs[-1], "mvp")
+            coordinator.shutdown()
+
+    def test_sync_recovery_plan_auto_implements_without_reset_or_stock_implement(self):
+        from tui.git_worktree import WorktreeContext
+        from tui.orchestrator import OrchestrationResult
+        from tui.plan import PLAN_END, PLAN_START
+
+        class SyncOrchestrator:
+            calls = []
+            gates = []
+
+            def __init__(self, repository, _runner, _settings, on_event, integration_gate=None, **_kwargs):
+                self.repository = repository
+                self.on_event = on_event
+                self.integration_gate = integration_gate or (lambda _seq, op: op())
+
+            def run(self, prompt, provider, model, reasoning, task_id=None, mode="coding",
+                    existing_context=None, sync_recovery=False, **kwargs):
+                type(self).calls.append(
+                    {
+                        "mode": mode,
+                        "sync_recovery": sync_recovery,
+                        "existing_context": existing_context,
+                        "kwargs": kwargs,
+                    }
+                )
+                context = existing_context or WorktreeContext(
+                    self.repository, task_id, "base", "main", self.repository / "sync-wt"
+                )
+                if mode == "plan":
+                    payload = (
+                        f"{PLAN_START}\n"
+                        '{"plan": "Keep both sides carefully.", "questions": [], "no_more_questions": true}\n'
+                        f"{PLAN_END}"
+                    )
+                    self.on_event("planning", payload, "message")
+                    return OrchestrationResult(
+                        True,
+                        task_id,
+                        context.branch_name,
+                        context.path,
+                        context=context,
+                        awaiting_plan=True,
+                    )
+
+                def finalize() -> None:
+                    type(self).gates.append("finalize")
+
+                self.integration_gate(kwargs.get("submission_sequence", 0), finalize)
+                return OrchestrationResult(True, task_id, context.branch_name, context.path, context=None)
+
+        with tempfile.TemporaryDirectory() as directory:
+            worktree = Path(directory) / "sync-wt"
+            worktree.mkdir()
+            coordinator = TaskCoordinator(Path(directory), object(), OrchestrationSettings(max_concurrent_tasks=1))
+            with patch("tui.task_coordinator.LocalOrchestrator", SyncOrchestrator), patch.object(
+                TaskCoordinator, "_cleanup_orphaned_sync_recoveries_locked"
+            ):
+                record = coordinator.submit_sync_recovery(
+                    provider="codex",
+                    model="luna",
+                    reasoning="medium",
+                    operating_branch="main",
+                    remote="origin",
+                    worktree_path=worktree,
+                    conflicted_paths=("shared.txt",),
+                    used_temp_branch=True,
+                    temp_branch_name="daedalus/sync-resolve-main-1",
+                    merge_failure="CONFLICT",
+                    attempt_limit=2,
+                    base_commit="abc",
+                )
+                # Wait for plan + auto coding.
+                deadline = time.time() + 5
+                while time.time() < deadline and record.status not in {"completed", "failed"}:
+                    if record.future is not None and not record.future.done():
+                        try:
+                            record.future.result(timeout=0.2)
+                        except Exception:
+                            pass
+                    time.sleep(0.05)
+                # Coding future may replace plan future.
+                if record.future is not None and not record.future.done():
+                    record.future.result(timeout=5)
+
+            self.assertTrue(record.sync_recovery)
+            self.assertEqual(record.status, "completed")
+            self.assertTrue(record.plan_implemented)
+            self.assertEqual(len(SyncOrchestrator.calls), 2)
+            self.assertEqual(SyncOrchestrator.calls[0]["mode"], "plan")
+            self.assertTrue(SyncOrchestrator.calls[0]["sync_recovery"])
+            self.assertIsNotNone(SyncOrchestrator.calls[0]["existing_context"])
+            self.assertEqual(SyncOrchestrator.calls[1]["mode"], "coding")
+            self.assertTrue(SyncOrchestrator.calls[1]["sync_recovery"])
+            self.assertIs(
+                SyncOrchestrator.calls[1]["existing_context"],
+                SyncOrchestrator.calls[0]["existing_context"],
+            )
+            self.assertEqual(SyncOrchestrator.gates, ["finalize"])
+            self.assertIsNone(coordinator.implement_plan(record.task_id))
+            coordinator.shutdown()
+
+    def test_sync_recovery_questions_pause_then_auto_continue(self):
+        from tui.git_worktree import WorktreeContext
+        from tui.orchestrator import OrchestrationResult
+        from tui.plan import PLAN_END, PLAN_START
+
+        class QuestionThenConfirmOrchestrator:
+            stage = 0
+
+            def __init__(self, repository, _runner, _settings, on_event, integration_gate=None, **_kwargs):
+                self.repository = repository
+                self.on_event = on_event
+                self.integration_gate = integration_gate or (lambda _seq, op: op())
+
+            def run(self, prompt, provider, model, reasoning, task_id=None, mode="coding",
+                    existing_context=None, sync_recovery=False, **kwargs):
+                context = existing_context or WorktreeContext(
+                    self.repository, task_id, "base", "main", self.repository / "sync-wt"
+                )
+                if mode == "plan":
+                    type(self).stage += 1
+                    if type(self).stage == 1:
+                        payload = (
+                            f"{PLAN_START}\n"
+                            '{"plan": "Need a decision.", "questions": [{"id": "q1", "question": "Keep?", '
+                            '"required": true, "options": [{"id": "a", "label": "Yes (Recommended)"}, '
+                            '{"id": "b", "label": "No"}]}], "no_more_questions": false}\n'
+                            f"{PLAN_END}"
+                        )
+                    else:
+                        payload = (
+                            f"{PLAN_START}\n"
+                            '{"plan": "Keep remote.", "questions": [], "no_more_questions": true}\n'
+                            f"{PLAN_END}"
+                        )
+                    self.on_event("planning", payload, "message")
+                    return OrchestrationResult(
+                        True,
+                        task_id,
+                        context.branch_name,
+                        context.path,
+                        context=context,
+                        awaiting_plan=True,
+                    )
+                self.integration_gate(0, lambda: None)
+                return OrchestrationResult(True, task_id, context.branch_name, context.path, context=None)
+
+        with tempfile.TemporaryDirectory() as directory:
+            worktree = Path(directory) / "sync-wt"
+            worktree.mkdir()
+            coordinator = TaskCoordinator(Path(directory), object(), OrchestrationSettings(max_concurrent_tasks=1))
+            with patch("tui.task_coordinator.LocalOrchestrator", QuestionThenConfirmOrchestrator), patch.object(
+                TaskCoordinator, "_cleanup_orphaned_sync_recoveries_locked"
+            ):
+                record = coordinator.submit_sync_recovery(
+                    provider="codex",
+                    model="luna",
+                    reasoning="medium",
+                    operating_branch="main",
+                    remote="origin",
+                    worktree_path=worktree,
+                    conflicted_paths=("shared.txt",),
+                    used_temp_branch=False,
+                    temp_branch_name=None,
+                    merge_failure="CONFLICT",
+                    base_commit="abc",
+                )
+                record.future.result(timeout=5)
+                self.assertEqual(record.status, "awaiting_answers")
+                preserved = record.context
+                self.assertIsNotNone(preserved)
+                self.assertTrue(coordinator.answer_plan(record.task_id, {"q1": "a"}))
+                deadline = time.time() + 5
+                while time.time() < deadline and record.status not in {"completed", "failed"}:
+                    if record.future is not None and not record.future.done():
+                        try:
+                            record.future.result(timeout=0.2)
+                        except Exception:
+                            pass
+                    time.sleep(0.05)
+                if record.future is not None and not record.future.done():
+                    record.future.result(timeout=5)
+            self.assertEqual(record.status, "completed")
+            self.assertTrue(record.plan_implemented)
             coordinator.shutdown()
 
 

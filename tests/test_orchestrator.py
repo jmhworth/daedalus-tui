@@ -716,6 +716,99 @@ class OrchestratorTests(unittest.TestCase):
         pending.assert_not_called()
         push.assert_not_called()
 
+    def test_sync_recovery_plan_skips_reset_task_to_base(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "plan", tokens_consumed=3)
+            context = WorktreeContext(
+                repository, "sync", "base", "daedalus/sync-resolve-main-1", repository / "sync-wt"
+            )
+            (context.path / ".agents" / "profiles").mkdir(parents=True)
+            (context.path / ".agents" / "profiles" / "planning.md").write_text(
+                "PLAN", encoding="utf-8"
+            )
+            manager = Mock()
+            gates = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda *_args: None,
+                integration_gate=lambda _seq, op: gates.append("gate") or op(),
+            )
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager):
+                result = orchestrator.run(
+                    "Resolve conflicts",
+                    "codex",
+                    "gpt-5.6-luna",
+                    "medium",
+                    mode="plan",
+                    existing_context=context,
+                    sync_recovery=True,
+                    sync_operating_branch="main",
+                    sync_used_temp_branch=True,
+                    sync_temp_branch_name="daedalus/sync-resolve-main-1",
+                )
+
+        self.assertTrue(result.succeeded)
+        self.assertTrue(result.awaiting_plan)
+        manager.reset_task_to_base.assert_not_called()
+        manager.create.assert_not_called()
+        self.assertEqual(gates, [])
+
+    def test_sync_recovery_coding_retries_unmerged_then_finalizes_and_pushes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "resolved", tokens_consumed=4)
+            context = WorktreeContext(
+                repository, "sync", "base", "main", repository / "sync-wt"
+            )
+            (context.path / ".agents" / "profiles").mkdir(parents=True)
+            (context.path / ".agents" / "profiles" / "coding.md").write_text(
+                "CODING", encoding="utf-8"
+            )
+            manager = Mock()
+            gates = []
+            finalize_calls = []
+            push_calls = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda *_args: None,
+                integration_gate=lambda _seq, op: gates.append("gate") or op(),
+            )
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager), patch(
+                "tui.orchestrator.list_unmerged_paths",
+                side_effect=[("shared.txt",), ()],
+            ), patch(
+                "tui.orchestrator.finalize_sync_merge",
+                side_effect=lambda *args, **kwargs: finalize_calls.append((args, kwargs)),
+            ), patch(
+                "tui.orchestrator.push_branch",
+                side_effect=lambda *args, **kwargs: push_calls.append((args, kwargs)),
+            ):
+                result = orchestrator.run(
+                    "Resolve conflicts",
+                    "codex",
+                    "gpt-5.6-luna",
+                    "medium",
+                    mode="coding",
+                    existing_context=context,
+                    sync_recovery=True,
+                    sync_operating_branch="main",
+                    sync_conflict_attempt_limit=3,
+                    sync_plan_text="Keep remote",
+                )
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual(runner.run.call_count, 2)
+        self.assertEqual(gates, ["gate"])
+        self.assertEqual(len(finalize_calls), 1)
+        self.assertEqual(push_calls[0][1].get("pull_first"), False)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -220,6 +220,12 @@ class TaskMemoryStore:
         submission_sequence: int | None = None,
         resume_from: str | None = None,
         topic: str | None = None,
+        sync_recovery: bool = False,
+        sync_operating_branch: str | None = None,
+        sync_remote: str | None = None,
+        sync_used_temp_branch: bool = False,
+        sync_temp_branch_name: str | None = None,
+        sync_conflict_attempt_limit: int | None = None,
     ) -> None:
         """Upsert a task snapshot keyed by the task worktree's directory name."""
         task = {
@@ -256,6 +262,17 @@ class TaskMemoryStore:
         cleaned_topic = topic.strip() if isinstance(topic, str) and topic.strip() else None
         if cleaned_topic is not None:
             task["topic"] = cleaned_topic
+        if sync_recovery:
+            task["sync_recovery"] = True
+            if sync_operating_branch:
+                task["sync_operating_branch"] = sync_operating_branch
+            if sync_remote:
+                task["sync_remote"] = sync_remote
+            task["sync_used_temp_branch"] = bool(sync_used_temp_branch)
+            if sync_temp_branch_name:
+                task["sync_temp_branch_name"] = sync_temp_branch_name
+            if sync_conflict_attempt_limit is not None:
+                task["sync_conflict_attempt_limit"] = int(sync_conflict_attempt_limit)
         with self._lock:
             entries = self._read_entries()
             updated_entries: list[dict[str, object]] = []

@@ -43,7 +43,13 @@ from .config import (
 )
 from .debug_log import LOGGER, close_fault_handler, configure_debug_logging, install_fault_handler, log_exception
 from .environment import cursor_environment, redact_environment_values
-from .git_worktree import GitWorktreeError, list_local_branches, push_branch, remote_exists
+from .git_worktree import (
+    GitWorktreeError,
+    SyncMergeConflictError,
+    list_local_branches,
+    push_branch,
+    remote_exists,
+)
 from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
 from .project_initializer import initialize_project, load_initializer_settings, validate_project_name
 from .personal_supabase import (
@@ -2544,6 +2550,9 @@ class DaedalusTuiApp(App[None]):
             if kind != "message":
                 self._refresh_project_selector()
                 self._refresh_task_list()
+                if record.sync_recovery:
+                    self._refresh_push_button()
+                    self._update_sync_recovery_status(record, phase)
             if is_selected:
                 self._render_selected_task_safely(f"task event phase={phase}")
         except Exception as error:
@@ -2555,6 +2564,36 @@ class DaedalusTuiApp(App[None]):
                 self._set_status("Error")
             except Exception as display_error:
                 log_exception("Could not show task rendering error", display_error)
+
+    def _update_sync_recovery_status(self, record: TaskRecord, phase: str) -> None:
+        """Surface Sync conflict recovery progress in the status bar."""
+        normalized = phase.lower()
+        branch = record.sync_operating_branch or "branch"
+        if normalized in {"planning", "queued"} and record.mode == "plan":
+            self._set_status("Sync conflict — planning…")
+            return
+        if normalized in {"questions", "questioning"}:
+            self._set_status("Awaiting conflict decisions")
+            return
+        if normalized in {"agent", "resolving", "running"} or (
+            normalized == "queued" and record.mode == "coding"
+        ):
+            self._set_status("Resolving sync conflicts…")
+            return
+        if normalized in {"ready", "integration"}:
+            self._set_status(f"Syncing {branch}…")
+            return
+        if normalized == "completed":
+            self._set_error("")
+            self._set_status(f"Synced {branch} to origin")
+            return
+        if normalized == "failed":
+            self._set_status("Sync conflict recovery failed")
+            if record.error:
+                self._set_error(record.error)
+            return
+        if normalized == "cancelled":
+            self._set_status("Sync conflict recovery cancelled")
 
     @staticmethod
     def _should_promote_task_update(record: TaskRecord, phase: str) -> bool:
@@ -2695,7 +2734,13 @@ class DaedalusTuiApp(App[None]):
             button.disabled = True
             return
         branch = self._selected_operating_branch()
-        button.disabled = not branch or not remote_exists(self._active_project_path)
+        if not branch or not remote_exists(self._active_project_path):
+            button.disabled = True
+            return
+        if self.coordinator.has_active_sync_recovery(branch):
+            button.disabled = True
+            return
+        button.disabled = False
 
     def _push_selected_branch(self) -> None:
         """Sync the Branch Select value for the active project with origin."""
@@ -2712,6 +2757,11 @@ class DaedalusTuiApp(App[None]):
             self._set_status("Error")
             self._refresh_push_button()
             return
+        if self.coordinator.has_active_sync_recovery(branch):
+            self._set_error("Sync conflict recovery is already active for this branch.")
+            self._set_status("Sync recovery in progress")
+            self._refresh_push_button()
+            return
 
         pull_first = self.command_menu_settings.pull_before_push
         self._push_in_flight = True
@@ -2722,6 +2772,8 @@ class DaedalusTuiApp(App[None]):
         def work() -> None:
             try:
                 push_branch(project_path, branch, pull_first=pull_first)
+            except SyncMergeConflictError as error:
+                self.call_from_thread(self._on_push_finished, False, error, branch)
             except GitWorktreeError as error:
                 self.call_from_thread(self._on_push_finished, False, str(error), branch)
             except Exception as error:  # pragma: no cover - defensive UI boundary
@@ -2737,17 +2789,57 @@ class DaedalusTuiApp(App[None]):
             exit_on_error=False,
         )
 
-    def _on_push_finished(self, succeeded: bool, error: str, branch: str) -> None:
+    def _on_push_finished(
+        self,
+        succeeded: bool,
+        error: str | SyncMergeConflictError,
+        branch: str,
+    ) -> None:
         self._push_in_flight = False
-        self._refresh_push_button()
         pull_first = self.command_menu_settings.pull_before_push
         if succeeded:
+            self._refresh_push_button()
             self._set_error("")
             verb = "Synced" if pull_first else "Pushed"
             self._set_status(f"{verb} {branch} to origin")
             return
-        self._set_error(error or ("Sync failed." if pull_first else "Push failed."))
+        if (
+            isinstance(error, SyncMergeConflictError)
+            and self.command_menu_settings.sync_conflict_recovery_enabled
+        ):
+            self._start_sync_conflict_recovery(error)
+            return
+        self._refresh_push_button()
+        message = str(error) if error else ("Sync failed." if pull_first else "Push failed.")
+        self._set_error(message)
         self._set_status("Sync failed" if pull_first else "Push failed")
+
+    def _start_sync_conflict_recovery(self, conflict: SyncMergeConflictError) -> None:
+        """Launch plan-mode recovery against the preserved Sync conflict worktree."""
+        try:
+            provider, model, reasoning, _mode = self._current_submission_settings()
+            record = self.coordinator.submit_sync_recovery(
+                provider=provider,
+                model=model,
+                reasoning=reasoning,
+                operating_branch=conflict.branch,
+                remote=conflict.remote,
+                worktree_path=conflict.worktree_path,
+                conflicted_paths=conflict.conflicted_paths,
+                used_temp_branch=conflict.used_temp_branch,
+                temp_branch_name=conflict.temp_branch_name,
+                merge_failure=conflict.merge_failure,
+                attempt_limit=self.command_menu_settings.sync_conflict_attempt_limit,
+            )
+        except (RuntimeError, ValueError, GitWorktreeError) as launch_error:
+            self._refresh_push_button()
+            self._set_error(str(launch_error))
+            self._set_status("Sync conflict recovery failed to start")
+            return
+        self._focus_submitted_task(record, "sync conflict recovery")
+        self._refresh_push_button()
+        self._set_error("")
+        self._set_status("Sync conflict — planning…")
 
     def _refresh_topic_select(self) -> None:
         """Refresh topics and restore the active project's remembered default."""
@@ -3259,6 +3351,12 @@ class DaedalusTuiApp(App[None]):
             and not record.plan_confirmed
         )
         implement_button = implement_nodes.first()
+        if record.sync_recovery:
+            # Orchestration owns coding→finalize→push for Sync recovery.
+            implement_button.disabled = True
+            implement_button.add_class("implemented")
+            implement_button.label = "Auto-resolving"
+            return
         implemented = record.plan_implemented
         implement_button.disabled = implemented or not (
             record.plan_confirmed
@@ -3492,7 +3590,7 @@ class DaedalusTuiApp(App[None]):
 
     def _implement_plan(self) -> None:
         record = self.coordinator.get(self._selected_task_id or "")
-        if record is None or record.mode != "plan":
+        if record is None or record.mode != "plan" or record.sync_recovery:
             return
         implement_plan = getattr(self.coordinator, "implement_plan", None)
         coding_record = implement_plan(record.task_id) if implement_plan is not None else None
@@ -3673,7 +3771,11 @@ class DaedalusTuiApp(App[None]):
     def _cancel_task(self) -> None:
         record = self.coordinator.get(self._selected_task_id or "")
         if record is not None and self.coordinator.cancel(record.task_id):
-            self._set_status("Cancelling")
+            if record.sync_recovery:
+                self._refresh_push_button()
+                self._set_status("Sync conflict recovery cancelled")
+            else:
+                self._set_status("Cancelling")
 
     def _retry_task(self) -> None:
         record = self.coordinator.get(self._selected_task_id or "")
