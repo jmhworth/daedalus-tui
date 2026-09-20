@@ -86,6 +86,7 @@ class LocalOrchestrator:
         on_event: EventCallback,
         integration_gate: IntegrationGate | None = None,
         environment_path: Path | None = None,
+        launch_environment_path: Path | None = None,
         migration_push_lock: Lock | None = None,
     ):
         self.repository = repository.resolve()
@@ -94,6 +95,9 @@ class LocalOrchestrator:
         self.on_event = on_event
         self.integration_gate = integration_gate or (lambda _sequence, operation: operation())
         self.environment_path = environment_path.resolve() if environment_path is not None else None
+        self.launch_environment_path = (
+            launch_environment_path.resolve() if launch_environment_path is not None else None
+        )
         self.migration_push_lock = migration_push_lock
         self._tokens_consumed = 0
 
@@ -299,6 +303,11 @@ class LocalOrchestrator:
             ),
             control=control,
             timeout_seconds=self.settings.agent_timeout_seconds,
+            credential_files=(
+                (self.launch_environment_path,)
+                if self.launch_environment_path is not None
+                else ()
+            ),
         )
         result = self.runner.run(
             request,

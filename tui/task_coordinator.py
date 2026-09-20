@@ -202,6 +202,7 @@ class TaskCoordinator:
         on_event: TaskEventCallback | None = None,
         memory_path: Path | None = None,
         environment_path: Path | None = None,
+        launch_environment_path: Path | None = None,
         migration_push_lock: Lock | None = None,
     ) -> None:
         if settings.max_concurrent_tasks < 1:
@@ -211,6 +212,9 @@ class TaskCoordinator:
         self.settings = settings
         self.on_event = on_event
         self.environment_path = environment_path.resolve() if environment_path is not None else None
+        self.launch_environment_path = (
+            launch_environment_path.resolve() if launch_environment_path is not None else None
+        )
         self.migration_push_lock = migration_push_lock
         self.integration = IntegrationCoordinator()
         self.executor = ThreadPoolExecutor(max_workers=settings.max_concurrent_tasks)
@@ -692,6 +696,8 @@ class TaskCoordinator:
         options: dict[str, object] = {"integration_gate": self.integration.run_when_ready}
         if self.environment_path is not None:
             options["environment_path"] = self.environment_path
+        if self.launch_environment_path is not None:
+            options["launch_environment_path"] = self.launch_environment_path
         if self.migration_push_lock is not None:
             options["migration_push_lock"] = self.migration_push_lock
         return LocalOrchestrator(

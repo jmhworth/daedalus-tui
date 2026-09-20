@@ -5,12 +5,23 @@ from __future__ import annotations
 from pathlib import Path
 import os
 
+# Operator credentials for agent CLIs. These are not project secrets: they live
+# in the launch-root or TUI package `.env` and are filled into Cursor subprocesses
+# when a target project does not define them.
+AGENT_CREDENTIAL_KEYS = frozenset({"CURSOR_API_KEY"})
+
+
+def tui_package_env_path() -> Path:
+    """Return ``.env`` beside the installed ``tui`` package root."""
+    return Path(__file__).resolve().parent.parent / ".env"
+
 
 def cursor_environment(directory: Path, extra_files: tuple[Path, ...] = ()) -> dict[str, str]:
     """Return the process environment plus local Cursor credentials.
 
     Explicit process variables always win over values in `.env` files. The
     target directory's `.env` is checked before explicitly supplied files.
+    Empty assignments are ignored so they cannot block later fallbacks.
     """
     environment = os.environ.copy()
     paths = (directory / ".env", *extra_files)
@@ -21,8 +32,42 @@ def cursor_environment(directory: Path, extra_files: tuple[Path, ...] = ()) -> d
             continue
         seen.add(path)
         for key, value in read_env_file(path).items():
+            if not value.strip():
+                continue
             environment.setdefault(key, value)
     return environment
+
+
+def with_agent_credential_fallbacks(
+    environment: dict[str, str],
+    fallback_files: tuple[Path, ...] = (),
+) -> dict[str, str]:
+    """Fill missing agent auth keys from operator env files.
+
+    Project and process values win. Non-empty ``CURSOR_API_KEY`` values from the
+    launch-root ``.env`` and the TUI package ``.env`` are applied only when the
+    key is absent or blank, so target projects do not need a copied API key.
+    """
+    merged = dict(environment)
+    paths = (*fallback_files, tui_package_env_path())
+    seen: set[Path] = set()
+    for path in paths:
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        values = read_env_file(resolved)
+        for key in AGENT_CREDENTIAL_KEYS:
+            current = merged.get(key, "")
+            if current.strip():
+                continue
+            candidate = values.get(key, "")
+            if candidate.strip():
+                merged[key] = candidate
+    return merged
 
 
 def read_env_file(path: Path) -> dict[str, str]:

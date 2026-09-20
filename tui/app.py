@@ -2577,6 +2577,7 @@ class DaedalusTuiApp(App[None]):
             self._external_coordinator = None
             coordinator.settings = settings
             coordinator.environment_path = project_path / ".env"
+            coordinator.launch_environment_path = self.launch_root / ".env"
             coordinator.migration_push_lock = self._migration_push_locks.setdefault(
                 project_path, threading.Lock()
             )
@@ -2588,6 +2589,7 @@ class DaedalusTuiApp(App[None]):
                 self._on_task_event,
                 memory_path=self.launch_root / DEFAULT_MEMORY_FILE,
                 environment_path=project_path / ".env",
+                launch_environment_path=self.launch_root / ".env",
                 migration_push_lock=self._migration_push_locks.setdefault(
                     project_path, threading.Lock()
                 ),

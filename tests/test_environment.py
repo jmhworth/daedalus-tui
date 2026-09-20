@@ -68,6 +68,55 @@ class EnvironmentTests(unittest.TestCase):
                 environment = cursor_environment(project, (launch,))
             self.assertEqual(environment["CURSOR_API_KEY"], "from-process")
 
+    def test_cursor_environment_skips_empty_assignments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            project.mkdir()
+            (project / ".env").write_text("CURSOR_API_KEY=\nOTHER=kept\n", encoding="utf-8")
+            launch = root / "launch.env"
+            launch.write_text("CURSOR_API_KEY=from-launch\n", encoding="utf-8")
+            import os
+            from unittest.mock import patch
+
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("CURSOR_API_KEY", None)
+                environment = cursor_environment(project, (launch,))
+            self.assertEqual(environment["CURSOR_API_KEY"], "from-launch")
+            self.assertEqual(environment["OTHER"], "kept")
+
+    def test_agent_credential_fallbacks_use_launch_then_package(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            launch = root / "launch.env"
+            package = root / "package.env"
+            launch.write_text("CURSOR_API_KEY=from-launch\nSUPABASE_URL=https://launch.test\n", encoding="utf-8")
+            package.write_text("CURSOR_API_KEY=from-package\n", encoding="utf-8")
+            import os
+            from unittest.mock import patch
+
+            from tui.environment import with_agent_credential_fallbacks
+
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("CURSOR_API_KEY", None)
+                with patch("tui.environment.tui_package_env_path", return_value=package):
+                    environment = with_agent_credential_fallbacks({}, (launch,))
+            self.assertEqual(environment["CURSOR_API_KEY"], "from-launch")
+            self.assertNotIn("SUPABASE_URL", environment)
+
+    def test_agent_credential_fallbacks_prefer_existing_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            launch = root / "launch.env"
+            launch.write_text("CURSOR_API_KEY=from-launch\n", encoding="utf-8")
+            from tui.environment import with_agent_credential_fallbacks
+
+            environment = with_agent_credential_fallbacks(
+                {"CURSOR_API_KEY": "from-project"},
+                (launch,),
+            )
+            self.assertEqual(environment["CURSOR_API_KEY"], "from-project")
+
     def test_redact_environment_values_masks_secrets(self):
         message = "failed with token=secret-value and url=https://example.test"
         redacted = redact_environment_values(

@@ -46,16 +46,20 @@ defaults in the `[layout]` table of
 `parameter_files/daedalus-tui.toml` (`compact_width`, `short_height`,
 `compact_task_sidebar_height`, and `compact_prompt_height`).
 
-For Cursor CLI, edit the active project's `.env` file (or copy its
-`.env.example` to a new `.env`) and set your key:
+For Cursor CLI, set `CURSOR_API_KEY` once in the launch-root `.env` (copy
+`.env.example` from the Daedalus TUI checkout if needed). Target projects such
+as `wfinance2` do not need their own copy; the TUI injects the operator key
+into Cursor worktree processes. When developing against an editable TUI
+checkout, the package-root `.env` is also consulted as a fallback.
 
 ```bash
-cp .env.example .env
+cp /path/to/daedalus-tui/.env.example .env   # in the launch root
 # edit .env and set CURSOR_API_KEY=...
 ```
 
 The TUI passes `CURSOR_API_KEY` to Cursor only when it is not already present
-in the process environment. You can also authenticate with `agent login`.
+in the process environment or the active project's `.env`. You can also
+authenticate with `agent login` instead of an API key.
 
 For personal shared Supabase projects, keep `SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in the active project's

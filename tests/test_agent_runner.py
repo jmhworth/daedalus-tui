@@ -228,14 +228,44 @@ class AgentRunnerTests(unittest.TestCase):
         self.assertEqual([event.text for event in output], ["I'll ", "inspect the files."])
         self.assertTrue(result.output_streamed)
 
+    @patch("tui.agent_runner.with_agent_credential_fallbacks", side_effect=lambda env, _files: env)
     @patch("tui.agent_runner.cursor_environment", return_value={"CURSOR_API_KEY": "from-env-file"})
     @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/agent")
     @patch("tui.agent_runner.subprocess.Popen")
-    def test_passes_cursor_api_key_to_subprocess(self, popen, _which, _environment):
+    def test_passes_cursor_api_key_to_subprocess(self, popen, _which, _environment, _fallbacks):
         popen.return_value = FakeProcess([json.dumps({"result": "done"})], [])
         AgentRunner().run(self.request("cursor", "cursor", ""), lambda *_: None)
 
         self.assertEqual(popen.call_args.kwargs["env"]["CURSOR_API_KEY"], "from-env-file")
+
+    @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/agent")
+    @patch("tui.agent_runner.subprocess.Popen")
+    def test_cursor_uses_credential_file_fallback(self, popen, _which):
+        import os
+        import tempfile
+
+        popen.return_value = FakeProcess([json.dumps({"result": "done"})], [])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            project.mkdir()
+            launch = root / "launch.env"
+            launch.write_text("CURSOR_API_KEY=from-launch-root\n", encoding="utf-8")
+            request = AgentRequest(
+                "Inspect this project",
+                project,
+                "cursor",
+                "cursor",
+                "",
+                (project,),
+                credential_files=(launch,),
+            )
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("CURSOR_API_KEY", None)
+                with patch("tui.environment.tui_package_env_path", return_value=root / "missing.env"):
+                    AgentRunner().run(request, lambda *_: None)
+
+        self.assertEqual(popen.call_args.kwargs["env"]["CURSOR_API_KEY"], "from-launch-root")
 
     @patch("tui.agent_runner.shutil.which", return_value=None)
     def test_reports_missing_cli(self, _which):

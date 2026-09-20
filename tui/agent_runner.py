@@ -14,7 +14,7 @@ import time
 from typing import Callable, Literal
 
 from .debug_log import LOGGER, log_exception
-from .environment import cursor_environment
+from .environment import cursor_environment, with_agent_credential_fallbacks
 
 
 @dataclass(frozen=True)
@@ -62,6 +62,7 @@ class AgentRequest:
     environment_files: tuple[Path, ...] = field(default_factory=tuple)
     control: "AgentControl | None" = None
     timeout_seconds: float | None = None
+    credential_files: tuple[Path, ...] = field(default_factory=tuple)
 
 
 @dataclass
@@ -150,11 +151,12 @@ class AgentRunner:
                 error=f"{name} is unavailable. Install it so `{executable}` is on PATH.",
             )
 
-        environment = (
-            cursor_environment(request.directory, request.environment_files)
-            if request.provider == "cursor"
-            else None
-        )
+        environment = None
+        if request.provider == "cursor":
+            environment = with_agent_credential_fallbacks(
+                cursor_environment(request.directory, request.environment_files),
+                request.credential_files,
+            )
         try:
             command = self.command_for(request)
             LOGGER.info(
@@ -293,7 +295,11 @@ class AgentRunner:
         diagnostics = self._failure_diagnostics(request.provider, stdout, stderr)
         LOGGER.error("Agent process failed provider=%s returncode=%s", request.provider, returncode)
         if request.provider == "cursor" and not environment.get("CURSOR_API_KEY", "").strip():
-            diagnostics += "\n\nCursor authentication: run `agent login` or set CURSOR_API_KEY in .env."
+            diagnostics += (
+                "\n\nCursor authentication: run `agent login`, or set CURSOR_API_KEY once in "
+                "the launch-root `.env` (or the Daedalus TUI package `.env`). "
+                "Target projects do not need their own copy."
+            )
         return AgentResult(
             provider=request.provider,
             returncode=returncode,
@@ -559,5 +565,8 @@ class AgentRunner:
                         return value.strip()
             if stdout.strip():
                 return stdout.strip()
-            return "No diagnostics were emitted. Check Cursor authentication (CURSOR_API_KEY or `agent login`)."
+            return (
+                "No diagnostics were emitted. Check Cursor authentication "
+                "(launch-root/package CURSOR_API_KEY or `agent login`)."
+            )
         return stdout.strip() or "No diagnostics were emitted."
