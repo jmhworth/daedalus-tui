@@ -84,5 +84,22 @@
   "82": "paste_from_system_clipboard",
   "83": ".__init__",
   "84": "._handle_visual_line_mode",
-  "89": "PersonalSupabaseSetupWizardScreen"
+  "85": "._focus_submitted_task",
+  "86": "._set_status",
+  "87": "._switch_project",
+  "88": "Path",
+  "89": "PersonalSupabaseSetupWizardScreen",
+  "90": "remove_personal_supabase",
+  "91": "ProjectInitializerScreen",
+  "92": ".run",
+  "93": ".on_mount",
+  "94": "._apply_responsive_layout",
+  "95": "resolve_personal_supabase_environment",
+  "96": "IntegrationCoordinator",
+  "97": "_TimeoutTracker",
+  "98": ".submit_sync_recovery",
+  "99": ".action_view_topic",
+  "100": ".implement_plan",
+  "101": "._update_plan_state",
+  "102": ".parse_cursor_event"
 }
