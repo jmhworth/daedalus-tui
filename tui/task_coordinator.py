@@ -133,6 +133,9 @@ class TaskRecord:
     memory_task_id: str | None = field(default=None, repr=False, compare=False)
     plan_text: str = ""
     plan_questions: tuple[PlanQuestion, ...] = ()
+    # Cursor's terminal result is authoritative for a planning turn. Streamed
+    # assistant fragments remain in ``messages`` for progress and fallback.
+    plan_final_output: str = field(default="", repr=False, compare=False)
     plan_answers: dict[str, str] = field(default_factory=dict)
     plan_answer_details: dict[str, str] = field(default_factory=dict)
     plan_clarifications: dict[str, list[PlanClarification]] = field(default_factory=dict)
@@ -713,6 +716,8 @@ class TaskCoordinator:
         record.started_at = time.time()
         self._persist_task(record)
         message_start = len(record.messages)
+        if record.mode == "plan":
+            record.plan_final_output = ""
         if record.mode == "plan" and record.plan_followup_prompt and record.provider == "cursor":
             # Cursor streams deltas by extending the last stored message. Give a
             # follow-up response its own transcript slot before starting it.
@@ -832,7 +837,7 @@ class TaskCoordinator:
         LOGGER.info("Task worker finished task=%s status=%s", record.task_id, record.status)
 
     def _update_plan_state(self, record: TaskRecord, new_messages: list[str]) -> bool:
-        parsed = self._parse_plan_messages(new_messages)
+        parsed = self._parse_plan_messages(new_messages, record.plan_final_output)
         if not parsed.valid:
             # A protocol error after the user answered questions must not erase
             # the last usable plan or make the choices impossible to resubmit.
@@ -868,14 +873,21 @@ class TaskCoordinator:
         return True
 
     @staticmethod
-    def _parse_plan_messages(new_messages: list[str]):
+    def _parse_plan_messages(new_messages: list[str], final_output: str = ""):
         """Parse plan JSON from one turn without letting join separators break it.
 
-        Non-Cursor providers store discrete agent_message chunks. Joining them
-        with blank lines is fine between complete payloads, but inserting
-        ``\\n\\n`` in the middle of a string value corrupts JSON. Try contiguous
-        concatenation and each chunk alone after the blank-line join.
+        Cursor's final result is complete and authoritative for plan-mode
+        requests, so parse it before the streamed fragments. All providers
+        retain the existing join-and-chunk fallback for versions that omit a
+        terminal result or split a payload across messages.
         """
+        last_failure = None
+        if final_output.strip():
+            parsed = parse_plan_response(final_output)
+            if parsed.valid:
+                return parsed
+            last_failure = parsed
+
         candidates: list[str] = []
         blank_joined = "\n\n".join(new_messages).strip()
         contiguous = "".join(new_messages).strip()
@@ -888,7 +900,6 @@ class TaskCoordinator:
             if cleaned and cleaned not in candidates:
                 candidates.append(cleaned)
 
-        last_failure = None
         for response in candidates:
             parsed = parse_plan_response(response)
             if parsed.valid:
@@ -918,7 +929,8 @@ class TaskCoordinator:
         self._persist_task(record)
 
     def _handle_event(self, record: TaskRecord, phase: str, message: str, kind: str) -> None:
-        record.phase = phase.replace("_", " ").capitalize()
+        if phase != "plan_result":
+            record.phase = phase.replace("_", " ").capitalize()
         status = {
             "worktree": "running",
             "planning": "planning",
@@ -938,7 +950,12 @@ class TaskCoordinator:
         if status:
             record.status = status
         if kind == "message" and message:
-            if record.provider == "cursor" and record.messages:
+            if phase == "plan_result":
+                # Keep the complete terminal result as its own durable
+                # transcript entry; never append it to Cursor stream deltas.
+                record.messages.append(message)
+                record.plan_final_output = message
+            elif record.provider == "cursor" and record.messages:
                 record.messages[-1] += message
             else:
                 record.messages.append(message)
@@ -1090,6 +1107,7 @@ class TaskCoordinator:
                 continue
             record.plan_text = parsed.plan
             record.plan_questions = parsed.questions
+            record.plan_final_output = message
             record.plan_confirmed = parsed.no_more_questions and not parsed.questions
             record.plan_error = None
             return

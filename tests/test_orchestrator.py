@@ -12,6 +12,35 @@ from tui.verification import VerificationResult
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_cursor_plan_final_result_is_emitted_after_streaming_but_coding_is_not_duplicated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            final_plan = "BEGIN_DAEDALUS_PLAN{\"plan\":\"Use the final result.\"}END_DAEDALUS_PLAN"
+            runner.run.return_value = AgentResult(
+                "cursor", 0, final_plan, output_streamed=True
+            )
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda phase, message, channel: events.append((phase, message, channel)),
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+
+            orchestrator.run_agent(
+                Mock(), context, ("cursor", "cursor", ""), "Plan this", event_phase="planning"
+            )
+            self.assertEqual(events, [("plan_result", final_plan, "message")])
+
+            events.clear()
+            orchestrator.run_agent(
+                Mock(), context, ("cursor", "cursor", ""), "Implement this", event_phase="agent"
+            )
+
+        self.assertEqual(events, [])
+
     def test_plan_waits_for_questions_and_preserves_worktree(self):
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)

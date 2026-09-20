@@ -315,8 +315,15 @@ class LocalOrchestrator:
         )
         if result.tokens_consumed is not None:
             self._tokens_consumed += result.tokens_consumed
-        if provider == "cursor" and result.succeeded and result.output and not result.output_streamed:
-            self.emit(event_phase, result.output, "message")
+        if provider == "cursor" and result.succeeded and result.output:
+            if event_phase == "planning":
+                # Cursor's stream-json assistant events are useful progress,
+                # but may be partial or cumulative. Its terminal ``result`` is
+                # the complete response and must remain available to plan
+                # parsing even after one or more assistant deltas arrived.
+                self.emit("plan_result", result.output, "message")
+            elif not result.output_streamed:
+                self.emit(event_phase, result.output, "message")
         if result.stopped_reason:
             raise AgentStopped(result.stopped_reason)
         return result

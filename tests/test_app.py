@@ -1963,6 +1963,45 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(implement_button.has_class("implemented"))
             self.assertEqual(str(implement_button.label), "Implemented")
 
+    async def test_plan_review_hides_cursor_protocol_and_mounts_all_final_questions(self):
+        app, coordinator = self.make_app()
+        final_result = (
+            'BEGIN_DAEDALUS_PLAN{"plan":"Render only this plan text.",'
+            '"questions":[{"id":"q1","question":"First?","options":[{"id":"a","label":"A (Recommended)"},{"id":"b","label":"B"}]},'
+            '{"id":"q2","question":"Second?","options":[{"id":"a","label":"A (Recommended)"},{"id":"b","label":"B"}]},'
+            '{"id":"q3","question":"Third?","options":[{"id":"a","label":"A (Recommended)"},{"id":"b","label":"B"}]},'
+            '{"id":"q4","question":"Fourth?","options":[{"id":"a","label":"A (Recommended)"},{"id":"b","label":"B"}]}]}'
+            'END_DAEDALUS_PLAN'
+        )
+        async with app.run_test() as pilot:
+            app.query_one("#mode-select", Select).value = "plan"
+            app.query_one("#prompt-input", TextArea).insert("Review the Cursor plan")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            record.messages.extend(("partial streamed output", final_result))
+            record.plan_final_output = final_result
+            record.plan_text = "Render only this plan text."
+            record.plan_questions = tuple(
+                PlanQuestion(
+                    f"q{index}",
+                    f"{ordinal}?",
+                    (PlanOption("a", "A (Recommended)"), PlanOption("b", "B")),
+                )
+                for index, ordinal in enumerate(("First", "Second", "Third", "Fourth"), start=1)
+            )
+            record.status = "awaiting_answers"
+            record.phase = "Questions"
+            coordinator.emit(record, "questions", "", "status")
+            await pilot.pause()
+            await pilot.pause()
+
+            rendered_plan = app.query_one("#plan-display", Static).render().plain
+            self.assertEqual(rendered_plan, record.plan_text)
+            self.assertNotIn("BEGIN_DAEDALUS_PLAN", rendered_plan)
+            self.assertNotIn('"questions"', rendered_plan)
+            for index in range(4):
+                self.assertTrue(app.query_one(f"#plan-question-{index}", Select).query_one("#label"))
+
     async def test_plan_review_can_mount_a_preselected_answer(self):
         app, coordinator = self.make_app()
         async with app.run_test() as pilot:

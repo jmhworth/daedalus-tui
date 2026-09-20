@@ -167,6 +167,41 @@ class TaskCoordinatorTests(unittest.TestCase):
             self.assertIsNone(record.plan_error)
             coordinator.shutdown()
 
+    def test_cursor_final_plan_result_overrides_fragmented_streamed_output(self):
+        final_result = (
+            "I'll inspect the repository first.\nBEGIN_DAEDALUS_PLAN\n"
+            '{"plan":"Use the complete Cursor result.","questions":['
+            '{"id":"q1","question":"Which market?","options":[{"id":"a","label":"LA only (Recommended)"},{"id":"b","label":"All cities"}]},'
+            '{"id":"q2","question":"Which matrix?","options":[{"id":"a","label":"Lag ACF (Recommended)"},{"id":"b","label":"Cross-market"}]},'
+            '{"id":"q3","question":"Include variance?","options":[{"id":"a","label":"No (Recommended)"},{"id":"b","label":"Yes"}]},'
+            '{"id":"q4","question":"Refresh strategy?","options":[{"id":"a","label":"Overwrite (Recommended)"},{"id":"b","label":"Merge"}]}]}'
+            "\nEND_DAEDALUS_PLAN"
+        )
+
+        class CursorPlanOrchestrator:
+            def __init__(self, _repository, _runner, _settings, on_event, integration_gate=None):
+                self.on_event = on_event
+
+            def run(self, _prompt, _provider, _model, _reasoning, task_id=None, **_kwargs):
+                self.on_event("planning", "I'll inspect the repo. ", "message")
+                self.on_event("planning", "This streamed fragment is incomplete.", "message")
+                self.on_event("plan_result", final_result, "message")
+                return OrchestrationResult(True, task_id, awaiting_plan=True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            coordinator = TaskCoordinator(Path(directory), object(), OrchestrationSettings(max_concurrent_tasks=1))
+            with patch("tui.task_coordinator.LocalOrchestrator", CursorPlanOrchestrator):
+                record = coordinator.submit("Plan weather analysis", "cursor", "cursor", "", mode="plan")
+                record.future.result(timeout=5)
+
+            self.assertEqual(record.status, "awaiting_answers")
+            self.assertEqual(record.plan_text, "Use the complete Cursor result.")
+            self.assertEqual([question.question_id for question in record.plan_questions], ["q1", "q2", "q3", "q4"])
+            self.assertEqual(record.plan_final_output, final_result)
+            self.assertEqual(record.messages[-1], final_result)
+            self.assertNotIn("BEGIN_DAEDALUS_PLAN", record.messages[0])
+            coordinator.shutdown()
+
     def test_first_ready_integration_is_serialized(self):
         coordinator = IntegrationCoordinator()
         started = threading.Event()

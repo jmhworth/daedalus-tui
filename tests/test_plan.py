@@ -103,6 +103,31 @@ class PlanTests(unittest.TestCase):
             "All\nClimate and Weather series already discoverable",
         )
 
+    def test_parser_accepts_cursor_preamble_and_four_unconfirmed_questions(self):
+        """Cursor may include prose and omit redundant false confirmation."""
+        response = (
+            "I'll inspect the repo and storage conventions first.\n"
+            "I have enough context to draft the plan and open decisions.\n"
+            f"{PLAN_START}\n"
+            '{"plan":"Collect the requested weather trades and compare the two regimes.",'
+            '"questions":[{"id":"q1","question":"Which weather markets?",'
+            '"required":true,"options":[{"id":"a","label":"Los Angeles daily high only (Recommended)"},'
+            '{"id":"b","label":"Multiple weather cities"}]},{"id":"q2",'
+            '"question":"Which autocorrelation matrix?","required":true,"options":['
+            '{"id":"a","label":"Lag ACF summary (Recommended)"},{"id":"b","label":"Cross-market correlation"}]},'
+            '{"id":"q3","question":"Include variance?","required":true,"options":['
+            '{"id":"a","label":"ACF only (Recommended)"},{"id":"b","label":"Include raw variance"}]},'
+            '{"id":"q4","question":"How should existing coverage refresh?","required":true,"options":['
+            '{"id":"a","label":"Re-collect full range (Recommended)"},{"id":"b","label":"Merge missing dates"}]}]}'
+            f"\n{PLAN_END}"
+        )
+
+        result = parse_plan_response(response)
+
+        self.assertTrue(result.valid)
+        self.assertFalse(result.no_more_questions)
+        self.assertEqual([question.question_id for question in result.questions], ["q1", "q2", "q3", "q4"])
+
     def test_parser_rejects_ambiguous_question_and_option_ids(self):
         duplicate_questions = (
             '{"plan":"Do it.","questions":[{"id":"q1","question":"First?","options":['

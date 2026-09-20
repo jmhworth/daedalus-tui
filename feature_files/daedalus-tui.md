@@ -25,7 +25,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Local execution**: Prompts run in isolated Git worktrees without daemon RPC or a local database; orchestration may push pending Supabase migrations for target projects when migration files change, while agents still do not own DB push or Git remotes. An explicit Command Menu action may publish the selected operating branch.
 - **Concurrent task inbox**: Up to four independent prompts can run at once, each with its own configuration snapshot, branch, worktree, status, and transcript; the left-side inbox promotes tasks with unseen updates.
 - **Plan-first task route**: Plan tasks remain selectable through `planning` and `questioning` states, support follow-up planning passes, and can promote their preserved context into the normal coding, verification, and integration route.
-- **Plan payload recovery**: Plan review prefers the latest valid `BEGIN_DAEDALUS_PLAN` block in a turn, tolerates raw newlines inside JSON string values, and retries contiguous message concatenation so soft-wrapped or multi-draft agent output still reaches `awaiting_answers` with selectable questions instead of falling back to Continue Plan / Start Coding only.
+- **Plan payload recovery**: Cursor plan review treats Cursor's terminal `result` as the authoritative complete response while retaining streamed assistant text for progress and fallback parsing; plan review otherwise prefers the latest valid `BEGIN_DAEDALUS_PLAN` block, tolerates raw newlines inside JSON strings, and retries contiguous message concatenation so soft-wrapped or multi-draft output still reaches `awaiting_answers` with selectable questions.
 - **Plan custom answers**: Plan review renders a software-owned custom-answer choice alongside the agent's reasonable options and collects free text only when that choice is selected; the agent protocol remains unchanged.
 - **Plan question clarifications**: Each plan question exposes a `?` control on the same row as its answer dropdown (dropdown narrowed, button at the trailing end) that opens a side-channel ask about that question alone; answers stay off the plan follow-up transcript and are browsable from a per-question dropdown on the review page.
 - **Literal plan review text**: `#plan-display` and dynamic plan-question Static widgets render agent-generated text with `markup=False` so brackets and scientific notation cannot trigger Textual/Rich markup parsing. Plan answer Select option labels are wrapped as literal Rich `Text` for the same reason.
@@ -67,6 +67,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-19: Preserved Cursor's final plan result separately from streamed assistant fragments so structured questions reliably reach selectable plan-review controls.
 - 2026-09-19: Command Menu GitHub action defaults to pull-then-push sync for active operating branches.
 - 2026-09-14: Relabeled Ctrl+Shift+S as activate personal Supabase after the scaffold+Activate redesign.
 - 2026-09-13: Removed the per-project task-count suffix from the Project Select labels so options show only the project name.

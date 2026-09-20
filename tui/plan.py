@@ -216,7 +216,21 @@ def _parse_plan_payload(payload_text: str, raw_response: str) -> PlanResult:
             valid=False,
             error="Plan payload is missing a plan.",
         )
-    if not isinstance(raw_questions, list) or not isinstance(no_more_questions, bool):
+    if not isinstance(raw_questions, list):
+        return PlanResult(
+            plan.strip(),
+            (),
+            False,
+            valid=False,
+            error="Plan payload must include questions and no_more_questions.",
+        )
+    # Older Cursor plan responses may omit this redundant field when they
+    # already supply questions. Questions are necessarily unconfirmed, so the
+    # safe compatible interpretation is false; empty question lists still
+    # require an explicit confirmation.
+    if no_more_questions is None and raw_questions:
+        no_more_questions = False
+    if not isinstance(no_more_questions, bool):
         return PlanResult(
             plan.strip(),
             (),
