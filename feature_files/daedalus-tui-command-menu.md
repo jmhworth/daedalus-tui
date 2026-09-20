@@ -5,10 +5,10 @@ The Command Menu makes infrequent but important project actions discoverable as 
 
 ## Key Points
 - `Ctrl+K` opens a modal Command Menu from the main TUI and focused prompt editor.
-- The menu exposes New Task, Create Topic, Activate/remove personal Supabase,
-  and Push to GitHub.
-- New Task remains directly available with `Ctrl+T`; the other low-frequency
-  actions remain discoverable through the menu.
+- The menu exposes New Task, New Project, Create Topic, Activate/remove
+  personal Supabase, and Push to GitHub.
+- New Task remains directly available with `Ctrl+T`, and New Project with
+  `Ctrl+Shift+N`; both are also discoverable through the menu.
 - The full keyboard-shortcut reference remains available from the Command Menu.
 - Push is enabled only when the selected operating branch and an `origin` remote are available.
 
@@ -28,3 +28,4 @@ HACKING
 - 2026-09-16: Fixed Command Menu Push state refresh to query the active modal screen, restoring disabled-state enforcement when no origin remote exists.
 - 2026-09-16: Added a destructive-but-local personal-Supabase cleanup action with exact project-name confirmation for debugging broken scaffolds.
 - 2026-09-16: Restored `Ctrl+T` as a direct New Task shortcut while keeping New Task available from the Command Menu.
+- 2026-09-19: Added New Project to the Command Menu and routed it through the existing project initializer.

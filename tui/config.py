@@ -74,6 +74,7 @@ class CommandMenuSettings:
     title: str = "Command Menu"
     subtitle: str = "Choose an action, or press Esc / Ctrl+K to close"
     new_task_label: str = "New Task"
+    new_project_label: str = "New Project"
     create_topic_label: str = "Create Topic"
     personal_supabase_label: str = "Activate personal Supabase"
     remove_personal_supabase_label: str = "Remove personal Supabase"
@@ -217,6 +218,7 @@ def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMen
             values.get("subtitle", "Choose an action, or press Esc / Ctrl+K to close")
         ),
         new_task_label=str(labels.get("new_task", "New Task")),
+        new_project_label=str(labels.get("new_project", "New Project")),
         create_topic_label=str(labels.get("create_topic", "Create Topic")),
         personal_supabase_label=str(
             labels.get("personal_supabase", "Activate personal Supabase")

@@ -4,6 +4,7 @@ subtitle = "Choose an action, or press Esc / Ctrl+K to close"
 
 [labels]
 new_task = "New Task"
+new_project = "New Project"
 create_topic = "Create Topic"
 personal_supabase = "Activate personal Supabase"
 remove_personal_supabase = "Remove personal Supabase"

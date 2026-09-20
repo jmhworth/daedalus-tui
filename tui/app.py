@@ -394,6 +394,10 @@ class CommandMenuScreen(ModalScreen[str | None]):
                 id="command-new-task-button",
                 variant="primary",
             )
+            yield Button(
+                self.settings.new_project_label,
+                id="command-new-project-button",
+            )
             yield Button(self.settings.create_topic_label, id="command-create-topic-button")
             yield Button(
                 self.settings.personal_supabase_label,
@@ -420,6 +424,7 @@ class CommandMenuScreen(ModalScreen[str | None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {
             "command-new-task-button": "new_task",
+            "command-new-project-button": "show_new_project",
             "command-create-topic-button": "show_create_topic",
             "command-register-supabase-button": "register_personal_supabase",
             "command-remove-supabase-button": "remove_personal_supabase",
@@ -1824,6 +1829,7 @@ class DaedalusTuiApp(App[None]):
         """Run a command after the command menu has been removed."""
         handlers = {
             "new_task": self.action_new_task,
+            "show_new_project": self.action_show_new_project,
             "show_create_topic": self.action_show_create_topic,
             "register_personal_supabase": self.action_register_personal_supabase,
             "remove_personal_supabase": self.action_remove_personal_supabase,

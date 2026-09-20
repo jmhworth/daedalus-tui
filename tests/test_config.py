@@ -66,6 +66,7 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(command_menu.title, "Command Menu")
         self.assertEqual(command_menu.new_task_label, "New Task")
+        self.assertEqual(command_menu.new_project_label, "New Project")
         self.assertEqual(command_menu.create_topic_label, "Create Topic")
         self.assertEqual(command_menu.personal_supabase_label, "Activate personal Supabase")
         self.assertEqual(command_menu.remove_personal_supabase_label, "Remove personal Supabase")

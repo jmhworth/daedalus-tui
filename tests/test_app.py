@@ -1269,6 +1269,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.screen, CommandMenuScreen)
             for button_id in (
                 "#command-new-task-button",
+                "#command-new-project-button",
                 "#command-create-topic-button",
                 "#command-register-supabase-button",
                 "#command-remove-supabase-button",
@@ -1320,6 +1321,16 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
             await pilot.press("ctrl+shift+n")
+            await pilot.pause()
+
+            self.assertIsInstance(app.screen, ProjectInitializerScreen)
+
+    async def test_command_menu_opens_new_project_modal(self):
+        app, _ = self.make_app()
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            app.screen.query_one("#command-new-project-button", Button).press()
             await pilot.pause()
 
             self.assertIsInstance(app.screen, ProjectInitializerScreen)
