@@ -15,18 +15,18 @@
     "semantic_hash": ""
   },
   "tests/test_app.py": {
-    "mtime": 1789866402.4440024,
-    "ast_hash": "50912278d1f85d045b6c58eb2a1c65ee",
+    "mtime": 1789870857.6760135,
+    "ast_hash": "9b5c6dc05ac5e15d3865553220b9312f",
     "semantic_hash": ""
   },
   "tests/test_config.py": {
-    "mtime": 1789866402.4447722,
-    "ast_hash": "ac83d15a0d3831733f2e132a8c88ea3a",
+    "mtime": 1789870857.6782956,
+    "ast_hash": "a8d7abfb7b613c82ce87ed8f18c94f1f",
     "semantic_hash": ""
   },
   "tests/test_git_worktree.py": {
-    "mtime": 1789605012.525261,
-    "ast_hash": "aa7ded69ef4e955aa9a46ca19a23a94b",
+    "mtime": 1789870857.6813715,
+    "ast_hash": "c21312dd536fe51e57908769f734836c",
     "semantic_hash": ""
   },
   "tests/test_graphify.py": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "tui/app.py": {
-    "mtime": 1789866402.4459066,
-    "ast_hash": "bb453de5ffa13ffbb73d3eb76abcbf92",
+    "mtime": 1789870857.6849756,
+    "ast_hash": "11e09ec3cec2fbba94ff78d12b936bff",
     "semantic_hash": ""
   },
   "tui/clipboard.py": {
@@ -85,8 +85,8 @@
     "semantic_hash": "cf5f808e3a03a0cd04a9f08912c9cacd"
   },
   "tui/config.py": {
-    "mtime": 1789866402.450882,
-    "ast_hash": "364591d1824bf6873ccb10401cad439a",
+    "mtime": 1789870857.686676,
+    "ast_hash": "001698fdcf0ccc45bcfa20b422db971e",
     "semantic_hash": ""
   },
   "tui/environment.py": {
@@ -95,8 +95,8 @@
     "semantic_hash": ""
   },
   "tui/git_worktree.py": {
-    "mtime": 1789605012.5261652,
-    "ast_hash": "852effe358ee9d50ccb7488b04a25def",
+    "mtime": 1789870857.6900337,
+    "ast_hash": "a41a7fe3e8fb0e16a4215ac511ea071c",
     "semantic_hash": ""
   },
   "tui/graphify.py": {
@@ -140,13 +140,13 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-orchestration.md": {
-    "mtime": 1789608912.897072,
-    "ast_hash": "b06c1c53a275d611461bbc5d589a7f66",
+    "mtime": 1789870857.6711257,
+    "ast_hash": "c9f7216def071ebff50794b86f24a671",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
-    "mtime": 1789596766.159769,
-    "ast_hash": "68da32c47c3fccd7d2493ff838a0d82a",
+    "mtime": 1789870857.6733947,
+    "ast_hash": "4cc1ac041867cb0365322c89bb38890b",
     "semantic_hash": ""
   },
   "requirements.txt": {
@@ -460,8 +460,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-command-menu.md": {
-    "mtime": 1789866402.4424784,
-    "ast_hash": "104adfef98297a9c20a64518d7f944e6",
+    "mtime": 1789870857.6693141,
+    "ast_hash": "893a2e4a06aa01e369f110ec47527444",
     "semantic_hash": ""
   },
   "tui/env_presence_probe.py": {

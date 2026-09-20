@@ -69,18 +69,13 @@
   "67": "__init__.py",
   "68": "task_coordinator.py",
   "69": "PersonalSupabaseActivationProgressScreen",
-  "70": "TranscriptLog",
   "71": "_collapse_inner_safe",
   "72": "render_call_graph_tree.py",
   "73": "._on_personal_supabase_activation_progress",
-  "74": "__init__.py",
   "75": "CallGraphRunnerTests",
   "76": "bootstrap_personal_supabase",
-  "77": "update_repository",
   "78": "load_project_worktree_settings",
-  "79": "ProjectWorktreeSettings",
   "80": ".edit_paste_after",
   "81": ".enter_insert_mode",
-  "82": ".nav_word_end",
   "89": "PersonalSupabaseSetupWizardScreen"
 }
