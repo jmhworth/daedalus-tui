@@ -84,5 +84,12 @@
   "82": "paste_from_system_clipboard",
   "83": ".__init__",
   "84": "._handle_visual_line_mode",
-  "89": "PersonalSupabaseSetupWizardScreen"
+  "85": ".on_mount",
+  "86": "_TimeoutTracker",
+  "87": "preflight_personal_supabase",
+  "88": "._on_personal_supabase_activation_progress",
+  "89": "PersonalSupabaseSetupWizardScreen",
+  "90": "select_roots",
+  "91": ".action_view_topic",
+  "92": ".parse_cursor_event"
 }
