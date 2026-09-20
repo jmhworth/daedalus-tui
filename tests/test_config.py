@@ -72,6 +72,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(command_menu.remove_personal_supabase_label, "Remove personal Supabase")
         self.assertEqual(command_menu.push_branch_label, "Sync to GitHub")
         self.assertTrue(command_menu.pull_before_push)
+        self.assertTrue(command_menu.sync_conflict_recovery_enabled)
+        self.assertEqual(command_menu.sync_conflict_attempt_limit, 3)
 
     def test_rejects_non_positive_layout_settings(self):
         with tempfile.TemporaryDirectory() as directory:

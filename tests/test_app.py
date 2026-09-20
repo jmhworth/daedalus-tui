@@ -121,10 +121,45 @@ class FakeCoordinator:
 
     def implement_plan(self, task_id):
         record = self.get(task_id)
-        if record is None or record.plan_implemented:
+        if record is None or record.plan_implemented or record.sync_recovery:
             return None
         record.plan_implemented = True
         return self.submit("Approved implementation", record.provider, record.model, record.reasoning)
+
+    def has_active_sync_recovery(self, branch=None):
+        terminal = {"completed", "failed", "cancelled", "blocked"}
+        for record in self.records:
+            if not record.sync_recovery or record.status in terminal:
+                continue
+            if branch is not None and record.sync_operating_branch != branch:
+                continue
+            return True
+        return False
+
+    def submit_sync_recovery(self, **kwargs):
+        record = TaskRecord(
+            f"task-{len(self.records) + 1}",
+            len(self.records) + 1,
+            "sync conflict",
+            kwargs.get("provider", "codex"),
+            kwargs.get("model", "model"),
+            kwargs.get("reasoning", "medium"),
+            mode="plan",
+            status="planning",
+            phase="Planning",
+            branch_name=kwargs.get("temp_branch_name") or kwargs.get("operating_branch", "main"),
+            worktree_path=kwargs.get("worktree_path"),
+            sync_recovery=True,
+            sync_operating_branch=kwargs.get("operating_branch", "main"),
+            sync_remote=kwargs.get("remote", "origin"),
+            sync_used_temp_branch=bool(kwargs.get("used_temp_branch")),
+            sync_temp_branch_name=kwargs.get("temp_branch_name"),
+            sync_conflict_attempt_limit=int(kwargs.get("attempt_limit", 3)),
+            sync_conflicted_paths=tuple(kwargs.get("conflicted_paths") or ()),
+        )
+        self.records.append(record)
+        self.emit(record, "planning", "", "status")
+        return record
 
     def clarify_plan_question(self, task_id, question_id, user_question):
         record = self.get(task_id)
@@ -718,6 +753,74 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("auth failed", "\n".join(app.query_one("#task-error", Log)._lines))
             self.assertFalse(app._push_in_flight)
             await pilot.pause()
+
+    @patch("tui.app.remote_exists", return_value=True)
+    async def test_push_conflict_launches_sync_recovery(self, _remote_exists):
+        from tui.git_worktree import SyncMergeConflictError
+
+        app, coordinator = self.make_app()
+        conflict = SyncMergeConflictError(
+            "merge failed",
+            repository=app._active_project_path,
+            branch="main",
+            remote="origin",
+            worktree_path=Path("/tmp/.sync-resolve-test"),
+            conflicted_paths=("shared.txt",),
+            used_temp_branch=True,
+            temp_branch_name="daedalus/sync-resolve-main-test",
+            merge_failure="CONFLICT shared.txt",
+        )
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+
+            def run_push_inline(work, **kwargs):
+                if kwargs.get("group") == "git-push":
+                    work()
+                    return None
+                return original_run_worker(work, **kwargs)
+
+            original_run_worker = app.run_worker
+            with patch("tui.app.push_branch", side_effect=conflict), patch.object(
+                app, "run_worker", side_effect=run_push_inline
+            ), patch.object(app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)):
+                app.screen.query_one("#command-push-branch-button", Button).press()
+                await pilot.pause()
+
+            self.assertEqual(len(coordinator.records), 1)
+            record = coordinator.records[0]
+            self.assertTrue(record.sync_recovery)
+            self.assertEqual(record.sync_operating_branch, "main")
+            self.assertEqual(str(app.query_one("#status", Static).render()), "Sync conflict — planning…")
+            self.assertTrue(coordinator.has_active_sync_recovery("main"))
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            self.assertTrue(app.screen.query_one("#command-push-branch-button", Button).disabled)
+            await pilot.pause()
+
+    @patch("tui.app.remote_exists", return_value=True)
+    async def test_non_conflict_push_failure_unchanged(self, _remote_exists):
+        from tui.git_worktree import GitWorktreeError
+
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+
+            def run_inline(work, **kwargs):
+                work()
+
+            with patch("tui.app.push_branch", side_effect=GitWorktreeError("network down")), patch.object(
+                app, "run_worker", side_effect=run_inline
+            ), patch.object(app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)):
+                app.screen.query_one("#command-push-branch-button", Button).press()
+                await pilot.pause()
+
+            self.assertEqual(coordinator.records, [])
+            self.assertEqual(str(app.query_one("#status", Static).render()), "Sync failed")
+            self.assertIn("network down", "\n".join(app.query_one("#task-error", Log)._lines))
+            await pilot.pause()
+
     async def test_output_and_error_logs_toggle_as_full_size_selectable_views(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:

@@ -12,7 +12,15 @@ from .agent_runner import AgentControl, AgentRequest, AgentResult, AgentRunner
 from .debug_log import LOGGER, log_exception
 from .environment import cursor_environment, redact_environment_values
 from .graphify import update_repository
-from .git_worktree import GitWorktreeError, GitWorktreeManager, WorktreeContext
+from .git_worktree import (
+    GitWorktreeError,
+    GitWorktreeManager,
+    WorktreeContext,
+    abort_sync_merge,
+    finalize_sync_merge,
+    list_unmerged_paths,
+    push_branch,
+)
 from .project_config import load_project_worktree_settings
 from .personal_supabase import (
     is_personal_supabase_registered,
@@ -24,6 +32,7 @@ from .prompts import (
     build_migration_repair_prompt,
     build_repair_prompt,
     build_resolver_prompt,
+    build_sync_conflict_coding_prompt,
     build_task_prompt,
 )
 from .supabase_migrations import migrations_pending, push_migrations
@@ -115,15 +124,26 @@ class LocalOrchestrator:
         resume_notes: tuple[str, ...] = (),
         resume_from: str | None = None,
         topic_slug: str | None = None,
+        *,
+        sync_recovery: bool = False,
+        sync_operating_branch: str | None = None,
+        sync_remote: str = "origin",
+        sync_used_temp_branch: bool = False,
+        sync_temp_branch_name: str | None = None,
+        sync_conflict_attempt_limit: int = 3,
+        sync_plan_text: str = "",
+        sync_plan_answers: dict[str, str] | None = None,
+        sync_plan_answer_details: dict[str, str] | None = None,
     ) -> OrchestrationResult:
         task_id = task_id or uuid.uuid4().hex[:12]
         LOGGER.info(
-            "Orchestration started task=%s mode=%s provider=%s resume_from=%s topic=%s",
+            "Orchestration started task=%s mode=%s provider=%s resume_from=%s topic=%s sync_recovery=%s",
             task_id,
             mode,
             provider,
             resume_from or "start",
             topic_slug or "-",
+            sync_recovery,
         )
         context: WorktreeContext | None = existing_context
         manager = GitWorktreeManager(
@@ -131,6 +151,29 @@ class LocalOrchestrator:
             self.settings.primary_branch,
             self.settings.worktree_root,
         )
+        if sync_recovery:
+            return self._run_sync_recovery(
+                manager,
+                prompt,
+                provider,
+                model,
+                reasoning,
+                task_id=task_id,
+                submission_sequence=submission_sequence,
+                mode=mode,
+                control=control,
+                existing_context=existing_context,
+                resume_notes=resume_notes,
+                topic_slug=topic_slug,
+                operating_branch=sync_operating_branch or self.settings.primary_branch,
+                remote=sync_remote,
+                used_temp_branch=sync_used_temp_branch,
+                temp_branch_name=sync_temp_branch_name,
+                attempt_limit=max(1, sync_conflict_attempt_limit),
+                plan_text=sync_plan_text,
+                plan_answers=sync_plan_answers or {},
+                plan_answer_details=sync_plan_answer_details or {},
+            )
         try:
             project_worktree_settings = load_project_worktree_settings(self.repository)
             self.emit("worktree", "Validating the primary Git worktree.")
@@ -267,6 +310,190 @@ class LocalOrchestrator:
             )
         except (GitWorktreeError, RuntimeError, ValueError) as error:
             log_exception(f"Orchestration failed task={task_id}", error)
+            message = str(error)
+            self.emit("failed", message, "error")
+            return OrchestrationResult(
+                False,
+                task_id,
+                context.branch_name if context else "",
+                context.path if context else None,
+                message,
+                context=context,
+                tokens_consumed=self._completed_tokens(False),
+            )
+
+    def _run_sync_recovery(
+        self,
+        manager: GitWorktreeManager,
+        prompt: str,
+        provider: str,
+        model: str,
+        reasoning: str,
+        *,
+        task_id: str,
+        submission_sequence: int,
+        mode: str,
+        control: AgentControl | None,
+        existing_context: WorktreeContext | None,
+        resume_notes: tuple[str, ...],
+        topic_slug: str | None,
+        operating_branch: str,
+        remote: str,
+        used_temp_branch: bool,
+        temp_branch_name: str | None,
+        attempt_limit: int,
+        plan_text: str,
+        plan_answers: dict[str, str],
+        plan_answer_details: dict[str, str],
+    ) -> OrchestrationResult:
+        """Plan or resolve Sync merge conflicts in a preserved sync worktree."""
+        context = existing_context
+        if context is None:
+            message = "Sync conflict recovery requires a preserved conflict worktree."
+            self.emit("failed", message, "error")
+            return OrchestrationResult(False, task_id, error=message)
+        try:
+            self.emit("worktree", f"Using sync conflict worktree at {context.path}.")
+            selection = (provider, model, reasoning)
+            self._raise_if_stopped(control)
+            if mode == "plan":
+                self.emit("planning", f"Planning sync conflict resolution with {provider}.")
+                profile_text = self.load_profile(context.path, "plan")
+                topic_text = self.load_topic(context.path, topic_slug)
+                result = self.run_agent(
+                    manager,
+                    context,
+                    selection,
+                    build_task_prompt(
+                        prompt,
+                        "plan",
+                        resume_notes,
+                        resumed=True,
+                        profile_text=profile_text,
+                        topic_text=topic_text,
+                    ),
+                    control,
+                    event_phase="planning",
+                )
+                if not result.succeeded:
+                    raise RuntimeError(result.error or "Sync conflict planning failed.")
+                manager.discard_graphify_changes(context.path)
+                # Keep conflict markers; never reset_task_to_base for sync recovery.
+                self.emit("questioning", "Sync conflict plan ready for review.")
+                return OrchestrationResult(
+                    True,
+                    task_id,
+                    context.branch_name,
+                    context.path,
+                    context=context,
+                    awaiting_plan=True,
+                    tokens_consumed=self._completed_tokens(),
+                )
+
+            # Coding / finalize path for an approved conflict plan.
+            leftover: tuple[str, ...] = ()
+            for attempt in range(1, attempt_limit + 1):
+                self._raise_if_stopped(control)
+                self.emit(
+                    "agent",
+                    f"Resolving sync conflicts (attempt {attempt}/{attempt_limit}).",
+                )
+                profile_text = self.load_profile(context.path, "coding")
+                topic_text = self.load_topic(context.path, topic_slug)
+                coding_prompt = build_sync_conflict_coding_prompt(
+                    plan_text or prompt,
+                    plan_answers,
+                    plan_answer_details,
+                    attempt=attempt,
+                    limit=attempt_limit,
+                    leftover_unmerged=leftover,
+                )
+                result = self.run_agent(
+                    manager,
+                    context,
+                    selection,
+                    build_task_prompt(
+                        coding_prompt,
+                        "coding",
+                        resume_notes if attempt == 1 else (),
+                        resumed=True,
+                        profile_text=profile_text,
+                        topic_text=topic_text,
+                    ),
+                    control,
+                    event_phase="agent",
+                )
+                if not result.succeeded:
+                    raise RuntimeError(result.error or "Sync conflict resolution failed.")
+                manager.discard_graphify_changes(context.path)
+                manager.stage_changes(context.path)
+                leftover = list_unmerged_paths(context.path)
+                if not leftover:
+                    break
+                self.emit(
+                    "resolving",
+                    f"Unmerged paths remain after attempt {attempt}: {', '.join(leftover)}",
+                )
+            else:
+                raise RuntimeError(
+                    f"Sync conflict resolution left unmerged paths after {attempt_limit} attempts: "
+                    + ", ".join(leftover)
+                )
+
+            def finalize_and_push() -> None:
+                self._raise_if_stopped(control)
+                self.emit("integration", "Finalizing sync merge commit.")
+                finalize_sync_merge(
+                    self.repository,
+                    context.path,
+                    operating_branch,
+                    used_temp_branch=used_temp_branch,
+                    temp_branch_name=temp_branch_name,
+                )
+                self.emit("integration", f"Pushing resolved {operating_branch} to {remote}.")
+                push_branch(self.repository, operating_branch, remote, pull_first=False)
+
+            self.emit("ready", "Sync conflicts resolved; finalizing under the integration gate.")
+            self.integration_gate(submission_sequence, finalize_and_push)
+            self.emit("completed", f"Synced {operating_branch} to {remote} after conflict resolution.")
+            return OrchestrationResult(
+                True,
+                task_id,
+                context.branch_name,
+                context.path,
+                context=None,
+                tokens_consumed=self._completed_tokens(),
+            )
+        except AgentStopped as stopped:
+            LOGGER.info("Sync recovery stopped task=%s reason=%s", task_id, stopped.reason)
+            if stopped.reason == "cancelled" and context is not None:
+                abort_sync_merge(
+                    self.repository,
+                    context.path,
+                    temp_branch_name=temp_branch_name,
+                )
+                self.emit("cancelled", "Sync conflict recovery cancelled; merge aborted.")
+                return OrchestrationResult(
+                    False,
+                    task_id,
+                    context.branch_name,
+                    context.path,
+                    "Sync conflict recovery cancelled.",
+                    cancelled=True,
+                    tokens_consumed=self._completed_tokens(False),
+                )
+            self.emit("paused", "Sync conflict recovery paused; conflict worktree preserved.")
+            return OrchestrationResult(
+                False,
+                task_id,
+                context.branch_name,
+                context.path,
+                context=context,
+                paused=True,
+                tokens_consumed=self._completed_tokens(False),
+            )
+        except (GitWorktreeError, RuntimeError, ValueError) as error:
+            log_exception(f"Sync recovery failed task={task_id}", error)
             message = str(error)
             self.emit("failed", message, "error")
             return OrchestrationResult(

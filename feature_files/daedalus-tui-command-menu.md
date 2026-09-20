@@ -13,6 +13,9 @@ The Command Menu makes infrequent but important project actions discoverable as 
 - Sync/Push is enabled only when the selected operating branch and an `origin` remote are available.
 - By default the GitHub action pulls remote commits into the operating branch
   before pushing (`pull_before_push`); set that parameter false for push-only.
+- Sync pull/merge conflicts (when `sync_conflict_recovery_enabled`) launch an
+  operator-owned plan→auto-resolve→push recovery in an isolated sync worktree;
+  Sync stays disabled while that recovery is active.
 
 ## Relevant Files
 - `tui/app.py`: Command Menu screen, activation/removal action dispatch, and push-button state.
@@ -26,6 +29,7 @@ The Command Menu makes infrequent but important project actions discoverable as 
 HACKING
 
 ## State Log
+- 2026-09-19: Added Sync conflict recovery tunables and UI hooks that launch plan-mode recovery, disable Sync while active, and auto-finish resolve+push.
 - 2026-09-19: Hotwired Command Menu Push into a default pull-then-push sync, with `pull_before_push` and a Sync to GitHub label.
 - 2026-09-16: Added a Ctrl+K Command Menu for low-frequency task, topic, Supabase, and GitHub Push actions while retaining shortcut-reference access.
 - 2026-09-16: Completed the Command Menu wiring, parameter loading, toolbar removal, shortcut migration, and read-only diff review.

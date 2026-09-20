@@ -14,6 +14,40 @@ class GitWorktreeError(RuntimeError):
     pass
 
 
+class SyncMergeConflictError(GitWorktreeError):
+    """Raised when an operator Sync pull/merge leaves unmerged paths.
+
+    The conflicted sync worktree is preserved so recovery can plan and resolve
+    conflicts without leaving the project's primary checkout mid-merge.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        repository: Path,
+        branch: str,
+        remote: str,
+        worktree_path: Path,
+        conflicted_paths: tuple[str, ...],
+        used_temp_branch: bool,
+        temp_branch_name: str | None,
+        merge_failure: str,
+    ) -> None:
+        super().__init__(message)
+        self.repository = repository
+        self.branch = branch
+        self.remote = remote
+        self.worktree_path = worktree_path
+        self.conflicted_paths = conflicted_paths
+        self.used_temp_branch = used_temp_branch
+        self.temp_branch_name = temp_branch_name
+        self.merge_failure = merge_failure
+
+
+SYNC_MERGE_COMMIT_MESSAGE = "Daedalus sync conflict resolution"
+
+
 def list_local_branches(repository: Path) -> list[str]:
     """Return local branch names under ``refs/heads`` without checking anything out."""
     try:
@@ -93,13 +127,197 @@ def _remote_ref_missing(stderr: str) -> bool:
     )
 
 
+def list_unmerged_paths(directory: Path) -> tuple[str, ...]:
+    """Return paths with unmerged (conflict) index entries in ``directory``."""
+    try:
+        process = subprocess.run(
+            ["git", "diff", "--name-only", "--diff-filter=U"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return ()
+    if process.returncode != 0:
+        return ()
+    return tuple(line.strip() for line in process.stdout.splitlines() if line.strip())
+
+
+def _sync_worktree_parent(repository: Path) -> Path:
+    parent = repository.parent / ".daedalus-worktrees" / repository.name
+    parent.mkdir(parents=True, exist_ok=True)
+    return parent
+
+
+def _sanitize_branch_for_name(branch: str) -> str:
+    return branch.replace("/", "-").replace(" ", "-")
+
+
+def _create_isolated_sync_worktree(
+    repository: Path,
+    branch: str,
+    local_sha: str,
+) -> tuple[Path, bool, str | None]:
+    """Create an isolated sync worktree for merging; never reuse an existing checkout.
+
+    When ``branch`` is already checked out elsewhere, attach via a temporary
+    ``daedalus/sync-resolve-*`` branch from the operating tip. Otherwise check out
+    ``branch`` directly in the new sync worktree.
+    """
+    sync_id = uuid.uuid4().hex[:8]
+    existing_checkout = _worktree_path_for_branch(repository, branch)
+    if existing_checkout is not None:
+        temp_branch = f"daedalus/sync-resolve-{_sanitize_branch_for_name(branch)}-{sync_id}"
+        temporary = _sync_worktree_parent(repository) / f".sync-resolve-{sync_id}"
+        add_command = ["git", "worktree", "add", "-b", temp_branch, str(temporary), local_sha]
+        used_temp_branch = True
+        temp_branch_name: str | None = temp_branch
+    else:
+        temporary = _sync_worktree_parent(repository) / f".sync-pull-{sync_id}"
+        add_command = ["git", "worktree", "add", str(temporary), branch]
+        used_temp_branch = False
+        temp_branch_name = None
+    try:
+        added = subprocess.run(
+            add_command,
+            cwd=repository,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:
+        raise GitWorktreeError(f"Failed to create sync worktree: {error}") from error
+    if added.returncode != 0:
+        raise GitWorktreeError(GitWorktreeManager.format_failure(add_command, added))
+    return temporary, used_temp_branch, temp_branch_name
+
+
+def _force_remove_worktree(repository: Path, worktree: Path) -> None:
+    remove = subprocess.run(
+        ["git", "worktree", "remove", "--force", str(worktree)],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+    )
+    if remove.returncode != 0:
+        subprocess.run(
+            ["git", "worktree", "prune"],
+            cwd=repository,
+            capture_output=True,
+            text=True,
+        )
+
+
+def _delete_branch_if_present(repository: Path, branch_name: str | None) -> None:
+    if not branch_name:
+        return
+    subprocess.run(
+        ["git", "branch", "-D", branch_name],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+    )
+
+
+def abort_sync_merge(
+    repository: Path,
+    worktree_path: Path,
+    *,
+    temp_branch_name: str | None = None,
+) -> None:
+    """Abort a preserved sync merge and remove the sync worktree (and temp branch)."""
+    if worktree_path.exists():
+        subprocess.run(
+            ["git", "merge", "--abort"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+        )
+        _force_remove_worktree(repository, worktree_path)
+    else:
+        subprocess.run(
+            ["git", "worktree", "prune"],
+            cwd=repository,
+            capture_output=True,
+            text=True,
+        )
+    _delete_branch_if_present(repository, temp_branch_name)
+
+
+def finalize_sync_merge(
+    repository: Path,
+    worktree_path: Path,
+    operating_branch: str,
+    *,
+    used_temp_branch: bool = False,
+    temp_branch_name: str | None = None,
+    message: str = SYNC_MERGE_COMMIT_MESSAGE,
+) -> None:
+    """Stage resolutions, commit the merge, update the operating branch, and clean up."""
+    if not worktree_path.exists():
+        raise GitWorktreeError(f"Sync worktree no longer exists: {worktree_path}")
+    add = subprocess.run(
+        ["git", "add", "-A"],
+        cwd=worktree_path,
+        capture_output=True,
+        text=True,
+    )
+    if add.returncode != 0:
+        raise GitWorktreeError(GitWorktreeManager.format_failure(["git", "add", "-A"], add))
+    remaining = list_unmerged_paths(worktree_path)
+    if remaining:
+        raise GitWorktreeError(
+            "Cannot finalize sync merge while unmerged paths remain: "
+            + ", ".join(remaining)
+        )
+    commit = subprocess.run(
+        ["git", "commit", "-m", message],
+        cwd=worktree_path,
+        capture_output=True,
+        text=True,
+    )
+    if commit.returncode != 0:
+        raise GitWorktreeError(
+            GitWorktreeManager.format_failure(["git", "commit", "-m", message], commit)
+        )
+    if used_temp_branch:
+        if not temp_branch_name:
+            raise GitWorktreeError("Temp sync branch name is required to update the operating branch.")
+        tip = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+        )
+        if tip.returncode != 0:
+            raise GitWorktreeError(GitWorktreeManager.format_failure(["git", "rev-parse", "HEAD"], tip))
+        update = subprocess.run(
+            ["git", "update-ref", f"refs/heads/{operating_branch}", tip.stdout.strip()],
+            cwd=repository,
+            capture_output=True,
+            text=True,
+        )
+        if update.returncode != 0:
+            raise GitWorktreeError(
+                GitWorktreeManager.format_failure(
+                    ["git", "update-ref", f"refs/heads/{operating_branch}", tip.stdout.strip()],
+                    update,
+                )
+            )
+        _force_remove_worktree(repository, worktree_path)
+        _delete_branch_if_present(repository, temp_branch_name)
+    else:
+        _force_remove_worktree(repository, worktree_path)
+
+
 def pull_branch(repository: Path, branch: str, remote: str = "origin") -> None:
     """Integrate ``remote/branch`` into the local branch without switching checkout.
 
     Fast-forwards when the local tip is behind, no-ops when ahead or equal, and
-    merges via the existing checkout (or a temporary worktree) when histories
-    have diverged. Missing remote branches are ignored so a first push can
-    still publish the local branch.
+    always merges in an isolated ``.sync-pull-*`` / ``.sync-resolve-*`` worktree
+    when histories have diverged (never in an existing operating-branch checkout).
+    Conflict-class failures preserve that worktree and raise
+    ``SyncMergeConflictError``. Missing remote branches are ignored so a first
+    push can still publish the local branch.
     """
     branch = branch.strip()
     if not branch:
@@ -163,62 +381,72 @@ def pull_branch(repository: Path, branch: str, remote: str = "origin") -> None:
             raise GitWorktreeError(GitWorktreeManager.format_failure(update_command, updated))
         return
 
-    temporary: Path | None = None
-    merge_directory = checkout
-    if merge_directory is None:
-        temporary = (
-            repository.parent
-            / ".daedalus-worktrees"
-            / repository.name
-            / f".sync-pull-{uuid.uuid4().hex[:8]}"
-        )
-        temporary.parent.mkdir(parents=True, exist_ok=True)
-        add_command = ["git", "worktree", "add", str(temporary), branch]
-        try:
-            added = subprocess.run(
-                add_command,
-                cwd=repository,
-                capture_output=True,
-                text=True,
-            )
-        except OSError as error:
-            raise GitWorktreeError(f"Failed to create sync worktree: {error}") from error
-        if added.returncode != 0:
-            raise GitWorktreeError(GitWorktreeManager.format_failure(add_command, added))
-        merge_directory = temporary
-
+    temporary, used_temp_branch, temp_branch_name = _create_isolated_sync_worktree(
+        repository, branch, local_sha
+    )
     merge_command = (
         ["git", "merge", "--ff-only", f"{remote}/{branch}"]
         if can_fast_forward
         else ["git", "merge", "--no-edit", f"{remote}/{branch}"]
     )
+    preserve_on_conflict = False
     try:
         try:
             merged = subprocess.run(
                 merge_command,
-                cwd=merge_directory,
+                cwd=temporary,
                 capture_output=True,
                 text=True,
             )
         except OSError as error:
             raise GitWorktreeError(f"Failed to run git merge: {error}") from error
         if merged.returncode != 0:
-            raise GitWorktreeError(GitWorktreeManager.format_failure(merge_command, merged))
-    finally:
-        if temporary is not None:
-            remove = subprocess.run(
-                ["git", "worktree", "remove", "--force", str(temporary)],
+            failure = GitWorktreeManager.format_failure(merge_command, merged)
+            conflicted = list_unmerged_paths(temporary)
+            if conflicted:
+                preserve_on_conflict = True
+                raise SyncMergeConflictError(
+                    failure,
+                    repository=repository.resolve(),
+                    branch=branch,
+                    remote=remote,
+                    worktree_path=temporary,
+                    conflicted_paths=conflicted,
+                    used_temp_branch=used_temp_branch,
+                    temp_branch_name=temp_branch_name,
+                    merge_failure=failure,
+                )
+            abort_sync_merge(repository, temporary, temp_branch_name=temp_branch_name)
+            raise GitWorktreeError(failure)
+        if used_temp_branch:
+            tip = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=temporary,
+                capture_output=True,
+                text=True,
+            )
+            if tip.returncode != 0:
+                raise GitWorktreeError(
+                    GitWorktreeManager.format_failure(["git", "rev-parse", "HEAD"], tip)
+                )
+            update = subprocess.run(
+                ["git", "update-ref", f"refs/heads/{branch}", tip.stdout.strip()],
                 cwd=repository,
                 capture_output=True,
                 text=True,
             )
-            if remove.returncode != 0:
-                subprocess.run(
-                    ["git", "worktree", "prune"],
-                    cwd=repository,
-                    capture_output=True,
-                    text=True,
+            if update.returncode != 0:
+                raise GitWorktreeError(
+                    GitWorktreeManager.format_failure(
+                        ["git", "update-ref", f"refs/heads/{branch}", tip.stdout.strip()],
+                        update,
+                    )
                 )
+    finally:
+        if not preserve_on_conflict:
+            _force_remove_worktree(repository, temporary)
+            if used_temp_branch:
+                _delete_branch_if_present(repository, temp_branch_name)
 
 
 def push_branch(

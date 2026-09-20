@@ -42,7 +42,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
-- **Command Menu**: `Ctrl+K` opens a discoverable action menu for New Task, Create Topic, Activate/remove personal Supabase, and Sync to GitHub (pull then push by default). New Task also remains available through `Ctrl+T`; the menu links to the full keyboard-shortcut reference, while New Project remains available through `Ctrl+Shift+N` and coding statistics remains on `Ctrl+U`.
+- **Command Menu**: `Ctrl+K` opens a discoverable action menu for New Task, Create Topic, Activate/remove personal Supabase, and Sync to GitHub (pull then push by default; merge conflicts can launch plan-mode recovery). New Task also remains available through `Ctrl+T`; the menu links to the full keyboard-shortcut reference, while New Project remains available through `Ctrl+Shift+N` and coding statistics remains on `Ctrl+U`.
 - **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a three-column settings grid above the output and composer, giving the transcript and prompt larger starting heights while retaining independent scrolling inside each widget.
 
 ## Relevant Files
@@ -67,6 +67,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-19: Sync to GitHub can recover pull/merge conflicts via plan-mode recovery in an isolated sync worktree, then auto-resolve and push.
 - 2026-09-19: Command Menu GitHub action defaults to pull-then-push sync for active operating branches.
 - 2026-09-14: Relabeled Ctrl+Shift+S as activate personal Supabase after the scaffold+Activate redesign.
 - 2026-09-13: Removed the per-project task-count suffix from the Project Select labels so options show only the project name.
