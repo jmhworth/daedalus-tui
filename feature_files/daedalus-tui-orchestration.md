@@ -56,6 +56,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-09-21: Added optional project-specific Claude settings and tool rules, environment-file injection without worktree secret copies, excluded atomic memory temp files from Git staging, and skipped empty repair commits after staging.
 - 2026-09-18: Pushed the target branch after every successful promotion (`promotion_push_enabled`, inside the integration gate after the graph refresh commit) and added `commit_primary_file` plus a `push_primary(enabled=...)` override so Orchestrate Mode can commit and push its context file the moment it is written.
 - 2026-09-16: Pre-approved discovered verification commands for non-interactive Claude runs and fell back to Daedalus' bundled profiles when a project has no `.agents/profiles/`, after msb and tex-manager tasks logged missing-profile warnings and Claude agents were denied `pytest`/`npm test`.
 - 2026-09-16: Replaced the dirty-primary start-up error with an auto-commit of the operator's pending changes plus a best-effort push of the operating branch, so a dirty checkout starts the task instead of failing it.

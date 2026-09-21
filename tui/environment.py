@@ -34,16 +34,19 @@ def agent_environment(
 ) -> dict[str, str] | None:
     """Return the subprocess environment for one provider, or None to inherit.
 
-    Cursor reads its credentials from local `.env` files, so it always gets an
-    explicit environment. Every provider additionally has ``stripped_variables``
-    removed: account mode deletes the API-key variables that would otherwise
-    make a CLI bill API credit instead of the operator's signed-in plan, and a
-    removed variable cannot be reintroduced by a local `.env` file.
+    Cursor reads its credentials from local `.env` files. Other providers load
+    only explicitly supplied environment files into their subprocess
+    environment, without placing a copy in the isolated worktree. Every
+    provider additionally has ``stripped_variables`` removed so account mode
+    cannot accidentally bill an API key from one of those files.
     """
     if provider == "cursor":
         environment = cursor_environment(directory, extra_files)
-    elif stripped_variables:
+    elif stripped_variables or extra_files:
         environment = os.environ.copy()
+        for path in extra_files:
+            for key, value in read_env_file(path).items():
+                environment.setdefault(key, value)
     else:
         # Nothing to change; let the child inherit the parent environment.
         return None

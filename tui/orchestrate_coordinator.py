@@ -81,6 +81,10 @@ PLANNER_TOOL_REFERENCE = re.compile(
     r"\bthe\s+(?:[\w-]+\s+){0,3}(?:skill|plugin)\b(?!\s+(?:level|set|gap|shortage)s?\b)",
     re.IGNORECASE,
 )
+ENVIRONMENT_BLOCKER = re.compile(
+    r"\b(?:permission|denied|credentials?|quota|session limit|rate limit)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -270,6 +274,16 @@ class OrchestrateCoordinator:
                 if self._stopping(session):
                     break
                 if not session.active:
+                    break
+                blocked = self._environment_blocker(session)
+                if blocked is not None:
+                    self._finish(
+                        session,
+                        "failed",
+                        f"Worker {blocked.card_id} needs an environment or permission fix: "
+                        f"{blocked.report.errors or blocked.report.notes}. "
+                        "Fix that blocker before starting another session.",
+                    )
                     break
                 if self._all_promoted(session) or session.cards_with_status("failed"):
                     self._plan(session, first_round=False)
@@ -559,6 +573,7 @@ class OrchestrateCoordinator:
         result: AgentResult,
     ) -> None:
         """Read the worker's report and ticked card before its worktree is committed."""
+        report = None
         try:
             raw = result.output or result.error or ""
             self.store.write_report(session, card, raw)
@@ -575,6 +590,15 @@ class OrchestrateCoordinator:
             self._persist(session)
         except Exception as error:  # Never break the worker's own run.
             log_exception(f"Could not capture worker report session={session.session_id} card={card.card_id}", error)
+        if result.succeeded:
+            if report is None or not report.valid or report.task_id != card.card_id:
+                raise RuntimeError(f"Worker {card.card_id} did not return a valid matching report.")
+            if report.status != "done":
+                raise RuntimeError(
+                    f"Worker {card.card_id} reported {report.status}: {report.errors or report.notes or 'card incomplete'}"
+                )
+            if not all(card.ticks):
+                raise RuntimeError(f"Worker {card.card_id} left checklist incomplete ({card.ticks_text}).")
 
     def _on_worker_event(self, record: TaskRecord, phase: str, message: str, kind: str) -> None:
         session_id = getattr(record, "session_id", None)
@@ -703,6 +727,15 @@ class OrchestrateCoordinator:
     def _all_promoted(self, session: OrchestrationSession) -> bool:
         promoted = self._promoted_ids(session)
         return bool(session.cards) and all(card.card_id in promoted for card in session.cards.values())
+
+    def _environment_blocker(self, session: OrchestrationSession) -> TaskCard | None:
+        """Avoid paying for another planner round when a tool or credential is unavailable."""
+        for card in session.cards.values():
+            report = card.report
+            if card.status == "failed" and report is not None and report.status != "done":
+                if ENVIRONMENT_BLOCKER.search(f"{report.errors} {report.notes}"):
+                    return card
+        return None
 
     def _environment_conflict(self, payload: PlannerPayload) -> str | None:
         """Reject a card that sends its worker after a planner-side skill or plugin.

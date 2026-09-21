@@ -19,6 +19,16 @@ def status_process(stdout: str):
 
 
 class GitWorktreeTests(unittest.TestCase):
+    def test_commit_changes_skips_commit_when_only_runtime_files_remain(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        with patch.object(manager, "stage_changes") as stage, patch.object(
+            manager, "git_output", return_value=""
+        ) as output, patch.object(manager, "run_git") as run_git:
+            self.assertFalse(manager.commit_changes(Path("/task"), "repair"))
+        stage.assert_called_once_with(Path("/task"))
+        output.assert_called_once_with(["diff", "--cached", "--name-only"], Path("/task"))
+        run_git.assert_not_called()
+
     def test_list_local_branches_returns_short_ref_names(self):
         with patch("tui.git_worktree.subprocess.run") as run:
             run.return_value = type(
@@ -139,6 +149,12 @@ class GitWorktreeTests(unittest.TestCase):
         ), patch.object(manager, "run_git", return_value=status_process(status)):
             run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
             manager.validate_primary()
+
+    def test_atomic_memory_temp_file_is_not_staged_as_project_work(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        status = "?? ..daedalus-memory.json.tpqh_jjy.tmp\n M tui/app.py\n"
+        with patch.object(manager, "run_git", return_value=status_process(status)):
+            self.assertEqual(manager.dirty_paths(Path("/repo")), ["tui/app.py"])
 
     def test_dirty_paths_keeps_real_changes_alongside_runtime_files(self):
         manager = GitWorktreeManager(Path("/repo"))
@@ -285,6 +301,7 @@ class GitWorktreeTests(unittest.TestCase):
                     ".",
                     ":(exclude).daedalus-orchestration",
                     ":(exclude,glob).daedalus-orchestration.[0-9]*",
+                    ":(exclude,glob)..daedalus-orchestration.*.tmp",
                 ],
                 worktree,
             )

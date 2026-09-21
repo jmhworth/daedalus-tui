@@ -18,6 +18,53 @@ from tui.verification import VerificationResult
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_worker_uses_project_claude_permissions_and_environment_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            worktree = Path(directory) / "worktree"
+            repository.mkdir()
+            worktree.mkdir()
+            (repository / "orchestrator").mkdir()
+            (repository / "orchestrator" / "permissions.json").write_text("{}", encoding="utf-8")
+            (repository / "fstore").mkdir()
+            (repository / "fstore" / ".env").write_text("R2_BUCKET=test\n", encoding="utf-8")
+            (repository / ".daedalus").write_text(
+                '[worktree]\nenvironment_files = ["fstore/.env"]\n'
+                '[claude]\nsettings_file = "orchestrator/permissions.json"\n'
+                'allowed_tools = ["Bash(python3:*)", "WebFetch"]\n',
+                encoding="utf-8",
+            )
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            orchestrator = LocalOrchestrator(
+                repository, runner, OrchestrationSettings(), lambda *_: None
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task", worktree)
+            with patch.object(orchestrator, "verification_tool_rules_for", return_value=()):
+                orchestrator.run_agent(Mock(), context, ("claude", "opus", "high"), "work")
+            request = runner.run.call_args.args[0]
+            self.assertEqual(request.settings_file, repository.resolve() / "orchestrator" / "permissions.json")
+            self.assertIn(repository.resolve() / "fstore" / ".env", request.environment_files)
+            self.assertEqual(request.allowed_tools, ("Bash(python3:*)", "WebFetch"))
+
+    def test_missing_configured_environment_fails_before_worker_launch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            worktree = Path(directory) / "worktree"
+            repository.mkdir()
+            worktree.mkdir()
+            (repository / ".daedalus").write_text(
+                '[worktree]\nenvironment_files = ["fstore/.env"]\n', encoding="utf-8"
+            )
+            runner = Mock()
+            orchestrator = LocalOrchestrator(
+                repository, runner, OrchestrationSettings(), lambda *_: None
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task", worktree)
+            with self.assertRaisesRegex(RuntimeError, "environment file is missing"):
+                orchestrator.run_agent(Mock(), context, ("claude", "opus", "high"), "work")
+            runner.run.assert_not_called()
+
     def test_task_commit_subject_uses_the_task_goal_and_formats_the_title(self):
         self.assertEqual(
             task_commit_subject("ignored generated implementation prompt", "task-1", "Fix login validation"),

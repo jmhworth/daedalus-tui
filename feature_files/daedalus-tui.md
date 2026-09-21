@@ -99,6 +99,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-21: Ignored empty provider, project, and branch selector events and stopped rendering queued task events after unmount to avoid Textual lifecycle crashes.
 - 2026-09-16: Switched the startup defaults from Codex with GPT-6 Astra to
   Claude Code with Claude Opus 5; the cascade still falls back to each other
   provider's first model, so selecting Codex preselects GPT-6 Astra.

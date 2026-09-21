@@ -129,6 +129,7 @@ repository exploration.
 HACKING
 
 ## State Log
+- 2026-09-21: Rejected partial, blocked, mismatched, and unticked worker reports before promotion and stopped on permission, quota, or credential blockers before another planner round.
 - 2026-09-16: Added the foundations (feature and parameter files, the
   `OrchestrateSettings` loader, the bundled role-rule and task-card templates,
   the `## Orchestrate Mode` notes in both `AGENTS.md` files, and

@@ -161,18 +161,27 @@ refresh failures are reported as warnings and never trigger resolver attempts.
 
 Target projects may add an optional `.daedalus` TOML file to prepare each task
 worktree before the agent starts. The `[worktree]` table accepts one argv-style
-`install_command` and repository-relative `readonly_paths`; the command runs in
-the task worktree, then each declared path is symlinked from the primary
-worktree. For example:
+`install_command`, repository-relative `readonly_paths`, and
+`environment_files`; the command runs in the task worktree, then each declared
+path is symlinked from the primary worktree. Environment files are loaded into
+the agent process without copying them into its worktree. A `[claude]` table
+can load a project-specific Claude settings JSON and add non-interactive tool
+permissions for workers and repair agents. For example:
 
 ```toml
 [worktree]
 install_command = ["npm", "ci"]
 readonly_paths = ["food-data"]
+environment_files = ["fstore/.env"]
+
+[claude]
+settings_file = "orchestrator/worker_permissions.json"
+allowed_tools = ["Bash(python3:*)", "WebFetch", "WebSearch"]
 ```
 
 Symlinked paths are shared local resources and are not OS-enforced read-only;
 agents and setup commands must treat them as immutable.
+Daedalus still stages, commits, and promotes worker changes itself.
 
 The launch root stores task history in `.daedalus-memory.json`. Its `tasks`
 entry maps each task's stable logical key (`task-<id>`) to the submission
@@ -462,6 +471,9 @@ its worktree, a runtime artifact that is never committed. Worker rows in the
 inbox show their card id; `Ctrl+C` in the orchestrate view stops the whole
 session, and sessions do not resume after a restart. Roles, caps, and
 budgets live in `parameter_files/daedalus-tui-orchestrate-mode.toml`.
+Workers must report `done` with every card checklist item ticked before
+Daedalus promotes their code. A partial or blocked report fails the card so
+the planner sees the actual error instead of treating unfinished work as done.
 
 One session artifact does reach the repository: after every accepted planner
 round, and again when the session ends, Daedalus writes `DAEDALUS_CONTEXT.md`

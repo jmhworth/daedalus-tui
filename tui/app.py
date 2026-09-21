@@ -2358,13 +2358,13 @@ class DaedalusTuiApp(App[None]):
         if event.select.id == "project-select":
             if str(event.value) == OPEN_DIRECTORY_VALUE:
                 self._prompt_for_project_directory()
-            elif event.value not in (Select.BLANK, ""):
+            elif event.value not in _SELECT_EMPTY:
                 self._switch_project(Path(str(event.value)))
             return
         if event.select.id == "target-branch-select":
             if self._suppress_target_branch_change:
                 return
-            if event.value not in (Select.BLANK, ""):
+            if event.value not in _SELECT_EMPTY:
                 self._on_target_branch_selected(str(event.value))
             self._refresh_push_button()
             self._refresh_compact_setting_value()
@@ -2400,6 +2400,8 @@ class DaedalusTuiApp(App[None]):
                 )
             return
         if event.select.id != "provider-select":
+            return
+        if event.value in _SELECT_EMPTY:
             return
         self._apply_provider_selection(str(event.value))
 
@@ -3076,6 +3078,8 @@ class DaedalusTuiApp(App[None]):
             self._apply_push_confirmation(record, message)
 
     def _apply_task_event(self, record: TaskRecord, phase: str, message: str, kind: str) -> None:
+        if self._textual_unmounted or not self.is_attached:
+            return
         try:
             if phase == ORCHESTRATE_PHASE:
                 self._apply_session_event(record, message, kind)

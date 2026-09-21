@@ -459,6 +459,18 @@ class LocalOrchestrator:
         event_phase: str = "agent",
     ) -> AgentResult:
         provider, model, reasoning = selection
+        project_settings = load_project_worktree_settings(self.repository)
+        configured_environment = tuple(
+            self.repository / path for path in project_settings.environment_files
+        )
+        for path in configured_environment:
+            if not path.is_file():
+                raise RuntimeError(f"Configured agent environment file is missing: {path}")
+        settings_file = None
+        if provider == "claude" and event_phase != "planning" and project_settings.claude_settings_file:
+            settings_file = self.repository / project_settings.claude_settings_file
+            if not settings_file.is_file():
+                raise RuntimeError(f"Configured Claude settings file is missing: {settings_file}")
         request = AgentRequest(
             prompt=prompt,
             directory=context.path,
@@ -466,10 +478,17 @@ class LocalOrchestrator:
             model=model,
             reasoning=reasoning,
             writable_directories=(context.path,),
-            environment_files=(self.repository / ".env",),
+            environment_files=(
+                *((self.repository / ".env",) if provider == "cursor" else ()),
+                *configured_environment,
+            ),
             control=control,
             timeout_seconds=self.settings.agent_timeout_seconds,
-            allowed_tools=self.verification_tool_rules_for(context.path),
+            allowed_tools=(
+                *self.verification_tool_rules_for(context.path),
+                *(project_settings.claude_allowed_tools if event_phase != "planning" else ()),
+            ),
+            settings_file=settings_file,
         )
         result = self.runner.run(
             request,

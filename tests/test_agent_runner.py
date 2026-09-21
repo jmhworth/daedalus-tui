@@ -12,7 +12,7 @@ from tui.agent_runner import (
     AgentRunner,
     ProviderAuthPolicy,
 )
-from tui.environment import read_env_file
+from tui.environment import agent_environment, read_env_file
 
 
 class FakeStream:
@@ -81,6 +81,34 @@ class AgentRunnerTests(unittest.TestCase):
             AgentRunner().command_for(self.request("cursor", "cursor", "")),
             ["agent", "-p", "--output-format", "stream-json", "--force", "Inspect this project"],
         )
+
+    def test_claude_command_uses_project_settings(self):
+        request = self.request("claude", "claude-opus-5", "high")
+        request = AgentRequest(
+            request.prompt, request.directory, request.provider, request.model,
+            request.reasoning, settings_file=Path("/repo/permissions.json"),
+            allowed_tools=("Bash(python3:*)",),
+        )
+        command = AgentRunner().command_for(request)
+        self.assertEqual(command[command.index("--settings") + 1], "/repo/permissions.json")
+        self.assertIn("Bash(python3:*)", command)
+
+    def test_claude_receives_project_environment_without_worktree_secret_file(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            primary = Path(directory) / "primary"
+            worktree = Path(directory) / "worktree"
+            primary.mkdir()
+            worktree.mkdir()
+            secret_file = primary / "fstore.env"
+            secret_file.write_text("R2_BUCKET=research\nANTHROPIC_API_KEY=wrong-auth\n", encoding="utf-8")
+            with patch.dict("tui.environment.os.environ", {"PATH": "/usr/bin"}, clear=True):
+                environment = agent_environment(
+                    "claude", worktree, (secret_file,), ("ANTHROPIC_API_KEY",)
+                )
+            self.assertEqual(environment["R2_BUCKET"], "research")
+            self.assertNotIn("ANTHROPIC_API_KEY", environment)
+            self.assertFalse((worktree / "fstore.env").exists())
 
     @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/codex")
     @patch("tui.agent_runner.subprocess.Popen")

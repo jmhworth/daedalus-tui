@@ -202,9 +202,11 @@ class GitWorktreeManager:
             target.symlink_to(source, target_is_directory=source.is_dir())
 
     def commit_changes(self, directory: Path, message: str) -> bool:
-        if not self.git_output(["status", "--porcelain"], directory):
-            return False
         self.stage_changes(directory)
+        # The only reported change may be Daedalus' ignored card directory.
+        # Check the index after staging instead of committing an empty repair.
+        if not self.git_output(["diff", "--cached", "--name-only"], directory):
+            return False
         self.run_git(["commit", "-m", message], directory)
         return True
 
@@ -222,6 +224,9 @@ class GitWorktreeManager:
             # the glob form catches rotated logs such as `.daedalus-debug.log.1`.
             excludes.append(f":(exclude){artifact}")
             excludes.append(f":(exclude,glob){artifact}.[0-9]*")
+            # Atomic memory writes briefly create a dot-prefixed .tmp file.
+            # It can disappear between status and git add during a busy session.
+            excludes.append(f":(exclude,glob).{artifact}.*.tmp")
         self.run_git(["add", "-A", "--", ".", *excludes], directory)
 
     def discard_graphify_changes(self, directory: Path) -> None:
@@ -340,6 +345,8 @@ class GitWorktreeManager:
             if entry.startswith(f"{artifact}/"):
                 return True
             if entry.startswith(f"{artifact}.") and entry[len(artifact) + 1 :].isdigit():
+                return True
+            if entry.startswith(f".{artifact}.") and entry.endswith(".tmp"):
                 return True
         return False
 

@@ -100,6 +100,7 @@ class AgentRequest:
     # Extra Claude Code permission rules for this run, such as the project's
     # verification commands; merged with the runner's configured allowlist.
     allowed_tools: tuple[str, ...] = field(default_factory=tuple)
+    settings_file: Path | None = None
 
 
 @dataclass
@@ -194,6 +195,8 @@ class AgentRunner:
                 "stream-json",
                 "--verbose",
             ]
+            if request.settings_file is not None:
+                command.extend(["--settings", str(request.settings_file)])
             # The worktree is already the working directory; only genuinely
             # extra roots need --add-dir. Its argument is variadic, so a
             # single-argument option always follows it and terminates the list

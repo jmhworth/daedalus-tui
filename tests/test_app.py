@@ -497,6 +497,15 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(model_select.value, "claude-opus-5")
             self.assertEqual(reasoning_select.value, "medium")
 
+    async def test_empty_provider_event_does_not_crash_selector_cascade(self):
+        app, _ = self.make_app()
+        async with app.run_test() as pilot:
+            provider = app.query_one("#provider-select", Select)
+            event = Mock(select=Mock(id="provider-select", value=Select.NULL), value=Select.NULL)
+            app.on_select_changed(event)
+            await pilot.pause()
+            self.assertEqual(provider.value, "codex")
+
     async def test_cursor_provider_keeps_its_inert_model_and_reasoning_controls(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:

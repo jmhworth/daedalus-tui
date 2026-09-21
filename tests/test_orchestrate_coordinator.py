@@ -66,7 +66,7 @@ def worker_report(task_id, status="done", errors=""):
     )
 
 
-CARD_ID = re.compile(r"^# (t\d+) —", re.MULTILINE)
+CARD_ID = re.compile(r"^# (\w+) —", re.MULTILINE)
 
 
 class ScriptedRunner:
@@ -105,7 +105,10 @@ class ScriptedRunner:
         card_path = request.directory / ".daedalus-orchestration" / "task.md"
         if card_path.is_file():
             text = card_path.read_text(encoding="utf-8")
-            card_path.write_text(text.replace(f"- [ ] {card_id} first item", f"- [x] {card_id} first item"), encoding="utf-8")
+            if card_id not in self.failing_cards:
+                text = text.replace(f"- [ ] {card_id} first item", f"- [x] {card_id} first item")
+                text = text.replace(f"- [ ] {card_id} second item", f"- [x] {card_id} second item")
+            card_path.write_text(text, encoding="utf-8")
         with self.lock:
             self.active_workers -= 1
         if card_id in self.failing_cards:
@@ -226,10 +229,8 @@ class ScenarioTests(unittest.TestCase):
         self.assertIn(OPERATOR_PROMPT, runner.planner_prompts[0])
         self.assertIn("t2  failed", runner.planner_prompts[1])
         self.assertIn("t2 crashed", runner.planner_prompts[1])
-        self.assertIn("t1  promoted   1/2 checklist", runner.planner_prompts[1])
-        # Ticks came from the card file (the worker ticked the first item; the
-        # report claimed both), reconciled with the card file winning.
-        self.assertEqual(session.cards["t1"].ticks, (True, False))
+        self.assertIn("t1  promoted   2/2 checklist", runner.planner_prompts[1])
+        self.assertEqual(session.cards["t1"].ticks, (True, True))
         self.assertEqual(session.cards["t1"].report.files_changed, ("src/t1.py",))
         self.assertEqual(session.tokens_planner, 30)
         self.assertEqual(session.tokens_workers, 15)
@@ -251,8 +252,8 @@ class ScenarioTests(unittest.TestCase):
         self.assertTrue(all(isinstance(record, SessionEventRecord) for record in session_events))
         self.assertEqual(session_events[-1].status, "completed")
 
-    def test_card_file_ticks_win_over_the_report(self):
-        """The worker ticked only the first item; its report claims both (t1 partial)."""
+    def test_partial_report_blocks_promotion(self):
+        """A partial worker report remains failed even if its checklist was ticked."""
         runner = ScriptedRunner(
             [planner_payload("One card.", [card("t1", "src/t1.py")]), planner_payload("Done.", [], done=True)]
         )
@@ -278,9 +279,41 @@ class ScenarioTests(unittest.TestCase):
             tasks.shutdown()
             for item in patches:
                 item.stop()
-        self.assertEqual(session.status, "completed", session.error)
-        self.assertEqual(session.cards["t1"].ticks, (True, False))
+        self.assertEqual(session.status, "failed")
+        self.assertEqual(session.cards["t1"].ticks, (True, True))
         self.assertEqual(session.cards["t1"].report.status, "partial")
+        self.assertEqual(session.cards["t1"].status, "failed")
+
+    def test_permission_denial_stops_before_another_planner_round(self):
+        runner = ScriptedRunner([planner_payload("One card.", [card("t1", "src/t1.py")])])
+        original_run = runner.run
+
+        def run(request, on_event=None):
+            result = original_run(request, on_event)
+            if "TASK_MODE: coding" in request.prompt:
+                return AgentResult(
+                    "claude", 0, worker_report("t1", "blocked", "Python execution denied by permissions"),
+                    tokens_consumed=5,
+                )
+            return result
+
+        runner.run = run
+        manager = self.manager()
+        tasks, coordinator = self.build(runner)
+        patches = self.patches(manager)
+        for item in patches:
+            item.start()
+        try:
+            session = coordinator.start(OPERATOR_PROMPT, PLANNER, WORKER, max_workers=1)
+            self.wait_for(session)
+        finally:
+            coordinator.shutdown()
+            tasks.shutdown()
+            for item in patches:
+                item.stop()
+        self.assertEqual(session.status, "failed")
+        self.assertIn("permission fix", session.error)
+        self.assertEqual(len(runner.planner_prompts), 1)
 
     def test_invalid_payload_gets_one_corrective_round_then_fails(self):
         runner = ScriptedRunner(["no payload here", "still no payload"])
