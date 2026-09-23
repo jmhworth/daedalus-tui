@@ -13,6 +13,7 @@ PARAMETER_DIRECTORY = "parameter_files"
 TUI_PARAMETER_FILE = "daedalus-tui.toml"
 ORCHESTRATION_PARAMETER_FILE = "daedalus-tui-orchestration.toml"
 CODING_STATISTICS_PARAMETER_FILE = "daedalus-tui-coding-statistics.toml"
+CODEX_USAGE_PARAMETER_FILE = "daedalus-tui-codex-usage.toml"
 COMMAND_MENU_PARAMETER_FILE = "daedalus-tui-command-menu.toml"
 
 
@@ -67,6 +68,13 @@ class CodingStatisticsSettings:
     recent_window_hours: int = 1
     forecast_days: int = 7
     thirty_day_forecast_days: int = 30
+
+
+@dataclass(frozen=True)
+class CodexUsageSettings:
+    executable: str = "codex"
+    timeout_seconds: float = 10.0
+    refresh_interval_seconds: float = 300.0
 
 
 @dataclass(frozen=True)
@@ -206,6 +214,22 @@ def load_coding_statistics_settings(parameter_path: Path | None = None) -> Codin
             f"{path} recent_window_hours, forecast_days, and thirty_day_forecast_days must be positive."
         )
     return CodingStatisticsSettings(recent_window_hours, forecast_days, thirty_day_forecast_days)
+
+
+def load_codex_usage_settings(parameter_path: Path | None = None) -> CodexUsageSettings:
+    path = parameter_path or (
+        Path(__file__).resolve().parents[1] / PARAMETER_DIRECTORY / CODEX_USAGE_PARAMETER_FILE
+    )
+    with path.open("rb") as source:
+        values = tomllib.load(source)
+    executable = str(values.get("executable", "codex")).strip()
+    timeout_seconds = float(values.get("timeout_seconds", 10.0))
+    refresh_interval_seconds = float(values.get("refresh_interval_seconds", 300.0))
+    if not executable or timeout_seconds <= 0 or refresh_interval_seconds <= 0:
+        raise ValueError(
+            f"{path} executable must be non-empty and timeout/refresh intervals must be positive."
+        )
+    return CodexUsageSettings(executable, timeout_seconds, refresh_interval_seconds)
 
 
 def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMenuSettings:

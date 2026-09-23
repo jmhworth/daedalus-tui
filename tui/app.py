@@ -32,11 +32,14 @@ from textual.widgets import (
 from textual.widgets.select import InvalidSelectValueError
 from .agent_runner import AgentRunner
 from .clipboard import copy_to_system_clipboard, paste_from_system_clipboard
+from .codex_usage import CodexUsageSnapshot, fetch_codex_usage
 from .config import (
     CodingStatisticsSettings,
     CommandMenuSettings,
+    CodexUsageSettings,
     TuiSettings,
     load_command_menu_settings,
+    load_codex_usage_settings,
     load_coding_statistics_settings,
     load_orchestration_settings,
     load_tui_settings,
@@ -1220,6 +1223,29 @@ def _format_count(value: int) -> str:
     return f"{value:,}"
 
 
+def _format_codex_usage(snapshot: CodexUsageSnapshot) -> str:
+    if snapshot.error:
+        return f"Codex plan usage: unavailable — {snapshot.error}"
+    plan = f" ({snapshot.plan_type.title()})" if snapshot.plan_type else ""
+    return (
+        f"Codex plan usage{plan}: "
+        f"5-hour {_format_codex_window(snapshot.five_hour)} · "
+        f"Weekly {_format_codex_window(snapshot.weekly)}"
+    )
+
+
+def _format_codex_window(window) -> str:
+    if window is None:
+        return "unavailable"
+    reset = ""
+    if window.resets_at is not None:
+        local_reset = window.resets_at.astimezone()
+        reset_date = local_reset.strftime("%b %d").replace(" 0", " ")
+        reset_time = local_reset.strftime("%I:%M %p").lstrip("0")
+        reset = f" (resets {reset_date}, {reset_time})"
+    return f"{window.remaining_percent}% left{reset}"
+
+
 class DaedalusTuiApp(App[None]):
     TITLE = "Daedalus TUI"
     CSS_PATH = "app.tcss"
@@ -1244,6 +1270,8 @@ class DaedalusTuiApp(App[None]):
         settings: TuiSettings | None = None,
         coordinator: TaskCoordinator | None = None,
         statistics_settings: CodingStatisticsSettings | None = None,
+        codex_usage_settings: CodexUsageSettings | None = None,
+        codex_usage_reader=None,
     ) -> None:
         super().__init__()
         self._initial_directory_path = (
@@ -1254,6 +1282,8 @@ class DaedalusTuiApp(App[None]):
         self.settings = settings or load_tui_settings()
         self.command_menu_settings = load_command_menu_settings()
         self.statistics_settings = statistics_settings or load_coding_statistics_settings()
+        self.codex_usage_settings = codex_usage_settings or load_codex_usage_settings()
+        self._codex_usage_reader = codex_usage_reader or fetch_codex_usage
         self.orchestration_settings = load_orchestration_settings()
         self.debug_log_path = self.launch_root / self.orchestration_settings.debug_log_filename
         self._fault_log_file = None
@@ -1316,6 +1346,8 @@ class DaedalusTuiApp(App[None]):
         self._personal_supabase_progress_screen: (
             PersonalSupabaseActivationProgressScreen | None
         ) = None
+        self._codex_usage_refresh_lock = threading.Lock()
+        self._codex_usage_stop = threading.Event()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -1388,6 +1420,7 @@ class DaedalusTuiApp(App[None]):
                             id="compact-settings-value",
                         )
                     yield Static(self._directory_text(), id="directory")
+                    yield Static("Codex plan usage: Loading…", id="codex-usage")
                     yield Static("Phase: Idle", id="phase")
                     yield Static("Task branch: —    Worktree: —", id="task-context")
                     with Vertical(id="output-panel"):
@@ -1551,6 +1584,11 @@ class DaedalusTuiApp(App[None]):
         self._refresh_task_list()
         self._refresh_compact_setting_value()
         self._apply_responsive_layout()
+        self._start_codex_usage_refresh()
+        self.set_interval(
+            self.codex_usage_settings.refresh_interval_seconds,
+            self._start_codex_usage_refresh,
+        )
         self._start_personal_supabase_bootstrap()
         prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
         prompt.enter_insert_mode()
@@ -1588,6 +1626,7 @@ class DaedalusTuiApp(App[None]):
 
     def on_unmount(self) -> None:
         self._textual_unmounted = True
+        self._codex_usage_stop.set()
         _unregister_app_for_thread_exit(self)
         shutdown_complete = self._shutdown_coordinators("Textual app unmount")
         if shutdown_complete:
@@ -2555,6 +2594,8 @@ class DaedalusTuiApp(App[None]):
                     self._update_sync_recovery_status(record, phase)
             if is_selected:
                 self._render_selected_task_safely(f"task event phase={phase}")
+            if phase.lower() == "completed" and record.provider == "codex":
+                self._start_codex_usage_refresh()
         except Exception as error:
             log_exception(f"Could not render task event task={record.task_id} phase={phase}", error)
             if not self._accept_task_events:
@@ -3027,6 +3068,38 @@ class DaedalusTuiApp(App[None]):
 
     def _directory_text(self) -> str:
         return f"Launch root: {self.launch_root}    Active project: {self.directory}"
+
+    def _start_codex_usage_refresh(self) -> None:
+        """Refresh the account usage line without blocking the TUI event loop."""
+        if not self._accept_task_events or self._codex_usage_stop.is_set():
+            return
+        if not self._codex_usage_refresh_lock.acquire(blocking=False):
+            return
+
+        def work() -> None:
+            try:
+                snapshot = self._codex_usage_reader(self.codex_usage_settings)
+            except Exception as error:
+                log_exception("Codex usage refresh failed", error)
+                snapshot = CodexUsageSnapshot(error="Codex usage data unavailable")
+            finally:
+                self._codex_usage_refresh_lock.release()
+            if self._codex_usage_stop.is_set() or not self._accept_task_events:
+                return
+            try:
+                self.call_from_thread(self._apply_codex_usage_snapshot, snapshot)
+            except RuntimeError as error:
+                if "App is not running" not in str(error):
+                    log_exception("Could not render Codex usage refresh", error)
+
+        threading.Thread(target=work, name="codex-usage-refresh", daemon=True).start()
+
+    def _apply_codex_usage_snapshot(self, snapshot: CodexUsageSnapshot) -> None:
+        try:
+            self.query_one("#codex-usage", Static).update(_format_codex_usage(snapshot))
+        except NoMatches:
+            # The refresh can finish while Textual is unmounting.
+            return
 
     def _refresh_task_list(self) -> None:
         """Render actionable history and tasks created during this session."""

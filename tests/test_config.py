@@ -3,7 +3,9 @@ import unittest
 from pathlib import Path
 
 from tui.config import (
+    CodexUsageSettings,
     LayoutSettings,
+    load_codex_usage_settings,
     load_coding_statistics_settings,
     load_command_menu_settings,
     load_orchestration_settings,
@@ -57,6 +59,12 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(statistics.recent_window_hours, 1)
         self.assertEqual(statistics.forecast_days, 7)
         self.assertEqual(statistics.thirty_day_forecast_days, 30)
+
+    def test_loads_codex_usage_settings(self):
+        root = Path(__file__).resolve().parents[1]
+        usage = load_codex_usage_settings(root / "parameter_files" / "daedalus-tui-codex-usage.toml")
+
+        self.assertEqual(usage, CodexUsageSettings("codex", 10.0, 300.0))
 
     def test_loads_command_menu_settings(self):
         root = Path(__file__).resolve().parents[1]

@@ -1,0 +1,4 @@
+# Read-only polling settings for the authenticated Codex plan usage line.
+executable = "codex"
+timeout_seconds = 10
+refresh_interval_seconds = 300

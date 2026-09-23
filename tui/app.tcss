@@ -94,14 +94,19 @@ Screen {
     margin-right: 1;
 }
 
-#directory, #phase, #title, #task-context, #status,
+#directory, #codex-usage, #phase, #title, #task-context, #status,
 #resume-notes-label {
     color: $text-muted;
     pointer: text;
 }
 
-#directory, #phase {
+#directory, #codex-usage, #phase {
     height: 1;
+}
+
+#codex-usage {
+    height: auto;
+    min-height: 1;
 }
 
 #task-context {

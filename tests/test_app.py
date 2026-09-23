@@ -25,6 +25,7 @@ from tui.app import (
     ProjectInitializerScreen,
     TopicViewerScreen,
 )
+from tui.codex_usage import CodexUsageSnapshot, CodexUsageWindow
 from tui.config import LayoutSettings, ModelOption, TuiSettings
 from tui.projects import DaedalusProject
 from tui.plan import CUSTOM_ANSWER_OPTION_ID, PlanOption, PlanQuestion, encode_custom_answer
@@ -257,6 +258,21 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(app.query_one("#view-topic-button", Button).disabled)
             self.assertIsInstance(app.query_one("#output-toggle-button", Button), Button)
             await pilot.pause()
+
+    async def test_main_page_shows_codex_plan_usage(self):
+        app, _ = self.make_app()
+        app._codex_usage_reader = lambda _settings: CodexUsageSnapshot(
+            five_hour=CodexUsageWindow(82),
+            weekly=CodexUsageWindow(64),
+            plan_type="plus",
+        )
+        async with app.run_test() as pilot:
+            await pilot.pause()
+
+            usage = str(app.query_one("#codex-usage", Static).render())
+            self.assertIn("Codex plan usage (Plus)", usage)
+            self.assertIn("5-hour 82% left", usage)
+            self.assertIn("Weekly 64% left", usage)
 
     async def test_command_menu_register_supabase_opens_confirmation(self):
         with tempfile.TemporaryDirectory() as directory:
