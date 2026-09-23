@@ -17,10 +17,11 @@ class ConfigTests(unittest.TestCase):
         settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
         orchestration = load_orchestration_settings(root / "parameter_files" / "daedalus-tui-orchestration.toml")
 
-        self.assertEqual(settings.default_model, "gpt-5.6-luna")
+        self.assertEqual(settings.default_model, "gpt-6-luna")
         self.assertEqual(settings.default_reasoning, "high")
         self.assertEqual([item.value for item in settings.codex_models], [
-            "gpt-6-astra", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+            "gpt-6-astra", "gpt-6-luna", "gpt-6-sol",
+            "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
         ])
         self.assertEqual([item.value for item in settings.codex_reasoning], [
             "light", "medium", "high", "extra-high", "max",

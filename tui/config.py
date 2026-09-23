@@ -132,7 +132,7 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
         raise ValueError(f"{path} layout values must be positive.")
 
     default_provider = str(defaults.get("provider", "codex"))
-    default_model = str(defaults.get("model", "gpt-5.6-luna"))
+    default_model = str(defaults.get("model", "gpt-6-luna"))
     default_reasoning = str(defaults.get("reasoning", "high"))
     if not providers or not codex_models or not codex_reasoning:
         raise ValueError(f"{path} must define providers, codex_models, and codex_reasoning.")

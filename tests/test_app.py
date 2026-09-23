@@ -183,10 +183,13 @@ class FakeCoordinator:
 def settings():
     return TuiSettings(
         "codex",
-        "gpt-5.6-luna",
+        "gpt-6-luna",
         "medium",
         (ModelOption("Codex", "codex"), ModelOption("Cursor CLI", "cursor")),
         (
+            ModelOption("GPT-6 Astra", "gpt-6-astra"),
+            ModelOption("GPT-6 Luna", "gpt-6-luna"),
+            ModelOption("GPT-6 Sol", "gpt-6-sol"),
             ModelOption("GPT-5.6 Luna", "gpt-5.6-luna"),
             ModelOption("GPT-5.6 Terra", "gpt-5.6-terra"),
             ModelOption("GPT-5.6 Sol", "gpt-5.6-sol"),
@@ -216,7 +219,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
             self.assertEqual(app.query_one("#provider-select", Select).value, "codex")
-            self.assertEqual(app.query_one("#model-select", Select).value, "gpt-5.6-luna")
+            self.assertEqual(app.query_one("#model-select", Select).value, "gpt-6-luna")
             self.assertEqual(app.query_one("#reasoning-select", Select).value, "medium")
             self.assertEqual(app.query_one("#mode-select", Select).value, "coding")
             self.assertEqual(app.query_one("#target-branch-select", Select).value, "main")
@@ -1608,7 +1611,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
 
             self.assertEqual(provider.value, "codex")
-            self.assertEqual(app.query_one("#model-select", Select).value, "gpt-5.6-luna")
+            self.assertEqual(app.query_one("#model-select", Select).value, "gpt-6-luna")
             self.assertEqual(app.query_one("#reasoning-select", Select).value, "medium")
             self.assertFalse(app.query_one("#model-select", Select).disabled)
             self.assertFalse(app.query_one("#reasoning-select", Select).disabled)
@@ -2773,7 +2776,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertTrue(app.query_one("#send-button", Button).disabled)
             self.assertFalse(prompt.disabled)
-            self.assertEqual((first.model, first.reasoning), ("gpt-5.6-luna", "medium"))
+            self.assertEqual((first.model, first.reasoning), ("gpt-6-luna", "medium"))
             self.assertEqual((second.model, second.reasoning), ("gpt-5.6-terra", "high"))
 
             coordinator.finish(first, "Implemented the first task.")
