@@ -74,6 +74,9 @@ wizard; Daedalus never copies credentials between project `.env` files.
   Data API / PostgREST settings after the migration is applied remotely.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
   commits and migration push.
+- **CLI launch path**: Migration pushes invoke the absolute Supabase CLI path
+  resolved from the Daedalus process PATH. The project credential overlay may
+  omit PATH and must not make an available CLI unlaunchable.
 
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
@@ -94,6 +97,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Fixed Activate migration pushes to launch the PATH-resolved Supabase CLI path when the project credential overlay omits PATH.
 - 2026-09-26: Aligned the DNS preflight regression fixture with a canonical direct Supabase database host so its IPv6 pooler guidance assertion tests the intended case.
 - 2026-09-26: DNS failures for canonical direct database URLs now recommend the Dashboard Session pooler connection string for IPv4-only networks.
 - 2026-09-26: Activation now catches canonical direct database URL project-ref mismatches and gives a targeted DNS resolution explanation, including that CLI login cannot fix DNS.

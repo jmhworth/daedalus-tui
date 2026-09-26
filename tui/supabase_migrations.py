@@ -40,11 +40,12 @@ def push_migrations(
     env: dict[str, str] | None = None,
 ) -> PushResult:
     """Run non-interactive `supabase db push --yes` in the target worktree."""
-    if shutil.which(executable) is None:
+    resolved_executable = shutil.which(executable)
+    if resolved_executable is None:
         return PushResult(False, f"{executable} is not available on PATH.")
     try:
         process = subprocess.run(
-            [executable, "db", "push", "--yes"],
+            [resolved_executable, "db", "push", "--yes"],
             cwd=directory,
             capture_output=True,
             text=True,

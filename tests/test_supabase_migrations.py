@@ -34,7 +34,10 @@ class SupabaseMigrationsTests(unittest.TestCase):
         result = push_migrations(Path("/worktree"), env={"SUPABASE_ACCESS_TOKEN": "tok"})
         self.assertTrue(result.succeeded)
         self.assertIn("up to date", result.output)
-        self.assertEqual(run.call_args.args[0], ["supabase", "db", "push", "--yes"])
+        self.assertEqual(
+            run.call_args.args[0],
+            ["/usr/local/bin/supabase", "db", "push", "--yes"],
+        )
         self.assertEqual(run.call_args.kwargs["cwd"], Path("/worktree"))
         self.assertEqual(run.call_args.kwargs["env"]["SUPABASE_ACCESS_TOKEN"], "tok")
 
