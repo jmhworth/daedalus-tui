@@ -5,11 +5,11 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 
 ## Key Points
 - **Independent project boundary**: The exported `tui` project owns its UI, provider execution, configuration, tests, and local orchestration modules without importing `local-daemon`.
-- **Provider controls**: Codex exposes GPT-6 Astra plus GPT-5.6 Luna, Terra,
-  and Sol with light, medium, high, extra-high, and max reasoning; GPT-5.6 Luna
-  at high reasoning is the default (GPT-6 Astra needs a current Codex CLI).
-  Cursor CLI is a provider-only choice with model and reasoning disabled. The
-  settings bar also exposes a per-project
+- **Provider controls**: Codex exposes GPT-6 Astra, Luna, and Sol plus
+  GPT-5.6 Luna, Terra, and Sol with light, medium, high, extra-high, and max
+  reasoning; GPT-6 Luna at high reasoning is the default. Cursor CLI is a
+  provider-only choice with model and reasoning disabled. The settings bar also
+  exposes a per-project
   Branch Select for the operating branch used by new task worktrees.
 - **Responsive layouts**: Terminal resize events switch narrow screens to a
   vertical workspace with a compact full-width task inbox and stacked project
@@ -68,6 +68,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-26: Restored GPT-6 Luna and Sol in the Codex picker and defaulted to GPT-6 Luna after confirming both slugs are live in the local Codex models cache.
 - 2026-09-26: Dropped unsupported GPT-6 Luna/Sol picker entries, defaulted Codex to GPT-5.6 Luna, and surfaced Codex JSONL API errors instead of benign stdin/cache stderr.
 - 2026-09-23: Added GPT-6 Luna and Sol to the Codex model picker and made GPT-6 Luna with high reasoning the default.
 - 2026-09-19: Preserved Cursor's final plan result separately from streamed assistant fragments so structured questions reliably reach selectable plan-review controls.
