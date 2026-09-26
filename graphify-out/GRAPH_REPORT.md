@@ -1,16 +1,16 @@
 # Graph Report - daedalus-tui  (2026-09-26)
 
 ## Corpus Check
-- 96 files · ~92,587 words
+- 96 files · ~92,747 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1865 nodes · 5158 edges · 104 communities (83 shown, 21 thin omitted)
+- 1865 nodes · 5158 edges · 105 communities (83 shown, 22 thin omitted)
 - Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 595 edges (avg confidence: 0.54)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `914cf0af`
+- Built from commit: `1738e714`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -117,6 +117,7 @@
 - .edit_paste_after
 - .edit_paste_before
 - .enter_insert_mode
+- RegistrationResult
 
 ## God Nodes (most connected - your core abstractions)
 1. `DaedalusTuiApp` - 182 edges
@@ -145,7 +146,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (104 total, 21 thin omitted)
+## Communities (105 total, 22 thin omitted)
 
 ### Community 0 - "PlanQuestion"
 Cohesion: 0.14
@@ -297,7 +298,7 @@ Nodes (5): Daedalus Project Instructions, graphify, Shared personal Supabase, Ta
 
 ### Community 41 - "KeyboardShortcutsScreen"
 Cohesion: 0.13
-Nodes (29): Remove values loaded for a subprocess from a user-facing diagnostic., redact_environment_values(), activate_personal_supabase(), _allow_list_comment(), _commit_paths(), commit_personal_supabase_scaffold(), _ensure_env_example(), _env_example_block() (+21 more)
+Nodes (27): activate_personal_supabase(), bootstrap_personal_supabase(), _commit_paths(), commit_personal_supabase_scaffold(), _ensure_supabase_scaffold(), _git_output(), _git_porcelain_paths(), _GitCommandResult (+19 more)
 
 ### Community 42 - "debug_log.py"
 Cohesion: 0.16
@@ -380,8 +381,8 @@ Cohesion: 0.29
 Nodes (6): Daedalus TUI Personal Shared Supabase, Dev Mode, Key Points, Relevant Files, State Log, Summary
 
 ### Community 68 - "task_coordinator.py"
-Cohesion: 0.33
-Nodes (6): is_personal_supabase_registered(), load_personal_supabase_status(), PersonalSupabaseStatus, Registration / activation marker loaded from a target project's ``.daedalus``., Return the ``[personal_supabase]`` marker, or an unregistered default., True when the project is marked registered for ``schema`` (or any schema if omit
+Cohesion: 0.21
+Nodes (10): is_personal_supabase_registered(), load_personal_supabase_status(), PersonalSupabaseStatus, project_ref_from_supabase_url(), Derive the project ref from a standard ``https://<ref>.supabase.co`` URL., Return an explicit or URL-derived project ref (empty when neither is usable)., Registration / activation marker loaded from a target project's ``.daedalus``., Return the ``[personal_supabase]`` marker, or an unregistered default. (+2 more)
 
 ### Community 69 - "PersonalSupabaseActivationProgressScreen"
 Cohesion: 0.22
@@ -416,8 +417,8 @@ Cohesion: 0.13
 Nodes (10): FakeOrchestrator, Prefer mounted selector values so clarification refreshes keep choices., encode_custom_answer(), is_valid_plan_answer(), Encode free text without confusing it with an agent option id., Validate agent option ids and the software-owned custom answer format., Parse plan JSON from one turn without letting join separators break it., Remove the clean, read-only planning worktree after coding is queued. (+2 more)
 
 ### Community 80 - ".edit_paste_after"
-Cohesion: 0.13
-Nodes (19): main(), Child-process probe for project-local Supabase env key presence.  Invoke as ``py, _ensure_profile_guidance(), _first_filled_env_value(), _key_or_aliases_label(), load_personal_supabase_settings(), personal_supabase_environment_settings(), profile_guidance_section() (+11 more)
+Cohesion: 0.09
+Nodes (36): main(), Child-process probe for project-local Supabase env key presence.  Invoke as ``py, Remove values loaded for a subprocess from a user-facing diagnostic., redact_environment_values(), _allow_list_comment(), _direct_database_host_project_ref(), _ensure_env_example(), _env_example_block() (+28 more)
 
 ### Community 81 - ".enter_insert_mode"
 Cohesion: 0.11
@@ -444,12 +445,12 @@ Cohesion: 0.21
 Nodes (8): GitWorktreeError, push_branch(), CompletedProcess, RuntimeError, Push a local branch to ``remote``, setting upstream with ``-u`` when needed., Install project resources and link declared shared read-only paths., Return whether ``remote`` is configured for ``repository``., remote_exists()
 
 ### Community 89 - "PersonalSupabaseSetupWizardScreen"
-Cohesion: 0.17
-Nodes (15): bootstrap_personal_supabase(), _ensure_supabase_scaffold(), load_project_personal_supabase_env_values(), _migration_creates_schema(), probe_project_personal_supabase_environment(), project_personal_supabase_env_path(), Path, Return the project-local ``.env`` path operators must edit. (+7 more)
+Cohesion: 0.33
+Nodes (4): probe_project_personal_supabase_environment(), project_personal_supabase_env_path(), Return the project-local ``.env`` path operators must edit., Check required project Supabase keys via a child process exit code.      The par
 
 ### Community 90 - "remove_personal_supabase"
-Cohesion: 0.14
-Nodes (18): personal_supabase_managed_env_keys(), Return every env key this feature may clean up (preferred + aliases)., Remove local personal-Supabase artifacts without touching remote state.      The, Remove only the personal-Supabase table from a project marker., Remove one already-resolved file, symlink, or directory., Remove the generated shared-Supabase block from ``.env.example``., Remove synchronized Supabase assignments while preserving other env values., Return env text without the configured Supabase assignments. (+10 more)
+Cohesion: 0.20
+Nodes (12): Remove local personal-Supabase artifacts without touching remote state.      The, Remove only the personal-Supabase table from a project marker., Remove one already-resolved file, symlink, or directory., Remove the generated shared-Supabase block from ``.env.example``., Remove the generated Personal Supabase section from one profile., Remove a generated block and normalize the blank lines around it., _remove_path(), remove_personal_supabase() (+4 more)
 
 ### Community 91 - "._finish_personal_supabase_progress"
 Cohesion: 0.25
@@ -468,13 +469,13 @@ Cohesion: 0.12
 Nodes (10): Remove known credential values before diagnostics reach the UI or log., Confirm, then remove local personal-Supabase artifacts for the project., Run scaffold+Activate in a background worker so the TUI stays responsive., Return provider metadata from the shared controls for a new task., Queue a coding task that writes and expands the requested topic file., Surface Sync conflict recovery progress in the status bar., Launch plan-mode recovery against the preserved Sync conflict worktree., _redact_supabase_diagnostic() (+2 more)
 
 ### Community 97 - "RegistrationResult"
-Cohesion: 0.33
-Nodes (7): _direct_database_host_project_ref(), preflight_personal_supabase(), PreflightResult, _probe_database_url(), Run access-method-aware live connectivity checks; never mutates schema., Return the project ref from a canonical Supabase direct DB hostname., Outcome of the access-method-aware live Supabase connectivity probe.
+Cohesion: 0.50
+Nodes (3): _ensure_profile_guidance(), profile_guidance_section(), Return the markdown section appended to coding/architecture profiles.
 
 ## Knowledge Gaps
 - **117 isolated node(s):** `daedalus-tui`, `Execution Boundaries (CRITICAL)`, `Evidence Extraction`, `Architecture Boundaries`, `Parameter Files` (+112 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
