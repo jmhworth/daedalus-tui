@@ -91,7 +91,12 @@
   "89": "PersonalSupabaseSetupWizardScreen",
   "90": "remove_personal_supabase",
   "91": "._finish_personal_supabase_progress",
+  "92": ".__init__",
   "93": ".on_mount",
+  "94": "._run_clarification",
+  "95": "profile_guidance_section",
+  "96": ".on_unmount",
+  "97": "RegistrationResult",
   "98": ".submit_sync_recovery",
-  "101": "._update_plan_state"
+  "99": ".nav_word_end"
 }
