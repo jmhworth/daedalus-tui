@@ -1055,7 +1055,13 @@ def preflight_personal_supabase(
             )
         return PreflightResult(True, "Supabase access-token preflight succeeded.", method="access_token")
 
-    probe = _probe_database_url(db_url, timeout, find_executable=find_executable, run_process=run_process)
+    probe = _probe_database_url(
+        db_url,
+        timeout,
+        project_ref=project_ref,
+        find_executable=find_executable,
+        run_process=run_process,
+    )
     if not probe.succeeded:
         return PreflightResult(False, probe.message, method="db_url")
     return PreflightResult(True, probe.message or "Supabase DB URL preflight succeeded.", method="db_url")
@@ -1431,9 +1437,23 @@ def _probe_database_url(
     db_url: str,
     timeout: float,
     *,
+    project_ref: str,
     find_executable,
     run_process,
 ) -> PreflightResult:
+    parsed = urlparse(db_url)
+    host = parsed.hostname
+    if not host:
+        return PreflightResult(False, "SUPABASE_DB_URL is missing a host.")
+    direct_host_ref = _direct_database_host_project_ref(host)
+    if direct_host_ref and direct_host_ref != project_ref.lower():
+        return PreflightResult(
+            False,
+            "SUPABASE_DB_URL points to database project "
+            f"{direct_host_ref!r}, but SUPABASE_URL points to {project_ref!r}. "
+            "Use the database connection string for the same Supabase project.",
+        )
+    port = parsed.port or 5432
     if find_executable("psql") is not None:
         try:
             process = run_process(
@@ -1453,17 +1473,31 @@ def _probe_database_url(
         )
         return PreflightResult(False, output or "Database reachability check failed.")
 
-    parsed = urlparse(db_url)
-    host = parsed.hostname
-    if not host:
-        return PreflightResult(False, "SUPABASE_DB_URL is missing a host.")
-    port = parsed.port or 5432
     try:
         with socket.create_connection((host, port), timeout=timeout):
             pass
+    except socket.gaierror as error:
+        return PreflightResult(
+            False,
+            f"DNS could not resolve database host {host}:{port} ({error}). "
+            "Check SUPABASE_DB_URL against the project's Connect settings; if the host "
+            "matches, check this machine's DNS/network. Supabase CLI login does not "
+            "affect DNS resolution.",
+        )
     except OSError as error:
         return PreflightResult(False, f"Could not reach database host {host}:{port} ({error}).")
     return PreflightResult(True, f"Database host {host}:{port} is reachable.")
+
+
+def _direct_database_host_project_ref(host: str) -> str | None:
+    """Return the project ref from a canonical Supabase direct DB hostname."""
+    prefix = "db."
+    suffix = ".supabase.co"
+    normalized = host.lower()
+    if not normalized.startswith(prefix) or not normalized.endswith(suffix):
+        return None
+    project_ref = normalized[len(prefix) : -len(suffix)]
+    return project_ref or None
 
 
 def _supabase_layout_conflict(root: Path, schema: str, settings: dict) -> str | None:

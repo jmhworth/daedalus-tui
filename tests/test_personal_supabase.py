@@ -1,3 +1,4 @@
+import socket
 import subprocess
 import tempfile
 import tomllib
@@ -459,6 +460,48 @@ class PersonalSupabaseTests(unittest.TestCase):
                 )
             self.assertTrue(result.succeeded)
             self.assertEqual(result.method, "db_url")
+
+    def test_preflight_db_url_reports_direct_host_project_ref_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            launch = Path(tmp)
+            self._write_project_env(launch, token=False)
+            env_path = launch / ".env"
+            env_path.write_text(
+                env_path.read_text(encoding="utf-8").replace(
+                    "example.test", "db.other-ref.supabase.co"
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("tui.personal_supabase.socket.create_connection") as connect:
+                result = preflight_personal_supabase(
+                    launch,
+                    find_executable=lambda name: "/bin/supabase" if name == "supabase" else None,
+                )
+
+            self.assertFalse(result.succeeded)
+            self.assertIn("points to database project 'other-ref'", result.message)
+            self.assertIn("points to 'shared-ref'", result.message)
+            connect.assert_not_called()
+
+    def test_preflight_db_url_explains_dns_lookup_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            launch = Path(tmp)
+            self._write_project_env(launch, token=False)
+
+            with patch(
+                "tui.personal_supabase.socket.create_connection",
+                side_effect=socket.gaierror(8, "nodename nor servname provided, or not known"),
+            ):
+                result = preflight_personal_supabase(
+                    launch,
+                    find_executable=lambda name: "/bin/supabase" if name == "supabase" else None,
+                )
+
+            self.assertFalse(result.succeeded)
+            self.assertIn("DNS could not resolve database host", result.message)
+            self.assertIn("project's Connect settings", result.message)
+            self.assertIn("CLI login does not affect DNS", result.message)
 
     def test_activate_success_pushes_once_and_marks_activated(self):
         with tempfile.TemporaryDirectory() as tmp:
