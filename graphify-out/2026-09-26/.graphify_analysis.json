@@ -1,0 +1,558 @@
+{
+  "communities": {
+    "0": [
+      "taskeventcallback",
+      "tests_test_git_worktree",
+      "tests_test_orchestrator",
+      "tests_test_orchestrator_orchestratortests",
+      "tests_test_orchestrator_orchestratortests_test_cancelled_agent_removes_unintegrated_worktree",
+      "tests_test_orchestrator_orchestratortests_test_failed_resolver_preserves_worktree",
+      "tests_test_orchestrator_orchestratortests_test_failed_task_verification_runs_repair_agent",
+      "tests_test_orchestrator_orchestratortests_test_graphify_failure_is_reported_without_failing_promotion",
+      "tests_test_orchestrator_orchestratortests_test_merge_failure_deploys_resolver_and_retries_verification",
+      "tests_test_orchestrator_orchestratortests_test_successful_graphify_changes_are_committed_after_promotion",
+      "tests_test_task_coordinator",
+      "tests_test_task_coordinator_fakeorchestrator",
+      "tests_test_task_coordinator_fakeorchestrator_init",
+      "tests_test_task_coordinator_fakeorchestrator_run",
+      "tests_test_task_coordinator_taskcoordinatortests",
+      "tests_test_task_coordinator_taskcoordinatortests_setup",
+      "tests_test_task_coordinator_taskcoordinatortests_test_cancel_paused_task_removes_preserved_worktree",
+      "tests_test_task_coordinator_taskcoordinatortests_test_executor_limits_concurrent_agent_tasks_and_snapshots_settings",
+      "tests_test_task_coordinator_taskcoordinatortests_test_failed_task_does_not_block_later_task",
+      "tests_test_task_coordinator_taskcoordinatortests_test_first_ready_integration_is_serialized",
+      "tests_test_task_coordinator_taskcoordinatortests_test_pause_preserves_context_and_resume_reuses_same_worktree",
+      "tui_agent_runner_agentresult",
+      "tui_agent_runner_agentresult_succeeded",
+      "tui_git_worktree",
+      "tui_git_worktree_gitworktreeerror",
+      "tui_git_worktree_rationale_1",
+      "tui_git_worktree_worktreecontext",
+      "tui_graphify_graphifyresult",
+      "tui_orchestrator",
+      "tui_orchestrator_localorchestrator",
+      "tui_orchestrator_orchestrationresult",
+      "tui_orchestrator_orchestrationsettings",
+      "tui_orchestrator_rationale_1",
+      "tui_task_coordinator",
+      "tui_task_coordinator_integrationcoordinator",
+      "tui_task_coordinator_integrationcoordinator_init",
+      "tui_task_coordinator_integrationcoordinator_run_when_ready",
+      "tui_task_coordinator_rationale_1",
+      "tui_task_coordinator_rationale_59",
+      "tui_task_coordinator_rationale_87",
+      "tui_task_coordinator_taskcoordinator",
+      "tui_task_coordinator_taskcoordinator_cancel",
+      "tui_task_coordinator_taskcoordinator_get",
+      "tui_task_coordinator_taskcoordinator_handle_event",
+      "tui_task_coordinator_taskcoordinator_init",
+      "tui_task_coordinator_taskcoordinator_notify",
+      "tui_task_coordinator_taskcoordinator_pause",
+      "tui_task_coordinator_taskcoordinator_resume",
+      "tui_task_coordinator_taskcoordinator_run",
+      "tui_task_coordinator_taskcoordinator_set_event_callback",
+      "tui_task_coordinator_taskcoordinator_shutdown",
+      "tui_task_coordinator_taskcoordinator_submit",
+      "tui_task_coordinator_taskcoordinator_tasks",
+      "tui_task_coordinator_taskrecord",
+      "tui_verification_verificationresult"
+    ],
+    "1": [
+      "tests_test_app_fakecoordinator",
+      "tests_test_app_fakecoordinator_cancel",
+      "tests_test_app_fakecoordinator_emit",
+      "tests_test_app_fakecoordinator_finish",
+      "tests_test_app_fakecoordinator_get",
+      "tests_test_app_fakecoordinator_init",
+      "tests_test_app_fakecoordinator_pause",
+      "tests_test_app_fakecoordinator_resume",
+      "tests_test_app_fakecoordinator_set_event_callback",
+      "tests_test_app_fakecoordinator_shutdown",
+      "tests_test_app_fakecoordinator_submit",
+      "tests_test_app_fakecoordinator_tasks",
+      "tests_test_app_tuiapptests",
+      "tests_test_app_tuiapptests_make_app",
+      "tests_test_app_tuiapptests_test_controls_and_launch_directory_are_visible",
+      "tests_test_app_tuiapptests_test_copy_selection_reads_focused_text_area_selection",
+      "tests_test_app_tuiapptests_test_copy_selection_uses_only_highlighted_text",
+      "tests_test_app_tuiapptests_test_cursor_disables_model_and_reasoning_controls",
+      "tests_test_app_tuiapptests_test_empty_prompt_is_rejected",
+      "tests_test_app_tuiapptests_test_multiple_tasks_keep_independent_snapshots_and_transcripts",
+      "tests_test_app_tuiapptests_test_paused_task_exposes_optional_resume_notes",
+      "tests_test_app_tuiapptests_test_plan_mode_is_snapshotted_and_task_controls_are_available",
+      "tests_test_app_tuiapptests_test_prompt_paste_falls_back_to_system_clipboard",
+      "tests_test_app_tuiapptests_test_prompt_supports_modal_vim_modes_and_multiline_insert",
+      "tests_test_app_tuiapptests_test_prompt_yank_mirrors_vim_register_to_system_clipboard",
+      "tests_test_app_tuiapptests_test_shift_v_selects_complete_lines",
+      "tests_test_app_tuiapptests_test_sidebar_switches_active_project_and_keeps_task_coordinators_separate",
+      "tests_test_app_tuiapptests_test_vim_navigation_scrolls_output_and_keeps_prompt_typing_safe",
+      "tests_test_app_tuiapptests_test_vim_paste_inserts_system_clipboard_into_prompt",
+      "tui_app_daedalustuiapp_on_mount",
+      "tui_vim_text_area_daedalusvimtextarea",
+      "tui_vim_text_area_daedalusvimtextarea_edit_paste_after",
+      "tui_vim_text_area_daedalusvimtextarea_edit_paste_before",
+      "tui_vim_text_area_daedalusvimtextarea_enter_insert_mode",
+      "tui_vim_text_area_daedalusvimtextarea_enter_visual_line_mode",
+      "tui_vim_text_area_daedalusvimtextarea_handle_command_mode",
+      "tui_vim_text_area_daedalusvimtextarea_handle_insert_mode",
+      "tui_vim_text_area_daedalusvimtextarea_handle_visual_line_mode",
+      "tui_vim_text_area_daedalusvimtextarea_on_key",
+      "tui_vim_text_area_daedalusvimtextarea_set_visual_line_selection",
+      "tui_vim_text_area_rationale_14",
+      "tui_vim_text_area_rationale_17",
+      "tui_vim_text_area_rationale_21",
+      "tui_vim_text_area_rationale_27",
+      "tui_vim_text_area_rationale_39",
+      "tui_vim_text_area_rationale_47",
+      "tui_vim_text_area_rationale_55",
+      "tui_vim_text_area_rationale_67",
+      "tui_vim_text_area_rationale_74",
+      "tui_vim_text_area_rationale_86",
+      "vimtextarea"
+    ],
+    "2": [
+      "outputcallback",
+      "tests_test_agent_runner",
+      "tests_test_agent_runner_agentrunnertests",
+      "tests_test_agent_runner_agentrunnertests_request",
+      "tests_test_agent_runner_agentrunnertests_test_builds_codex_command_and_maps_reasoning",
+      "tests_test_agent_runner_agentrunnertests_test_builds_exact_cursor_command",
+      "tests_test_agent_runner_agentrunnertests_test_cursor_failure_without_stderr_has_actionable_diagnostics",
+      "tests_test_agent_runner_agentrunnertests_test_emits_only_completed_agent_messages_and_suppresses_stderr",
+      "tests_test_agent_runner_agentrunnertests_test_failed_process_surfaces_stderr_only_in_error",
+      "tests_test_agent_runner_agentrunnertests_test_parses_cursor_json_result_without_streaming_raw_output",
+      "tests_test_agent_runner_agentrunnertests_test_passes_cursor_api_key_to_subprocess",
+      "tests_test_agent_runner_agentrunnertests_test_pause_terminates_active_process_without_emitting_an_error",
+      "tests_test_agent_runner_agentrunnertests_test_reads_cursor_env_file_without_requiring_python_dotenv",
+      "tests_test_agent_runner_agentrunnertests_test_reports_missing_cli",
+      "tests_test_agent_runner_fakeprocess",
+      "tests_test_agent_runner_fakeprocess_init",
+      "tests_test_agent_runner_fakeprocess_wait",
+      "tests_test_agent_runner_fakestream",
+      "tests_test_agent_runner_fakestream_close",
+      "tests_test_agent_runner_fakestream_init",
+      "tests_test_agent_runner_fakestream_readline",
+      "tests_test_agent_runner_interruptibleprocess",
+      "tests_test_agent_runner_interruptibleprocess_init",
+      "tests_test_agent_runner_interruptibleprocess_poll",
+      "tests_test_agent_runner_interruptibleprocess_terminate",
+      "thread",
+      "tui_agent_runner",
+      "tui_agent_runner_agentlogevent",
+      "tui_agent_runner_agentrequest",
+      "tui_agent_runner_agentrunner",
+      "tui_agent_runner_agentrunner_command_for",
+      "tui_agent_runner_agentrunner_failure_diagnostics",
+      "tui_agent_runner_agentrunner_normalize_output",
+      "tui_agent_runner_agentrunner_parse_codex_event",
+      "tui_agent_runner_agentrunner_run",
+      "tui_agent_runner_agentrunner_stream",
+      "tui_agent_runner_agentrunner_stream_stdout",
+      "tui_agent_runner_agentrunner_wait_for_process",
+      "tui_agent_runner_rationale_1",
+      "tui_agent_runner_rationale_85",
+      "tui_environment",
+      "tui_environment_cursor_environment",
+      "tui_environment_rationale_1",
+      "tui_environment_rationale_10",
+      "tui_environment_read_env_file",
+      "tui_init",
+      "tui_init_getattr",
+      "tui_init_rationale_1"
+    ],
+    "3": [
+      "changed",
+      "composeresult",
+      "pressed",
+      "tui_app_daedalustuiapp",
+      "tui_app_daedalustuiapp_action_cancel_task",
+      "tui_app_daedalustuiapp_action_copy_error",
+      "tui_app_daedalustuiapp_action_copy_output",
+      "tui_app_daedalustuiapp_action_copy_selection",
+      "tui_app_daedalustuiapp_action_pause_task",
+      "tui_app_daedalustuiapp_action_resume_task",
+      "tui_app_daedalustuiapp_action_submit_prompt",
+      "tui_app_daedalustuiapp_apply_task_event",
+      "tui_app_daedalustuiapp_cancel_task",
+      "tui_app_daedalustuiapp_compose",
+      "tui_app_daedalustuiapp_coordinator_for",
+      "tui_app_daedalustuiapp_copy_error",
+      "tui_app_daedalustuiapp_copy_output",
+      "tui_app_daedalustuiapp_copy_selection",
+      "tui_app_daedalustuiapp_copy_text",
+      "tui_app_daedalustuiapp_copy_to_clipboard",
+      "tui_app_daedalustuiapp_directory_text",
+      "tui_app_daedalustuiapp_get_selected_text",
+      "tui_app_daedalustuiapp_handle_vim_key",
+      "tui_app_daedalustuiapp_on_button_pressed",
+      "tui_app_daedalustuiapp_on_key",
+      "tui_app_daedalustuiapp_on_select_changed",
+      "tui_app_daedalustuiapp_on_task_event",
+      "tui_app_daedalustuiapp_on_unmount",
+      "tui_app_daedalustuiapp_paste_into_prompt",
+      "tui_app_daedalustuiapp_pause_task",
+      "tui_app_daedalustuiapp_refresh_project_selector",
+      "tui_app_daedalustuiapp_refresh_task_selector",
+      "tui_app_daedalustuiapp_render_selected_task",
+      "tui_app_daedalustuiapp_resume_task",
+      "tui_app_daedalustuiapp_scroll_output",
+      "tui_app_daedalustuiapp_set_error",
+      "tui_app_daedalustuiapp_set_status",
+      "tui_app_daedalustuiapp_submit_prompt",
+      "tui_app_daedalustuiapp_switch_project",
+      "tui_app_rationale_140",
+      "tui_app_rationale_444",
+      "tui_app_rationale_462"
+    ],
+    "4": [
+      "tests_test_app",
+      "tests_test_app_fakerunner",
+      "tests_test_app_fakerunner_init",
+      "tests_test_app_settings",
+      "tests_test_config",
+      "tests_test_config_configtests",
+      "tests_test_config_configtests_test_loads_all_provider_and_orchestration_settings",
+      "tests_test_projects",
+      "tests_test_projects_projectdiscoverytests",
+      "tests_test_projects_projectdiscoverytests_test_finds_root_and_nested_feature_file_projects",
+      "tests_test_projects_projectdiscoverytests_test_returns_no_projects_for_missing_root",
+      "tui_app",
+      "tui_app_daedalustuiapp_init",
+      "tui_app_rationale_1",
+      "tui_clipboard",
+      "tui_clipboard_copy_to_system_clipboard",
+      "tui_clipboard_paste_from_system_clipboard",
+      "tui_clipboard_rationale_1",
+      "tui_clipboard_rationale_37",
+      "tui_config",
+      "tui_config_load_orchestration_settings",
+      "tui_config_load_tui_settings",
+      "tui_config_modeloption",
+      "tui_config_options",
+      "tui_config_rationale_1",
+      "tui_config_tuisettings",
+      "tui_main",
+      "tui_projects",
+      "tui_projects_daedalusproject",
+      "tui_projects_daedalusproject_display_name",
+      "tui_projects_daedalusproject_name",
+      "tui_projects_discover_projects",
+      "tui_projects_rationale_1",
+      "tui_projects_rationale_12",
+      "tui_projects_rationale_41",
+      "tui_vim_text_area",
+      "tui_vim_text_area_rationale_1"
+    ],
+    "5": [
+      "eventcallback",
+      "integrationgate",
+      "tests_test_verification",
+      "tests_test_verification_verificationtests",
+      "tests_test_verification_verificationtests_test_discovers_root_and_nested_test_suites",
+      "tests_test_verification_verificationtests_test_stops_at_first_failed_command",
+      "tui_agent_runner_agentcontrol",
+      "tui_agent_runner_agentcontrol_clear_pause",
+      "tui_agent_runner_agentcontrol_request_cancel",
+      "tui_agent_runner_agentcontrol_request_pause",
+      "tui_agent_runner_agentcontrol_stop_reason",
+      "tui_agent_runner_rationale_47",
+      "tui_orchestrator_agentstopped",
+      "tui_orchestrator_agentstopped_init",
+      "tui_orchestrator_localorchestrator_emit",
+      "tui_orchestrator_localorchestrator_init",
+      "tui_orchestrator_localorchestrator_integrate",
+      "tui_orchestrator_localorchestrator_raise_if_stopped",
+      "tui_orchestrator_localorchestrator_refresh_graphify",
+      "tui_orchestrator_localorchestrator_resolve_integration",
+      "tui_orchestrator_localorchestrator_run",
+      "tui_orchestrator_localorchestrator_run_agent",
+      "tui_orchestrator_localorchestrator_verify_with_repairs",
+      "tui_orchestrator_rationale_306",
+      "tui_verification",
+      "tui_verification_discover_commands",
+      "tui_verification_format_process_result",
+      "tui_verification_package_has_test_script",
+      "tui_verification_rationale_1",
+      "tui_verification_run_verification"
+    ],
+    "6": [
+      "tests_test_git_worktree_gitworktreetests",
+      "tests_test_git_worktree_gitworktreetests_test_cancel_cleanup_force_deletes_unintegrated_branch",
+      "tests_test_git_worktree_gitworktreetests_test_create_uses_primary_sha_and_task_branch",
+      "tests_test_git_worktree_gitworktreetests_test_discard_graphify_changes_restores_and_cleans_only_graph_output",
+      "tests_test_git_worktree_gitworktreetests_test_primary_validation_rejects_dirty_repository",
+      "tests_test_git_worktree_gitworktreetests_test_successful_cleanup_forces_worktree_removal_before_branch_delete",
+      "tui_git_worktree_gitworktreemanager",
+      "tui_git_worktree_gitworktreemanager_capture_primary",
+      "tui_git_worktree_gitworktreemanager_commit_changes",
+      "tui_git_worktree_gitworktreemanager_commit_graphify_changes",
+      "tui_git_worktree_gitworktreemanager_create",
+      "tui_git_worktree_gitworktreemanager_discard_graphify_changes",
+      "tui_git_worktree_gitworktreemanager_format_failure",
+      "tui_git_worktree_gitworktreemanager_git_output",
+      "tui_git_worktree_gitworktreemanager_has_unmerged_paths",
+      "tui_git_worktree_gitworktreemanager_head",
+      "tui_git_worktree_gitworktreemanager_init",
+      "tui_git_worktree_gitworktreemanager_is_clean",
+      "tui_git_worktree_gitworktreemanager_merge_primary_into_task",
+      "tui_git_worktree_gitworktreemanager_promote",
+      "tui_git_worktree_gitworktreemanager_remove_cancelled",
+      "tui_git_worktree_gitworktreemanager_remove_successful",
+      "tui_git_worktree_gitworktreemanager_run_git",
+      "tui_git_worktree_gitworktreemanager_validate_primary",
+      "tui_git_worktree_rationale_112",
+      "tui_git_worktree_rationale_46",
+      "tui_git_worktree_rationale_59",
+      "tui_git_worktree_rationale_89"
+    ],
+    "7": [
+      "tests_test_prompts",
+      "tests_test_prompts_prompttests",
+      "tests_test_prompts_prompttests_test_ask_and_plan_modes_are_read_only",
+      "tests_test_prompts_prompttests_test_repair_and_resolver_prompts_forbid_agent_git_operations",
+      "tests_test_prompts_prompttests_test_resumed_prompt_explains_existing_work_and_omits_empty_notes_section",
+      "tests_test_prompts_prompttests_test_task_prompt_assigns_git_ownership_to_orchestrator",
+      "tui_prompts",
+      "tui_prompts_build_repair_prompt",
+      "tui_prompts_build_resolver_prompt",
+      "tui_prompts_build_task_prompt",
+      "tui_prompts_rationale_1"
+    ],
+    "8": [
+      "tests_test_graphify",
+      "tests_test_graphify_graphifytests",
+      "tests_test_graphify_graphifytests_test_failed_update_returns_diagnostics_without_raising",
+      "tests_test_graphify_graphifytests_test_missing_graphify_is_non_blocking",
+      "tests_test_graphify_graphifytests_test_runs_update_from_primary_repository",
+      "tui_graphify",
+      "tui_graphify_rationale_1",
+      "tui_graphify_rationale_19",
+      "tui_graphify_update_repository"
+    ],
+    "9": [
+      "pkg_daedalus_tui"
+    ],
+    "10": [
+      "tests_init"
+    ],
+    "11": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_app_py_key"
+    ],
+    "12": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_app_py_path"
+    ],
+    "13": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_config_py_path"
+    ],
+    "14": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_environment_py_path"
+    ],
+    "15": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_git_worktree_py_completedprocess"
+    ],
+    "16": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_git_worktree_py_path"
+    ],
+    "17": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_git_worktree_py_runtimeerror"
+    ],
+    "18": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_graphify_py_path"
+    ],
+    "19": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_orchestrator_py_path"
+    ],
+    "20": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_orchestrator_py_runtimeerror"
+    ],
+    "21": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_projects_py_path"
+    ],
+    "22": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_task_coordinator_py_path"
+    ],
+    "23": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_verification_py_completedprocess"
+    ],
+    "24": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_verification_py_path"
+    ],
+    "25": [
+      "users_jameshollingsworth_projects_daedalus_tui_tui_vim_text_area_py_key"
+    ]
+  },
+  "cohesion": {
+    "0": 0.12323232323232323,
+    "1": 0.06980392156862746,
+    "2": 0.0975177304964539,
+    "3": 0.1091753774680604,
+    "4": 0.10810810810810811,
+    "5": 0.12643678160919541,
+    "6": 0.13756613756613756,
+    "7": 0.32727272727272727,
+    "8": 0.3333333333333333,
+    "9": 1.0,
+    "10": 1.0,
+    "11": 1.0,
+    "12": 1.0,
+    "13": 1.0,
+    "14": 1.0,
+    "15": 1.0,
+    "16": 1.0,
+    "17": 1.0,
+    "18": 1.0,
+    "19": 1.0,
+    "20": 1.0,
+    "21": 1.0,
+    "22": 1.0,
+    "23": 1.0,
+    "24": 1.0,
+    "25": 1.0
+  },
+  "gods": [
+    {
+      "id": "tui_app_daedalustuiapp",
+      "label": "DaedalusTuiApp",
+      "degree": 52
+    },
+    {
+      "id": "tui_git_worktree_gitworktreemanager",
+      "label": "GitWorktreeManager",
+      "degree": 41
+    },
+    {
+      "id": "tui_agent_runner_agentrunner",
+      "label": "AgentRunner",
+      "degree": 36
+    },
+    {
+      "id": "tui_git_worktree_worktreecontext",
+      "label": "WorktreeContext",
+      "degree": 34
+    },
+    {
+      "id": "tui_task_coordinator_taskcoordinator",
+      "label": "TaskCoordinator",
+      "degree": 34
+    },
+    {
+      "id": "tui_agent_runner_agentcontrol",
+      "label": "AgentControl",
+      "degree": 32
+    },
+    {
+      "id": "tui_orchestrator_orchestrationsettings",
+      "label": "OrchestrationSettings",
+      "degree": 32
+    },
+    {
+      "id": "tui_orchestrator_localorchestrator",
+      "label": "LocalOrchestrator",
+      "degree": 31
+    },
+    {
+      "id": "tui_task_coordinator_taskrecord",
+      "label": "TaskRecord",
+      "degree": 29
+    },
+    {
+      "id": "tui_vim_text_area_daedalusvimtextarea",
+      "label": "DaedalusVimTextArea",
+      "degree": 26
+    }
+  ],
+  "surprises": [
+    {
+      "source": "FakeStream",
+      "target": "AgentControl",
+      "source_files": [
+        "tests/test_agent_runner.py",
+        "tui/agent_runner.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "FakeProcess",
+      "target": "AgentControl",
+      "source_files": [
+        "tests/test_agent_runner.py",
+        "tui/agent_runner.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "InterruptibleProcess",
+      "target": "AgentControl",
+      "source_files": [
+        "tests/test_agent_runner.py",
+        "tui/agent_runner.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "AgentRunnerTests",
+      "target": "AgentControl",
+      "source_files": [
+        "tests/test_agent_runner.py",
+        "tui/agent_runner.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "FakeRunner",
+      "target": "DaedalusTuiApp",
+      "source_files": [
+        "tests/test_app.py",
+        "tui/app.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `DaedalusTuiApp` connect `DaedalusTuiApp` to `WorktreeContext`, `DaedalusVimTextArea`, `AgentRunner`, `app.py`?",
+      "why": "High betweenness centrality (0.255) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `AgentRunner` connect `AgentRunner` to `WorktreeContext`, `DaedalusTuiApp`, `app.py`, `AgentControl`?",
+      "why": "High betweenness centrality (0.178) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `TaskRecord` connect `WorktreeContext` to `DaedalusVimTextArea`, `AgentRunner`, `DaedalusTuiApp`, `app.py`, `AgentControl`, `GitWorktreeManager`?",
+      "why": "High betweenness centrality (0.139) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 10 inferred relationships involving `DaedalusTuiApp` (e.g. with `FakeCoordinator` and `FakeRunner`) actually correct?",
+      "why": "`DaedalusTuiApp` has 10 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 8 inferred relationships involving `GitWorktreeManager` (e.g. with `GitWorktreeTests` and `AgentStopped`) actually correct?",
+      "why": "`GitWorktreeManager` has 8 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 12 inferred relationships involving `AgentRunner` (e.g. with `AgentRunnerTests` and `FakeProcess`) actually correct?",
+      "why": "`AgentRunner` has 12 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 11 inferred relationships involving `WorktreeContext` (e.g. with `GitWorktreeTests` and `OrchestratorTests`) actually correct?",
+      "why": "`WorktreeContext` has 11 INFERRED edges - model-reasoned connections that need verification."
+    }
+  ]
+}

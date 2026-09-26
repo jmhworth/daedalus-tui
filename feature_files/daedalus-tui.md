@@ -68,6 +68,8 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-09-26: Restored GPT-6 Luna and Sol in the Codex picker and defaulted to GPT-6 Luna after confirming both slugs are live in the local Codex models cache.
+- 2026-09-26: Dropped unsupported GPT-6 Luna/Sol picker entries, defaulted Codex to GPT-5.6 Luna, and surfaced Codex JSONL API errors instead of benign stdin/cache stderr.
 - 2026-09-23: Added GPT-6 Luna and Sol to the Codex model picker and made GPT-6 Luna with high reasoning the default.
 - 2026-09-19: Preserved Cursor's final plan result separately from streamed assistant fragments so structured questions reliably reach selectable plan-review controls.
 - 2026-09-19: Sync to GitHub can recover pull/merge conflicts via plan-mode recovery in an isolated sync worktree, then auto-resolve and push.

@@ -551,22 +551,107 @@ class AgentRunner:
 
     @staticmethod
     def _failure_diagnostics(provider: str, stdout: str, stderr: str) -> str:
+        if provider == "codex":
+            return AgentRunner._codex_failure_diagnostics(stdout, stderr)
         if stderr.strip():
             return stderr.strip()
-        if provider == "cursor":
-            try:
-                payload = json.loads(stdout)
-            except json.JSONDecodeError:
-                payload = None
-            if isinstance(payload, dict):
-                for key in ("error", "message", "result"):
-                    value = payload.get(key)
-                    if isinstance(value, str) and value.strip():
-                        return value.strip()
-            if stdout.strip():
-                return stdout.strip()
-            return (
-                "No diagnostics were emitted. Check Cursor authentication "
-                "(launch-root/package CURSOR_API_KEY or `agent login`)."
-            )
+        try:
+            payload = json.loads(stdout)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            for key in ("error", "message", "result"):
+                value = payload.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        if stdout.strip():
+            return stdout.strip()
+        return (
+            "No diagnostics were emitted. Check Cursor authentication "
+            "(launch-root/package CURSOR_API_KEY or `agent login`)."
+        )
+
+    @staticmethod
+    def _codex_failure_diagnostics(stdout: str, stderr: str) -> str:
+        """Prefer Codex JSONL error events over benign stderr noise."""
+        messages = AgentRunner._codex_error_messages(stdout)
+        stderr_text = AgentRunner._material_codex_stderr(stderr)
+        parts = [part for part in (*messages, stderr_text) if part]
+        if parts:
+            return "\n".join(parts)
         return stdout.strip() or "No diagnostics were emitted."
+
+    @staticmethod
+    def _codex_error_messages(stdout: str) -> list[str]:
+        messages: list[str] = []
+        for payload in AgentRunner._json_payloads(stdout):
+            if payload.get("type") == "error":
+                text = AgentRunner._format_codex_error_message(payload.get("message"))
+                if text:
+                    messages.append(text)
+                continue
+            item = payload.get("item")
+            if (
+                payload.get("type") == "item.completed"
+                and isinstance(item, dict)
+                and item.get("type") == "error"
+            ):
+                text = AgentRunner._format_codex_error_message(item.get("message"))
+                if text:
+                    messages.append(text)
+                continue
+            if payload.get("type") == "turn.failed":
+                error = payload.get("error")
+                if isinstance(error, dict):
+                    text = AgentRunner._format_codex_error_message(error.get("message"))
+                    if text:
+                        messages.append(text)
+        # Preserve order while dropping exact duplicates from paired events.
+        unique: list[str] = []
+        seen: set[str] = set()
+        for message in messages:
+            if message in seen:
+                continue
+            seen.add(message)
+            unique.append(message)
+        return unique
+
+    @staticmethod
+    def _format_codex_error_message(value: object) -> str | None:
+        if not isinstance(value, str) or not value.strip():
+            return None
+        text = value.strip()
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return text
+        if not isinstance(payload, dict):
+            return text
+        error = payload.get("error")
+        if isinstance(error, dict):
+            nested = error.get("message")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+        message = payload.get("message")
+        if isinstance(message, str) and message.strip():
+            return message.strip()
+        return text
+
+    @staticmethod
+    def _material_codex_stderr(stderr: str) -> str | None:
+        lines = [
+            line
+            for line in stderr.splitlines()
+            if line.strip() and not AgentRunner._benign_codex_stderr_line(line)
+        ]
+        text = "\n".join(lines).strip()
+        return text or None
+
+    @staticmethod
+    def _benign_codex_stderr_line(line: str) -> bool:
+        stripped = line.strip()
+        if stripped == "Reading additional input from stdin...":
+            return True
+        # Soft cache parse failures from a newer Codex app writing models_cache.json
+        # that an older CLI cannot deserialize; the real failure is usually on stdout.
+        return "codex_models_manager::cache: failed to load models cache:" in stripped

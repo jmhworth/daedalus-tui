@@ -69,6 +69,7 @@
   "67": "__init__.py",
   "68": "task_coordinator.py",
   "69": "PersonalSupabaseActivationProgressScreen",
+  "70": "configure_debug_logging",
   "71": "_collapse_inner_safe",
   "72": "render_call_graph_tree.py",
   "73": "._on_personal_supabase_activation_progress",
@@ -81,6 +82,7 @@
   "80": ".edit_paste_after",
   "81": ".enter_insert_mode",
   "82": "paste_from_system_clipboard",
+  "83": ".cursor_shape",
   "84": "._handle_visual_line_mode",
   "85": "._focus_submitted_task",
   "86": "._set_status",
@@ -88,12 +90,8 @@
   "88": "Path",
   "89": "PersonalSupabaseSetupWizardScreen",
   "90": "remove_personal_supabase",
-  "91": "ProjectInitializerScreen",
-  "92": ".run",
+  "91": "._finish_personal_supabase_progress",
   "93": ".on_mount",
-  "94": "._apply_responsive_layout",
-  "97": "_TimeoutTracker",
   "98": ".submit_sync_recovery",
-  "101": "._update_plan_state",
-  "102": ".parse_cursor_event"
+  "101": "._update_plan_state"
 }
