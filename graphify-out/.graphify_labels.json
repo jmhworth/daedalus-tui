@@ -98,5 +98,9 @@
   "96": ".on_unmount",
   "97": "RegistrationResult",
   "98": ".submit_sync_recovery",
-  "99": ".nav_word_end"
+  "99": ".nav_word_end",
+  "100": ".finish",
+  "101": ".edit_paste_after",
+  "102": ".edit_paste_before",
+  "103": ".enter_insert_mode"
 }

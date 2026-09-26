@@ -1,16 +1,16 @@
 # Graph Report - daedalus-tui  (2026-09-26)
 
 ## Corpus Check
-- 96 files · ~92,529 words
+- 96 files · ~92,587 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1865 nodes · 5158 edges · 100 communities (83 shown, 17 thin omitted)
+- 1865 nodes · 5158 edges · 104 communities (83 shown, 21 thin omitted)
 - Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 595 edges (avg confidence: 0.54)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `acfdbb03`
+- Built from commit: `914cf0af`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -114,6 +114,9 @@
 - RegistrationResult
 - .submit_sync_recovery
 - .nav_word_end
+- .edit_paste_after
+- .edit_paste_before
+- .enter_insert_mode
 
 ## God Nodes (most connected - your core abstractions)
 1. `DaedalusTuiApp` - 182 edges
@@ -142,7 +145,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (100 total, 17 thin omitted)
+## Communities (104 total, 21 thin omitted)
 
 ### Community 0 - "PlanQuestion"
 Cohesion: 0.14
@@ -412,10 +415,6 @@ Nodes (7): SupabaseMigrationsTests, migrations_pending(), push_migrations(), Pat
 Cohesion: 0.13
 Nodes (10): FakeOrchestrator, Prefer mounted selector values so clarification refreshes keep choices., encode_custom_answer(), is_valid_plan_answer(), Encode free text without confusing it with an agent option id., Validate agent option ids and the software-owned custom answer format., Parse plan JSON from one turn without letting join separators break it., Remove the clean, read-only planning worktree after coding is queued. (+2 more)
 
-### Community 79 - "push_branch"
-Cohesion: 0.14
-Nodes (4): Paste Vim's register, falling back to the system clipboard., Paste before the cursor, including from the system clipboard., Return bar, underline, or block for the current Vim state., Return to Insert mode after programmatic prompt operations.
-
 ### Community 80 - ".edit_paste_after"
 Cohesion: 0.13
 Nodes (19): main(), Child-process probe for project-local Supabase env key presence.  Invoke as ``py, _ensure_profile_guidance(), _first_filled_env_value(), _key_or_aliases_label(), load_personal_supabase_settings(), personal_supabase_environment_settings(), profile_guidance_section() (+11 more)
@@ -475,7 +474,7 @@ Nodes (7): _direct_database_host_project_ref(), preflight_personal_supabase(), P
 ## Knowledge Gaps
 - **117 isolated node(s):** `daedalus-tui`, `Execution Boundaries (CRITICAL)`, `Evidence Extraction`, `Architecture Boundaries`, `Parameter Files` (+112 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -484,7 +483,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.131) - this node is a cross-community bridge._
 - **Why does `AgentRunner` connect `._set_status` to `DaedalusVimTextArea`, `configure_debug_logging`, `debug_log.py`, `load_project_worktree_settings`, `._persist_task`, `.enter_insert_mode`, `paste_from_system_clipboard`, `._handle_visual_line_mode`, `._focus_submitted_task`, `update_repository`, `._shutdown_coordinators`, `Path`, `PlanClarification`, `.__init__`, `CodingStatisticsScreen`?**
   _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Why does `TuiAppTests` connect `bootstrap_personal_supabase` to `DaedalusVimTextArea`, `AgentRunner`, `._handle_visual_line_mode`, `load_project_worktree_settings`, `._render_line_strip`, `paste_from_system_clipboard`, `.cursor_shape`, `._handle_visual_line_mode`, `._set_status`, `PlanClarification`?**
+- **Why does `TuiAppTests` connect `bootstrap_personal_supabase` to `DaedalusVimTextArea`, `AgentRunner`, `.finish`, `._handle_visual_line_mode`, `load_project_worktree_settings`, `._render_line_strip`, `paste_from_system_clipboard`, `.cursor_shape`, `._handle_visual_line_mode`, `._set_status`, `PlanClarification`?**
   _High betweenness centrality (0.056) - this node is a cross-community bridge._
 - **Are the 22 inferred relationships involving `DaedalusTuiApp` (e.g. with `FakeCoordinator` and `FakeRunner`) actually correct?**
   _`DaedalusTuiApp` has 22 INFERRED edges - model-reasoned connections that need verification._

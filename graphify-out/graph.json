@@ -1366,8 +1366,8 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "tests_test_app_fakecoordinator_finish",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 100,
+      "community_name": ".finish",
       "norm_label": ".finish()"
     },
     {
@@ -2433,8 +2433,8 @@
       "source_location": "L2632",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_output_log_supports_textual_selection",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 100,
+      "community_name": ".finish",
       "norm_label": ".test_output_log_supports_textual_selection()"
     },
     {
@@ -2532,8 +2532,8 @@
       "source_location": "L2778",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_multiple_tasks_keep_independent_snapshots_and_transcripts",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 100,
+      "community_name": ".finish",
       "norm_label": ".test_multiple_tasks_keep_independent_snapshots_and_transcripts()"
     },
     {
@@ -2554,8 +2554,8 @@
       "source_location": "L2835",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_background_completion_promotes_an_unselected_task",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 100,
+      "community_name": ".finish",
       "norm_label": ".test_background_completion_promotes_an_unselected_task()"
     },
     {
@@ -5103,7 +5103,7 @@
       "label": ".test_push_failure_captures_diagnostics()",
       "file_type": "code",
       "source_file": "tests/test_supabase_migrations.py",
-      "source_location": "L43",
+      "source_location": "L46",
       "_origin": "ast",
       "id": "tests_test_supabase_migrations_supabasemigrationstests_test_push_failure_captures_diagnostics",
       "community": 77,
@@ -18504,8 +18504,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "tui_vim_text_area_daedalusvimtextarea_enter_insert_mode",
-      "community": 79,
-      "community_name": "push_branch",
+      "community": 103,
+      "community_name": ".enter_insert_mode",
       "norm_label": ".enter_insert_mode()"
     },
     {
@@ -18592,8 +18592,8 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "tui_vim_text_area_daedalusvimtextarea_edit_paste_after",
-      "community": 79,
-      "community_name": "push_branch",
+      "community": 101,
+      "community_name": ".edit_paste_after",
       "norm_label": ".edit_paste_after()"
     },
     {
@@ -18603,8 +18603,8 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "tui_vim_text_area_daedalusvimtextarea_edit_paste_before",
-      "community": 79,
-      "community_name": "push_branch",
+      "community": 102,
+      "community_name": ".edit_paste_before",
       "norm_label": ".edit_paste_before()"
     },
     {
@@ -18702,8 +18702,8 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "tui_vim_text_area_rationale_64",
-      "community": 79,
-      "community_name": "push_branch",
+      "community": 103,
+      "community_name": ".enter_insert_mode",
       "norm_label": "return to insert mode after programmatic prompt operations."
     },
     {
@@ -18757,8 +18757,8 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "tui_vim_text_area_rationale_163",
-      "community": 79,
-      "community_name": "push_branch",
+      "community": 101,
+      "community_name": ".edit_paste_after",
       "norm_label": "paste vim's register, falling back to the system clipboard."
     },
     {
@@ -18768,8 +18768,8 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "tui_vim_text_area_rationale_171",
-      "community": 79,
-      "community_name": "push_branch",
+      "community": 102,
+      "community_name": ".edit_paste_before",
       "norm_label": "paste before the cursor, including from the system clipboard."
     },
     {
@@ -19766,7 +19766,7 @@
       "label": "Relevant Files",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L78",
+      "source_location": "L81",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_relevant_files",
       "community": 66,
@@ -19777,7 +19777,7 @@
       "label": "Dev Mode",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L93",
+      "source_location": "L96",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_dev_mode",
       "community": 66,
@@ -19788,7 +19788,7 @@
       "label": "State Log",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L96",
+      "source_location": "L99",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_state_log",
       "community": 66,
@@ -39703,7 +39703,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "tests/test_supabase_migrations.py",
-      "source_location": "L43",
+      "source_location": "L46",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_supabase_migrations_supabasemigrationstests",
@@ -39775,7 +39775,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_supabase_migrations.py",
-      "source_location": "L45",
+      "source_location": "L48",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tests_test_supabase_migrations_supabasemigrationstests_test_push_failure_captures_diagnostics",
@@ -79549,7 +79549,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L93",
+      "source_location": "L96",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -79571,7 +79571,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L78",
+      "source_location": "L81",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -79582,7 +79582,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L96",
+      "source_location": "L99",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -80218,5 +80218,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "acfdbb0374a87dcaab06c3cdd7223be8f7a516d2"
+  "built_at_commit": "914cf0afbda7be6392e79ecd6b21737d7ff2215c"
 }

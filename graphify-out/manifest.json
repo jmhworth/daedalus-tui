@@ -305,13 +305,13 @@
     "semantic_hash": ""
   },
   "tests/test_supabase_migrations.py": {
-    "mtime": 1787709207.8073556,
-    "ast_hash": "45073faec8e2c4ff926139093d66607e",
+    "mtime": 1790448242.3437166,
+    "ast_hash": "7ebf02c4d02e045ae8429d59858203a8",
     "semantic_hash": ""
   },
   "tui/supabase_migrations.py": {
-    "mtime": 1787709207.8090909,
-    "ast_hash": "9047a82f0a92edca2f406eee0e4ecd40",
+    "mtime": 1790448242.343966,
+    "ast_hash": "bec350e8af11c6f8cc5618b3ec9ffcdb",
     "semantic_hash": ""
   },
   "topic_files/project-imports-to-the-daedalus-format.md": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-personal-supabase.md": {
-    "mtime": 1790447757.8207269,
-    "ast_hash": "b3d482f9b7ea10f4c7f4392c85ddadd1",
+    "mtime": 1790448242.3427718,
+    "ast_hash": "6a46c209126a313b38c7f12970ea0b05",
     "semantic_hash": ""
   },
   "tests/test_environment.py": {
