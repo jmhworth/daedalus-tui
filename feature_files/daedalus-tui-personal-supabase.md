@@ -18,7 +18,8 @@ wizard; Daedalus never copies credentials between project `.env` files.
   `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` (Supabase's new API key
   names). Legacy `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` and
   `SUPABASE_PRIVATE_KEY` (secret alias) still resolve. `SUPABASE_PROJECT_REF` is
-  optional when the URL is `https://<ref>.supabase.co`.
+  optional when the URL is `https://<ref>.supabase.co`; Daedalus derives the ref
+  and supplies temporary Supabase CLI link state for migration pushes.
 - **Database access is separate from API keys**: Activate / `db push` still need
   one of `SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`; publishable/secret keys
   cannot apply SQL migrations.
@@ -77,6 +78,11 @@ wizard; Daedalus never copies credentials between project `.env` files.
 - **CLI launch path**: Migration pushes invoke the absolute Supabase CLI path
   resolved from the Daedalus process PATH. The project credential overlay may
   omit PATH and must not make an available CLI unlaunchable.
+- **Temporary CLI link state**: `supabase db push` reads the linked project ref
+  from `supabase/.temp/project-ref`; setting `project_id` in `config.toml` alone
+  does not link the CLI. Activate supplies that file only while pushing and
+  restores any prior value afterward, so operators do not need to run
+  `supabase link` in every project.
 
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
@@ -97,6 +103,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Fixed Activate pushes failing with “Cannot find project ref” by temporarily supplying the derived ref in the Supabase CLI link-state file and restoring it after the push.
 - 2026-09-26: Fixed Activate migration pushes to launch the PATH-resolved Supabase CLI path when the project credential overlay omits PATH.
 - 2026-09-26: Aligned the DNS preflight regression fixture with a canonical direct Supabase database host so its IPv6 pooler guidance assertion tests the intended case.
 - 2026-09-26: DNS failures for canonical direct database URLs now recommend the Dashboard Session pooler connection string for IPv4-only networks.

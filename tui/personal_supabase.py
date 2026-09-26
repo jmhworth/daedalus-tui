@@ -704,7 +704,7 @@ def _validate_supabase_scaffold(
 
 @contextmanager
 def temporary_supabase_cli_config(project_root: Path, project_ref: str) -> Iterator[None]:
-    """Expose a real project ref to the CLI without persisting it in tracked config."""
+    """Expose a real project ref to the CLI without permanently linking the project."""
     root = project_root.expanduser().resolve()
     config_path = root / "supabase" / "config.toml"
     if not config_path.is_file() or not project_ref.strip():
@@ -722,18 +722,36 @@ def temporary_supabase_cli_config(project_root: Path, project_ref: str) -> Itera
     if current.strip() and current.strip() not in {placeholder, project_ref.strip()}:
         raise ValueError("supabase/config.toml project ref conflicts with project environment.")
     if current.strip() == project_ref.strip():
-        yield
-        return
-    replacement = f'project_id = "{project_ref.strip()}"'
-    if re.search(r"(?m)^\s*project_id\s*=.*$", original):
-        prepared = re.sub(r"(?m)^\s*project_id\s*=.*$", replacement, original, count=1)
+        prepared = original
     else:
-        prepared = replacement + "\n\n" + original
+        replacement = f'project_id = "{project_ref.strip()}"'
+        if re.search(r"(?m)^\s*project_id\s*=.*$", original):
+            prepared = re.sub(r"(?m)^\s*project_id\s*=.*$", replacement, original, count=1)
+        else:
+            prepared = replacement + "\n\n" + original
+
+    # `db push` resolves its target from the link state file created by
+    # `supabase link`; project_id in config.toml alone is not sufficient.
+    linked_ref_path = root / "supabase" / ".temp" / "project-ref"
+    linked_ref_existed = linked_ref_path.exists()
+    original_linked_ref = linked_ref_path.read_bytes() if linked_ref_existed else None
     try:
-        config_path.write_text(prepared, encoding="utf-8")
+        if prepared != original:
+            config_path.write_text(prepared, encoding="utf-8")
+        linked_ref_path.parent.mkdir(parents=True, exist_ok=True)
+        linked_ref_path.write_text(project_ref.strip(), encoding="utf-8")
         yield
     finally:
-        config_path.write_text(original, encoding="utf-8")
+        if prepared != original:
+            config_path.write_text(original, encoding="utf-8")
+        if original_linked_ref is None:
+            linked_ref_path.unlink(missing_ok=True)
+            try:
+                linked_ref_path.parent.rmdir()
+            except OSError:
+                pass
+        else:
+            linked_ref_path.write_bytes(original_linked_ref)
 
 
 def is_personal_supabase_registered(project_root: Path, schema: str | None = None) -> bool:
