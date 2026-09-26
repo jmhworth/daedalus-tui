@@ -94,6 +94,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Aligned the DNS preflight regression fixture with a canonical direct Supabase database host so its IPv6 pooler guidance assertion tests the intended case.
 - 2026-09-26: DNS failures for canonical direct database URLs now recommend the Dashboard Session pooler connection string for IPv4-only networks.
 - 2026-09-26: Activation now catches canonical direct database URL project-ref mismatches and gives a targeted DNS resolution explanation, including that CLI login cannot fix DNS.
 - 2026-09-16: Activation now tolerates the operator-managed project `.env` during its narrow scaffold Git gate without staging it, and the UI test follows the project-local activation call signature.

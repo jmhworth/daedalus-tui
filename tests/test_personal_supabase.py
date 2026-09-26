@@ -488,6 +488,13 @@ class PersonalSupabaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             launch = Path(tmp)
             self._write_project_env(launch, token=False)
+            env_path = launch / ".env"
+            env_path.write_text(
+                env_path.read_text(encoding="utf-8").replace(
+                    "example.test", "db.shared-ref.supabase.co"
+                ),
+                encoding="utf-8",
+            )
 
             with patch(
                 "tui.personal_supabase.socket.create_connection",
