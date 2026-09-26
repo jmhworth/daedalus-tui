@@ -58,6 +58,8 @@ wizard; Daedalus never copies credentials between project `.env` files.
   bounded non-destructive access-method-aware reachability probe before push.
   For canonical direct database hosts, activation checks the host project ref
   against `SUPABASE_URL` and gives a DNS-specific correction when resolution fails.
+  That correction explains that direct endpoints are IPv6 by default and recommends
+  the dashboard Session pooler connection string for networks that cannot use IPv6.
 - **Deliberate linking**: Confirmation warns about scaffold + Activate prerequisites;
   the Activate action stays disabled until the exact project name is entered.
 - **Agent teaching**: Idempotently appends a Personal Supabase Schema section to
@@ -92,6 +94,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: DNS failures for canonical direct database URLs now recommend the Dashboard Session pooler connection string for IPv4-only networks.
 - 2026-09-26: Activation now catches canonical direct database URL project-ref mismatches and gives a targeted DNS resolution explanation, including that CLI login cannot fix DNS.
 - 2026-09-16: Activation now tolerates the operator-managed project `.env` during its narrow scaffold Git gate without staging it, and the UI test follows the project-local activation call signature.
 - 2026-09-16: Wizard Continue now probes the active project's `.env` via a child-process exit code (never loads secrets in the TUI), shows the absolute path being checked, and no longer depends on the launch-root `.env`.

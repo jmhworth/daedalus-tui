@@ -43,6 +43,7 @@ wizard_cancel_label = "Cancel"
 activate_commit_message = "Add personal Supabase schema scaffold."
 activate_status_commit_message = "Mark personal Supabase schema activated."
 preflight_timeout_seconds = 15
+direct_database_dns_hint = "The direct db.* endpoint is IPv6 by default; if this machine or network cannot use it, open Supabase Dashboard > Connect, choose Session pooler, and replace SUPABASE_DB_URL with that full connection string (port 5432)."
 activation_progress_title = "Personal Supabase activation"
 activation_progress_subtitle = "The local scaffold, Git, connectivity, and migration steps will appear here."
 activation_progress_stages = [

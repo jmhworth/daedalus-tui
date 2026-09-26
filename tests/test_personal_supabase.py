@@ -501,6 +501,9 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertFalse(result.succeeded)
             self.assertIn("DNS could not resolve database host", result.message)
             self.assertIn("project's Connect settings", result.message)
+            self.assertIn("direct db.* endpoint is IPv6 by default", result.message)
+            self.assertIn("choose Session pooler", result.message)
+            self.assertIn("SUPABASE_DB_URL", result.message)
             self.assertIn("CLI login does not affect DNS", result.message)
 
     def test_activate_success_pushes_once_and_marks_activated(self):

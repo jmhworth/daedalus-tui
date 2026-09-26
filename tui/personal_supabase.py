@@ -1061,6 +1061,7 @@ def preflight_personal_supabase(
         project_ref=project_ref,
         find_executable=find_executable,
         run_process=run_process,
+        direct_dns_hint=str(settings.get("direct_database_dns_hint", "")),
     )
     if not probe.succeeded:
         return PreflightResult(False, probe.message, method="db_url")
@@ -1440,6 +1441,7 @@ def _probe_database_url(
     project_ref: str,
     find_executable,
     run_process,
+    direct_dns_hint: str = "",
 ) -> PreflightResult:
     parsed = urlparse(db_url)
     host = parsed.hostname
@@ -1477,12 +1479,17 @@ def _probe_database_url(
         with socket.create_connection((host, port), timeout=timeout):
             pass
     except socket.gaierror as error:
+        direct_hint = (
+            f" {direct_dns_hint.format(host=host, port=port, project_ref=project_ref)}"
+            if direct_dns_hint and direct_host_ref
+            else ""
+        )
         return PreflightResult(
             False,
             f"DNS could not resolve database host {host}:{port} ({error}). "
             "Check SUPABASE_DB_URL against the project's Connect settings; if the host "
-            "matches, check this machine's DNS/network. Supabase CLI login does not "
-            "affect DNS resolution.",
+            "matches, check this machine's DNS/network."
+            f"{direct_hint} Supabase CLI login does not affect DNS resolution.",
         )
     except OSError as error:
         return PreflightResult(False, f"Could not reach database host {host}:{port} ({error}).")
