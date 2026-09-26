@@ -21,8 +21,11 @@ wizard; Daedalus never copies credentials between project `.env` files.
   optional when the URL is `https://<ref>.supabase.co`; Daedalus derives the ref
   and supplies temporary Supabase CLI link state for migration pushes.
 - **Database access is separate from API keys**: Activate / `db push` still need
-  one of `SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`; publishable/secret keys
-  cannot apply SQL migrations.
+  one of `SUPABASE_DB_URL`, `SUPABASE_DB_URL_IPV4`, `SUPABASE_DB_URL_IPV6`, or
+  `SUPABASE_ACCESS_TOKEN`; publishable/secret keys cannot apply SQL migrations.
+  Optional family-specific URLs are probed in IPv4, IPv6, then default order;
+  Activate pushes with the first reachable URL. The IPv4 URL should use the
+  Supabase Session pooler. `SUPABASE_URL` remains the separate PostgREST/API URL.
 - **Phase 1 — Scaffold**: Writes durable project files only (`supabase/` config +
   `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
@@ -55,7 +58,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
   redacted error class—no credentials). Launch validates all registered projects;
   launch `db push` runs only for activated projects when `supabase_db_push_enabled`.
 - **Supabase connected**: Project-local required API settings + one DB access method
-  (`SUPABASE_DB_URL` or `SUPABASE_ACCESS_TOKEN`), `supabase` on PATH, and a
+  (`SUPABASE_DB_URL`, either family-specific URL, or `SUPABASE_ACCESS_TOKEN`), `supabase` on PATH, and a
   bounded non-destructive access-method-aware reachability probe before push.
   For canonical direct database hosts, activation checks the host project ref
   against `SUPABASE_URL` and gives a DNS-specific correction when resolution fails.
@@ -83,6 +86,10 @@ wizard; Daedalus never copies credentials between project `.env` files.
   does not link the CLI. Activate supplies that file only while pushing and
   restores any prior value afterward, so operators do not need to run
   `supabase link` in every project.
+- **Network-family-aware migration URL**: When project `.env` provides separate
+  IPv4 and IPv6 Postgres URLs, preflight probes them and activation passes the
+  reachable URL with `supabase db push --db-url`. This avoids letting the CLI
+  silently select an unreachable IPv6 direct endpoint on IPv4-only networks.
 
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
@@ -103,6 +110,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Added optional IPv4/IPv6 Postgres URLs and use the first reachable endpoint explicitly for migration pushes, keeping the PostgREST API URL independent.
 - 2026-09-26: Fixed Activate pushes failing with “Cannot find project ref” by temporarily supplying the derived ref in the Supabase CLI link-state file and restoring it after the push.
 - 2026-09-26: Fixed Activate migration pushes to launch the PATH-resolved Supabase CLI path when the project credential overlay omits PATH.
 - 2026-09-26: Aligned the DNS preflight regression fixture with a canonical direct Supabase database host so its IPv6 pooler guidance assertion tests the intended case.

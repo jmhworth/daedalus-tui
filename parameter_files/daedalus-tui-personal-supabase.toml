@@ -11,14 +11,18 @@ env_secret_key = "SUPABASE_SECRET_KEY"
 env_publishable_key_aliases = ["SUPABASE_ANON_KEY"]
 env_secret_key_aliases = ["SUPABASE_PRIVATE_KEY", "SUPABASE_SERVICE_ROLE_KEY"]
 env_db_url_key = "SUPABASE_DB_URL"
+env_db_url_ipv4_key = "SUPABASE_DB_URL_IPV4"
+env_db_url_ipv6_key = "SUPABASE_DB_URL_IPV6"
 env_access_token_key = "SUPABASE_ACCESS_TOKEN"
-# Keys operators must set in the active project's ignored .env (preferred names; aliases still resolve).
+# Documented keys for the active project's ignored .env (database URL variants are optional alternatives).
 canonical_env_keys = [
   "SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SECRET_KEY",
   "SUPABASE_PROJECT_REF",
   "SUPABASE_DB_URL",
+  "SUPABASE_DB_URL_IPV4",
+  "SUPABASE_DB_URL_IPV6",
   "SUPABASE_ACCESS_TOKEN",
 ]
 # Conceptually required after alias resolution (project ref may be derived from URL).
@@ -36,7 +40,7 @@ confirmation_name_prompt = "Type this project name exactly to confirm:"
 confirmation_button_label = "Activate"
 wizard_title = "Personal Supabase setup"
 wizard_scaffold_done = "Scaffold files are in place for schema {schema}."
-wizard_env_instructions = "Next, edit this exact project .env file and set:\n\n  {env_path}\n\n  SUPABASE_URL=...\n  SUPABASE_PUBLISHABLE_KEY=...\n  SUPABASE_SECRET_KEY=...\n  SUPABASE_DB_URL=...   # or SUPABASE_ACCESS_TOKEN=...\n\nProject ref is optional when the URL is https://<ref>.supabase.co.\nDaedalus never writes these values into tracked files, .env.example, or another project.\nContinue re-checks this project file in a separate process and only looks at the exit code.\n\nWhen the values are saved, continue."
+wizard_env_instructions = "Next, edit this exact project .env file and set:\n\n  {env_path}\n\n  SUPABASE_URL=...\n  SUPABASE_PUBLISHABLE_KEY=...\n  SUPABASE_SECRET_KEY=...\n  SUPABASE_DB_URL=...   # default database connection\n  SUPABASE_DB_URL_IPV4=...   # optional IPv4 Session pooler connection\n  SUPABASE_DB_URL_IPV6=...   # optional IPv6 direct connection\n  # or SUPABASE_ACCESS_TOKEN=...\n\nSet at least one database URL or access token. When multiple URLs are set, Activate probes IPv4, then IPv6, then the default URL, and passes the reachable URL to the migration push. Copy URLs from Supabase Dashboard > Connect. Project ref is optional when SUPABASE_URL is https://<ref>.supabase.co.\nDaedalus never writes these values into tracked files, .env.example, or another project.\nContinue re-checks this project file in a separate process and only looks at the exit code.\n\nWhen the values are saved, continue."
 wizard_env_missing = "Environment variables still not detected."
 wizard_continue_label = "Continue"
 wizard_cancel_label = "Cancel"

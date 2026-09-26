@@ -96,6 +96,7 @@ class PreflightResult:
     succeeded: bool
     message: str = ""
     method: str = ""
+    database_url: str | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
@@ -135,6 +136,8 @@ def personal_supabase_managed_env_keys(settings: dict | None = None) -> set[str]
         str(values["env_publishable_key"]),
         str(values["env_secret_key"]),
         str(values["env_db_url_key"]),
+        str(values["env_db_url_ipv4_key"]),
+        str(values["env_db_url_ipv6_key"]),
         str(values["env_access_token_key"]),
         *(str(key) for key in values.get("env_publishable_key_aliases", [])),
         *(str(key) for key in values.get("env_secret_key_aliases", [])),
@@ -194,6 +197,8 @@ def resolve_personal_supabase_environment(
     secret_key = str(config["env_secret_key"])
     project_ref_key = str(config["env_project_ref_key"])
     db_url_key = str(config["env_db_url_key"])
+    db_url_ipv4_key = str(config["env_db_url_ipv4_key"])
+    db_url_ipv6_key = str(config["env_db_url_ipv6_key"])
     access_token_key = str(config["env_access_token_key"])
 
     url = values.get(url_key, "").strip()
@@ -227,11 +232,13 @@ def resolve_personal_supabase_environment(
         return None, "Project environment has a malformed Supabase project ref."
 
     db_url = values.get(db_url_key, "").strip()
+    db_url_ipv4 = values.get(db_url_ipv4_key, "").strip()
+    db_url_ipv6 = values.get(db_url_ipv6_key, "").strip()
     access_token = values.get(access_token_key, "").strip()
-    if require_database_access and not db_url and not access_token:
+    if require_database_access and not any((db_url, db_url_ipv4, db_url_ipv6, access_token)):
         return None, (
             "Project environment must define one database access setting: "
-            f"{db_url_key} or {access_token_key}. "
+            f"{db_url_key}, {db_url_ipv4_key}, {db_url_ipv6_key}, or {access_token_key}. "
             "API keys alone cannot run migration pushes."
         )
 
@@ -243,6 +250,10 @@ def resolve_personal_supabase_environment(
     }
     if db_url:
         overlay[db_url_key] = db_url
+    if db_url_ipv4:
+        overlay[db_url_ipv4_key] = db_url_ipv4
+    if db_url_ipv6:
+        overlay[db_url_ipv6_key] = db_url_ipv6
     if access_token:
         overlay[access_token_key] = access_token
     return overlay, None
@@ -1041,12 +1052,16 @@ def preflight_personal_supabase(
         return PreflightResult(False, resolve_error or "Project environment could not be resolved.")
     project_ref = resolved[str(settings["env_project_ref_key"])]
     access_token = resolved.get(str(settings["env_access_token_key"]), "").strip()
-    db_url = resolved.get(str(settings["env_db_url_key"]), "").strip()
+    database_urls = [
+        resolved.get(str(settings[key]), "").strip()
+        for key in ("env_db_url_ipv4_key", "env_db_url_ipv6_key", "env_db_url_key")
+        if resolved.get(str(settings[key]), "").strip()
+    ]
     if find_executable(executable) is None:
         return PreflightResult(False, f"{executable} is not available on PATH.")
 
     env = {**os.environ, **values, **resolved}
-    if access_token:
+    if access_token and not database_urls:
         try:
             process = run_process(
                 [executable, "projects", "list"],
@@ -1073,17 +1088,26 @@ def preflight_personal_supabase(
             )
         return PreflightResult(True, "Supabase access-token preflight succeeded.", method="access_token")
 
-    probe = _probe_database_url(
-        db_url,
-        timeout,
-        project_ref=project_ref,
-        find_executable=find_executable,
-        run_process=run_process,
-        direct_dns_hint=str(settings.get("direct_database_dns_hint", "")),
-    )
-    if not probe.succeeded:
-        return PreflightResult(False, probe.message, method="db_url")
-    return PreflightResult(True, probe.message or "Supabase DB URL preflight succeeded.", method="db_url")
+    probe_errors: list[str] = []
+    for db_url in database_urls:
+        probe = _probe_database_url(
+            db_url,
+            timeout,
+            project_ref=project_ref,
+            find_executable=find_executable,
+            run_process=run_process,
+            direct_dns_hint=str(settings.get("direct_database_dns_hint", "")),
+        )
+        if probe.succeeded:
+            return PreflightResult(
+                True,
+                probe.message or "Supabase DB URL preflight succeeded.",
+                method="db_url",
+                database_url=db_url,
+            )
+        probe_errors.append(probe.message)
+    message = "\n".join(error for error in probe_errors if error)
+    return PreflightResult(False, message or "Supabase DB URL preflight failed.", method="db_url")
 
 
 def activate_personal_supabase(
@@ -1259,7 +1283,10 @@ def activate_personal_supabase(
     report_progress("Pushing migrations")
     try:
         with temporary_supabase_cli_config(root, project_ref):
-            pushed = push_migrations(root, executable=executable, env=environment)
+            push_options = {"executable": executable, "env": environment}
+            if preflight.database_url:
+                push_options["database_url"] = preflight.database_url
+            pushed = push_migrations(root, **push_options)
     except ValueError as error:
         message = str(error)
         _write_registration_marker(
@@ -1352,8 +1379,11 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "`[personal_supabase]` marker in `.daedalus`).\n"
         "- This project's ignored `.env` is the canonical source for "
         "`SUPABASE_URL`, publishable/secret API keys (legacy anon/service_role aliases "
-        "still work), and one database access setting (`SUPABASE_DB_URL` or "
-        "`SUPABASE_ACCESS_TOKEN`); the project ref is optional when the URL is "
+        "still work), and one database access setting (`SUPABASE_DB_URL`, "
+        "`SUPABASE_DB_URL_IPV4`, `SUPABASE_DB_URL_IPV6`, or `SUPABASE_ACCESS_TOKEN`). "
+        "When multiple database URLs are set, Activate probes the IPv4 URL, then IPv6, "
+        "then the default URL and passes the reachable URL to migration push. "
+        "`SUPABASE_URL` remains the independent PostgREST/API endpoint. Project ref is optional when the URL is "
         "`https://<ref>.supabase.co`. Operators set those values manually; Daedalus "
         "never writes credentials into project `.env` files.\n"
         f"- Qualify SQL, migrations, RLS policies, and client/API configuration for `{schema}`.\n"
@@ -1678,6 +1708,8 @@ def _shared_env_example_block(settings: dict, keys: list[str] | None = None) -> 
     ]
     database_keys = {
         str(settings["env_db_url_key"]),
+        str(settings["env_db_url_ipv4_key"]),
+        str(settings["env_db_url_ipv6_key"]),
         str(settings["env_access_token_key"]),
     }
     project_ref_key = str(settings["env_project_ref_key"])
@@ -1688,6 +1720,10 @@ def _shared_env_example_block(settings: dict, keys: list[str] | None = None) -> 
             lines.append(
                 "# Database access for Activate / migration push (set at least one in this project's `.env`):"
             )
+        if key == str(settings["env_db_url_ipv4_key"]):
+            lines.append("# Optional IPv4 connection; use the Supabase Session pooler URL.")
+        elif key == str(settings["env_db_url_ipv6_key"]):
+            lines.append("# Optional IPv6 connection; use the Supabase direct connection URL.")
         lines.append(f"{key}=")
     return "\n".join(lines) + "\n"
 
