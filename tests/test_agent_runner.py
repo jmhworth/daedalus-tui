@@ -324,6 +324,75 @@ class AgentRunnerTests(unittest.TestCase):
         self.assertIn("internet connection", result.error)
         self.assertTrue(process.terminated)
 
+    @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/codex")
+    @patch("tui.agent_runner.subprocess.Popen")
+    def test_codex_failure_prefers_json_errors_over_benign_stderr(self, popen, _which):
+        events = [
+            {"type": "thread.started"},
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "error",
+                    "message": "Model metadata for `gpt-6-luna` not found.",
+                },
+            },
+            {
+                "type": "error",
+                "message": json.dumps(
+                    {
+                        "type": "error",
+                        "status": 400,
+                        "error": {
+                            "type": "invalid_request_error",
+                            "message": (
+                                "The 'gpt-6-luna' model is not supported when "
+                                "using Codex with a ChatGPT account."
+                            ),
+                        },
+                    }
+                ),
+            },
+            {
+                "type": "turn.failed",
+                "error": {
+                    "message": json.dumps(
+                        {
+                            "type": "error",
+                            "status": 400,
+                            "error": {
+                                "type": "invalid_request_error",
+                                "message": (
+                                    "The 'gpt-6-luna' model is not supported when "
+                                    "using Codex with a ChatGPT account."
+                                ),
+                            },
+                        }
+                    )
+                },
+            },
+        ]
+        popen.return_value = FakeProcess(
+            [*(json.dumps(event) + "\n" for event in events)],
+            [
+                "Reading additional input from stdin...\n",
+                "2026-09-26T17:56:55.125615Z ERROR codex_models_manager::cache: "
+                "failed to load models cache: missing field `base_instructions` "
+                "at line 133 column 5\n",
+            ],
+            returncode=1,
+        )
+
+        result = AgentRunner().run(self.request(model="gpt-6-luna"), lambda *_: None)
+
+        self.assertFalse(result.succeeded)
+        self.assertIn("Model metadata for `gpt-6-luna` not found.", result.error)
+        self.assertIn(
+            "The 'gpt-6-luna' model is not supported when using Codex with a ChatGPT account.",
+            result.error,
+        )
+        self.assertNotIn("Reading additional input from stdin", result.error)
+        self.assertNotIn("base_instructions", result.error)
+
     def test_reads_cursor_env_file_without_requiring_python_dotenv(self):
         with unittest.mock.patch("tui.environment.Path.is_file", return_value=True), unittest.mock.patch(
             "tui.environment.Path.read_text", return_value="export CURSOR_API_KEY='secret-value'\n"
