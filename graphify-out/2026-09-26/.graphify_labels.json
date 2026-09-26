@@ -102,5 +102,6 @@
   "100": ".finish",
   "101": ".edit_paste_after",
   "102": ".edit_paste_before",
-  "103": ".enter_insert_mode"
+  "103": ".enter_insert_mode",
+  "104": "RegistrationResult"
 }
