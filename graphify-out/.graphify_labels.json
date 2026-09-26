@@ -90,8 +90,8 @@
   "88": "Path",
   "89": "PersonalSupabaseSetupWizardScreen",
   "90": "remove_personal_supabase",
+  "91": "._finish_personal_supabase_progress",
   "93": ".on_mount",
-  "94": "._apply_responsive_layout",
   "98": ".submit_sync_recovery",
   "101": "._update_plan_state"
 }

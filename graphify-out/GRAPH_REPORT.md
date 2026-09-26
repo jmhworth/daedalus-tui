@@ -1,16 +1,16 @@
 # Graph Report - daedalus-tui  (2026-09-26)
 
 ## Corpus Check
-- 96 files · ~92,098 words
+- 96 files · ~92,130 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1861 nodes · 5147 edges · 95 communities (77 shown, 18 thin omitted)
+- 1861 nodes · 5147 edges · 95 communities (78 shown, 17 thin omitted)
 - Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 595 edges (avg confidence: 0.54)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `41237804`
+- Built from commit: `2b61d1c6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -105,8 +105,8 @@
 - Path
 - PersonalSupabaseSetupWizardScreen
 - remove_personal_supabase
+- ._finish_personal_supabase_progress
 - .on_mount
-- ._apply_responsive_layout
 - .submit_sync_recovery
 - ._update_plan_state
 
@@ -137,19 +137,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (95 total, 18 thin omitted)
+## Communities (95 total, 17 thin omitted)
 
 ### Community 0 - "PlanQuestion"
 Cohesion: 0.14
 Nodes (32): CandidateFeatureGroup, A deterministic connected component of qualifying similarity relations., Return the stable identifier using the concise ``id`` spelling., score_band(), SimilarityResult, _canonical_tree_name(), _feature_ids_by_member(), _histogram_bars() (+24 more)
 
 ### Community 1 - "DaedalusVimTextArea"
-Cohesion: 0.05
-Nodes (26): Exception, DaedalusTuiApp, Key, Remove known credential values before diagnostics reach the UI or log., Synchronize registered projects; push migrations only when activated., Add Vim-like navigation without changing TextArea insert behavior., Run the wide-layout measurement after the next screen refresh., Persist Textual failures that would otherwise only flash on screen. (+18 more)
+Cohesion: 0.04
+Nodes (33): DaedalusTuiApp, Key, Remove known credential values before diagnostics reach the UI or log., Synchronize registered projects; push migrations only when activated., Add Vim-like navigation without changing TextArea insert behavior., Run the wide-layout measurement after the next screen refresh., Run a command after the command menu has been removed., Confirm, then scaffold (if needed) and Activate personal Supabase. (+25 more)
 
 ### Community 2 - "AgentRunner"
 Cohesion: 0.07
-Nodes (26): Mount, FakeCoordinator, FakeRunner, settings(), PersonalSupabaseActivationProgressScreen, PersonalSupabaseSetupWizardScreen, PlanAnswerSelect, Display a topic markdown file without allowing edits. (+18 more)
+Nodes (30): Mount, FakeCoordinator, FakeRunner, settings(), CommandMenuScreen, KeyboardShortcutsScreen, PersonalSupabaseActivationProgressScreen, PersonalSupabaseSetupWizardScreen (+22 more)
 
 ### Community 3 - "DaedalusTuiApp"
 Cohesion: 0.06
@@ -292,12 +292,12 @@ Cohesion: 0.15
 Nodes (32): activate_personal_supabase(), _allow_list_comment(), bootstrap_personal_supabase(), _commit_paths(), commit_personal_supabase_scaffold(), _ensure_env_example(), _ensure_supabase_scaffold(), _env_example_block() (+24 more)
 
 ### Community 42 - "debug_log.py"
-Cohesion: 0.18
-Nodes (6): Log, Return only direct-child projects, or the empty-root fallback., Selectable transcript rendering with semantic assistant-message emphasis., A selectable log that can emphasize a task's final assistant message.      ``Log, Return the tone assigned to each rendered transcript line., TranscriptLog
+Cohesion: 0.11
+Nodes (9): Log, Path, Memory override for the project, else the parameter-file default., Update the project's coordinator so later submits use ``branch``., Return only direct-child projects, or the empty-root fallback., Selectable transcript rendering with semantic assistant-message emphasis., A selectable log that can emphasize a task's final assistant message.      ``Log, Return the tone assigned to each rendered transcript line. (+1 more)
 
 ### Community 44 - "CandidateFeatureGroup"
-Cohesion: 0.07
-Nodes (17): Path, Resize, Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com, Measure wide controls after their current layout pass completes., Apply provider-specific model and reasoning choices to all controls., Avoid posting Select.Changed events when the options are unchanged., Return labels and values for one compact settings category. (+9 more)
+Cohesion: 0.18
+Nodes (6): Resize, Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com, Measure wide controls after their current layout pass completes., Switch to compact mode when wide controls extend past their bars., Return whether wide-layout controls are clipped or too narrow.
 
 ### Community 45 - "KeyboardShortcutsScreen"
 Cohesion: 0.20
@@ -316,7 +316,7 @@ Cohesion: 0.12
 Nodes (3): TaskCoordinatorTests, Submit independent prompts while sharing a serialized integration gate., TaskCoordinator
 
 ### Community 49 - "._render_line_strip"
-Cohesion: 0.17
+Cohesion: 0.20
 Nodes (5): Text, _literal_select_options(), Build Select prompts that Rich will not parse as markup., Finish Select setup without allowing a stale value to exit the TUI.          Pla, Replace question controls after Textual has completed child removal.
 
 ### Community 50 - "environment.py"
@@ -348,8 +348,8 @@ Cohesion: 0.09
 Nodes (28): Agent plan text must not be parsed as Textual/Rich markup., Follow-up questions must not crash when old option ids linger on widgets., Deferred Select init must not fatal-exit on a leftover option id., Clearing questions after confirmation must keep the TUI alive., Resolve a Select value that is legal for the current question options., build_implementation_prompt(), build_plan_clarification_prompt(), build_plan_followup_prompt() (+20 more)
 
 ### Community 59 - "PlanClarification"
-Cohesion: 0.05
-Nodes (36): Binding, ComposeResult, Select, CodingStatisticsScreen, CommandMenuScreen, CompactSettingsSelect, CreateTopicScreen, _format_codex_usage() (+28 more)
+Cohesion: 0.07
+Nodes (24): Binding, Select, CodingStatisticsScreen, CompactSettingsSelect, _format_codex_usage(), _format_codex_window(), _format_count(), _format_tokens() (+16 more)
 
 ### Community 60 - "trading.py"
 Cohesion: 0.32
@@ -376,8 +376,8 @@ Cohesion: 0.19
 Nodes (11): _ensure_profile_guidance(), is_personal_supabase_activated(), is_personal_supabase_registered(), load_personal_supabase_status(), PersonalSupabaseStatus, profile_guidance_section(), Return the markdown section appended to coding/architecture profiles., Registration / activation marker loaded from a target project's ``.daedalus``. (+3 more)
 
 ### Community 69 - "PersonalSupabaseActivationProgressScreen"
-Cohesion: 0.25
-Nodes (6): Use Textual's OSC 52 path and a native clipboard fallback., copy_to_system_clipboard(), paste_from_system_clipboard(), System clipboard helpers for terminals without OSC 52 support., Read clipboard text using the native command available on the host., The Daedalus prompt's incremental Vim editing adapter.
+Cohesion: 0.14
+Nodes (7): Return a TextArea selection or the active screen selection., Use Textual's OSC 52 path and a native clipboard fallback., copy_to_system_clipboard(), paste_from_system_clipboard(), System clipboard helpers for terminals without OSC 52 support., Read clipboard text using the native command available on the host., The Daedalus prompt's incremental Vim editing adapter.
 
 ### Community 70 - "configure_debug_logging"
 Cohesion: 0.33
@@ -416,8 +416,8 @@ Cohesion: 0.12
 Nodes (12): _nonnegative_int(), _phase_for_status(), Path, Parse plan JSON from one turn without letting join separators break it., Rehydrate this project's persisted tasks after a TUI restart., Recover review questions from the last persisted plan response., Run an ask-mode clarification that does not mutate plan conversation state., Construct an orchestrator with the project environment when configured. (+4 more)
 
 ### Community 84 - "._handle_visual_line_mode"
-Cohesion: 0.08
-Nodes (7): Changed, Pressed, Submitted, PersonalSupabaseConfirmationScreen, PersonalSupabaseRemovalConfirmationScreen, Require an explicit confirmation before scaffolding/Activating a shared schema., Require an exact project-name confirmation before local cleanup.
+Cohesion: 0.05
+Nodes (11): Changed, ComposeResult, Pressed, Submitted, CreateTopicScreen, PersonalSupabaseConfirmationScreen, PersonalSupabaseRemovalConfirmationScreen, Confirm, then remove local personal-Supabase artifacts for the project. (+3 more)
 
 ### Community 85 - "._focus_submitted_task"
 Cohesion: 0.10
@@ -431,9 +431,13 @@ Nodes (13): Remove values loaded for a subprocess from a user-facing diagnostic.
 Cohesion: 0.14
 Nodes (18): personal_supabase_managed_env_keys(), Return every env key this feature may clean up (preferred + aliases)., Remove local personal-Supabase artifacts without touching remote state.      The, Remove only the personal-Supabase table from a project marker., Remove one already-resolved file, symlink, or directory., Remove the generated shared-Supabase block from ``.env.example``., Remove synchronized Supabase assignments while preserving other env values., Return env text without the configured Supabase assignments. (+10 more)
 
+### Community 91 - "._finish_personal_supabase_progress"
+Cohesion: 0.25
+Nodes (4): Finish a queued modal update only if its screen is still mounted., Apply worker results that arrived while this modal was mounting., Freeze the progress display and allow the operator to close it., Render a completion state after all modal widgets are mounted.
+
 ### Community 93 - ".on_mount"
-Cohesion: 0.12
-Nodes (10): Pause active agents before ThreadPoolExecutor joins its workers.      CPython ex, Stop agents before an explicit Textual exit begins., Cover terminal and event-loop exits that bypass Textual unmount., Run before ThreadPoolExecutor's internal interpreter-exit join., Clean up if Textual's run loop returns without its unmount hook., Idempotently detach task callbacks and request child-process shutdown., _register_app_for_thread_exit(), _shutdown_apps_before_thread_join() (+2 more)
+Cohesion: 0.10
+Nodes (12): Exception, Pause active agents before ThreadPoolExecutor joins its workers.      CPython ex, Stop agents before an explicit Textual exit begins., Persist Textual failures that would otherwise only flash on screen., Cover terminal and event-loop exits that bypass Textual unmount., Run before ThreadPoolExecutor's internal interpreter-exit join., Clean up if Textual's run loop returns without its unmount hook., Idempotently detach task callbacks and request child-process shutdown. (+4 more)
 
 ### Community 98 - ".submit_sync_recovery"
 Cohesion: 0.29
@@ -446,16 +450,16 @@ Nodes (8): PlanTests, Cursor may include prose and omit redundant false confirma
 ## Knowledge Gaps
 - **117 isolated node(s):** `daedalus-tui`, `Execution Boundaries (CRITICAL)`, `Evidence Extraction`, `Architecture Boundaries`, `Parameter Files` (+112 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `AgentRunner`, `PersonalSupabaseActivationProgressScreen`, `._on_personal_supabase_activation_progress`, `debug_log.py`, `bootstrap_personal_supabase`, `CandidateFeatureGroup`, `._persist_task`, `._render_line_strip`, `CodingStatisticsScreen`, `._focus_submitted_task`, `calculate_token_usage`, `._set_status`, `PlanClarification`, `.on_mount`, `._apply_responsive_layout`, `DescriptorEmbedder`?**
+- **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `AgentRunner`, `PersonalSupabaseActivationProgressScreen`, `._on_personal_supabase_activation_progress`, `debug_log.py`, `._finish_personal_supabase_progress`, `bootstrap_personal_supabase`, `CandidateFeatureGroup`, `._persist_task`, `._render_line_strip`, `CodingStatisticsScreen`, `._handle_visual_line_mode`, `._focus_submitted_task`, `._set_status`, `PlanClarification`, `.on_mount`, `calculate_token_usage`, `DescriptorEmbedder`?**
   _High betweenness centrality (0.136) - this node is a cross-community bridge._
-- **Why does `AgentRunner` connect `._set_status` to `DaedalusVimTextArea`, `AgentRunner`, `._set_status`, `CandidateFeatureGroup`, `._persist_task`, `CodingStatisticsScreen`, `._handle_visual_line_mode`, `._shutdown_coordinators`, `update_repository`, `._focus_submitted_task`, `PlanClarification`, `CodingStatisticsScreen`?**
+- **Why does `AgentRunner` connect `._set_status` to `DaedalusVimTextArea`, `AgentRunner`, `._set_status`, `debug_log.py`, `._persist_task`, `CodingStatisticsScreen`, `._handle_visual_line_mode`, `._shutdown_coordinators`, `update_repository`, `._focus_submitted_task`, `PlanClarification`, `CodingStatisticsScreen`?**
   _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Why does `TaskCoordinator` connect `._persist_task` to `DaedalusVimTextArea`, `AgentRunner`, `Key`, `._shutdown_coordinators`, `._set_status`, `.provider_split`, `CodingStatisticsScreen`, `calculate_token_usage`, `._set_status`, `CandidateFeatureGroup`, `update_repository`, `DescriptorEmbedder`, `PlanClarification`, `CodingStatisticsScreen`, `._on_personal_supabase_activation_progress`, `load_project_worktree_settings`, `.enter_insert_mode`, `paste_from_system_clipboard`, `._handle_visual_line_mode`, `.submit_sync_recovery`?**
+- **Why does `TaskCoordinator` connect `._persist_task` to `DaedalusVimTextArea`, `AgentRunner`, `Key`, `._shutdown_coordinators`, `._set_status`, `.provider_split`, `CodingStatisticsScreen`, `calculate_token_usage`, `._set_status`, `debug_log.py`, `update_repository`, `DescriptorEmbedder`, `PlanClarification`, `CodingStatisticsScreen`, `._on_personal_supabase_activation_progress`, `load_project_worktree_settings`, `.enter_insert_mode`, `paste_from_system_clipboard`, `._handle_visual_line_mode`, `.submit_sync_recovery`?**
   _High betweenness centrality (0.056) - this node is a cross-community bridge._
 - **Are the 22 inferred relationships involving `DaedalusTuiApp` (e.g. with `FakeCoordinator` and `FakeRunner`) actually correct?**
   _`DaedalusTuiApp` has 22 INFERRED edges - model-reasoned connections that need verification._
