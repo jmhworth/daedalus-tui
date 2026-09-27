@@ -23,7 +23,8 @@ from .personal_supabase import load_personal_supabase_settings, resolve_personal
 def main() -> int:
     require_database_access = os.environ.get("DAEDALUS_ENV_PROBE_REQUIRE_DB", "1") != "0"
     settings = load_personal_supabase_settings()
-    values = read_env_file(Path(__file__).resolve().parents[1] / ".env")
+    tui_root = Path(os.environ.get("DAEDALUS_TUI_ROOT", Path(__file__).resolve().parents[1]))
+    values = read_env_file(tui_root / ".env")
     _resolved, error = resolve_personal_supabase_environment(
         values,
         settings,

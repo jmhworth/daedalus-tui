@@ -29,6 +29,14 @@ from tui.supabase_migrations import PushResult
 
 
 class PersonalSupabaseTests(unittest.TestCase):
+    def setUp(self):
+        self._tui_root_temp = tempfile.TemporaryDirectory()
+        self.tui_root = Path(self._tui_root_temp.name)
+        root_patch = patch("tui.personal_supabase.TUI_ROOT", self.tui_root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+        self.addCleanup(self._tui_root_temp.cleanup)
+
     def _seed_project(self, root: Path, name: str = "example-project") -> Path:
         project = root / name
         (project / ".agents" / "profiles").mkdir(parents=True)
@@ -78,7 +86,9 @@ class PersonalSupabaseTests(unittest.TestCase):
             lines.append("SUPABASE_ACCESS_TOKEN=access-token")
         else:
             lines.append("SUPABASE_DB_URL=postgres://user:password@example.test:5432/db")
-        (project / ".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        contents = "\n".join(lines) + "\n"
+        (project / ".env").write_text(contents, encoding="utf-8")
+        (self.tui_root / ".env").write_text(contents, encoding="utf-8")
 
     def test_schema_matches_validated_project_slug(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -236,7 +246,13 @@ class PersonalSupabaseTests(unittest.TestCase):
             root = Path(tmp)
             launch = root / "launch"
             project = self._seed_project(launch, "demo-app")
-            self._write_project_env(launch)
+            (launch / ".env").write_text(
+                "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                "SUPABASE_SECRET_KEY=secret-key\n"
+                "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
+                encoding="utf-8",
+            )
             missing_ok, missing_error = probe_project_personal_supabase_environment(project)
             self.assertFalse(missing_ok)
             self.assertIsNotNone(missing_error)
@@ -264,6 +280,12 @@ class PersonalSupabaseTests(unittest.TestCase):
                 "SUPABASE_SECRET_KEY=secret-key\n",
                 encoding="utf-8",
             )
+            (self.tui_root / ".env").write_text(
+                "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                "SUPABASE_SECRET_KEY=secret-key\n",
+                encoding="utf-8",
+            )
 
             result = bootstrap_personal_supabase(project)
 
@@ -279,6 +301,12 @@ class PersonalSupabaseTests(unittest.TestCase):
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
             (project / ".env").write_text(
+                "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                "SUPABASE_SECRET_KEY=secret-key\n",
+                encoding="utf-8",
+            )
+            (self.tui_root / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
                 "SUPABASE_SECRET_KEY=secret-key\n",
@@ -313,6 +341,13 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(result.environment["SUPABASE_SECRET_KEY"], "service-key")
 
             (project / ".env").write_text(
+                "SUPABASE_URL=https://shared-ref.supabase.co\n"
+                "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
+                "SUPABASE_PRIVATE_KEY=private-key\n"
+                "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
+                encoding="utf-8",
+            )
+            (self.tui_root / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
                 "SUPABASE_PRIVATE_KEY=private-key\n"
@@ -516,7 +551,7 @@ class PersonalSupabaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             launch = Path(tmp)
             self._write_project_env(launch, token=False)
-            env_path = launch / ".env"
+            env_path = self.tui_root / ".env"
             env_path.write_text(
                 env_path.read_text(encoding="utf-8").replace(
                     "example.test", "db.other-ref.supabase.co"
@@ -539,7 +574,7 @@ class PersonalSupabaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             launch = Path(tmp)
             self._write_project_env(launch, token=False)
-            env_path = launch / ".env"
+            env_path = self.tui_root / ".env"
             env_path.write_text(
                 env_path.read_text(encoding="utf-8").replace(
                     "example.test", "db.shared-ref.supabase.co"

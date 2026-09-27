@@ -424,9 +424,13 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     "#continue-personal-supabase-wizard-button",
                     Button,
                 )
-                self.assertIn(str((project / ".env").resolve()), str(instructions.render()))
-                continue_button.press()
-                await pilot.pause()
+                self.assertIn(str((TUI_ROOT / ".env").resolve()), str(instructions.render()))
+                with patch(
+                    "tui.app.probe_project_personal_supabase_environment",
+                    return_value=(False, "Daedalus TUI .env is missing SUPABASE_URL."),
+                ):
+                    continue_button.press()
+                    await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
                 self.assertEqual(outcomes, [])
                 self.assertIn(
@@ -434,7 +438,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     str(status.render()),
                 )
                 self.assertIn("SUPABASE_URL", str(status.render()))
-                self.assertIn(str((project / ".env").resolve()), str(status.render()))
+                self.assertIn(str((TUI_ROOT / ".env").resolve()), str(status.render()))
 
                 (project / ".env").write_text(
                     "SUPABASE_URL=https://shared-ref.supabase.co\n"

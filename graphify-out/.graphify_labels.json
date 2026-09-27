@@ -84,11 +84,12 @@
   "82": "paste_from_system_clipboard",
   "83": ".cursor_shape",
   "84": "RegistrationResult",
+  "85": "._focus_submitted_task",
+  "86": "CandidateFeatureGroup",
   "87": ".cursor_shape",
   "88": ".edit_paste_after",
   "89": "PersonalSupabaseSetupWizardScreen",
   "90": "remove_personal_supabase",
   "91": "._finish_personal_supabase_progress",
-  "93": ".on_mount",
-  "99": ".edit_paste_after"
+  "93": ".on_mount"
 }

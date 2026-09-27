@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "tests/test_app.py": {
-    "mtime": 1790478000.0648797,
-    "ast_hash": "3109b9a3907e84dc447ec2e2d8ac789f",
+    "mtime": 1790533138.7780077,
+    "ast_hash": "6ddd6d03ae67869234957a04822ce056",
     "semantic_hash": ""
   },
   "tests/test_config.py": {
@@ -305,13 +305,13 @@
     "semantic_hash": ""
   },
   "tests/test_supabase_migrations.py": {
-    "mtime": 1790530335.3827507,
-    "ast_hash": "b82ae49c8e2b02ad56e6398c8fe35f9f",
+    "mtime": 1790532961.9896274,
+    "ast_hash": "9db7b198b7b737eae396cda76d660243",
     "semantic_hash": ""
   },
   "tui/supabase_migrations.py": {
-    "mtime": 1790530279.8219135,
-    "ast_hash": "8ef1f9b19df4dd0885edf8065f7ade00",
+    "mtime": 1790532961.933398,
+    "ast_hash": "80ca14eae9006e78663df6075e25afd1",
     "semantic_hash": ""
   },
   "topic_files/project-imports-to-the-daedalus-format.md": {
@@ -440,18 +440,18 @@
     "semantic_hash": ""
   },
   "tests/test_personal_supabase.py": {
-    "mtime": 1790530373.197354,
-    "ast_hash": "75f78473e55b20cf5aace6e592f5a624",
+    "mtime": 1790533104.644335,
+    "ast_hash": "5b6ad32a2346fb7892d9a02208e9c6f6",
     "semantic_hash": ""
   },
   "tui/personal_supabase.py": {
-    "mtime": 1790531635.1742601,
-    "ast_hash": "db9cd8112cfacdf4b1b8a2a82e1ec9cc",
+    "mtime": 1790532985.639093,
+    "ast_hash": "9032e643ffc900fcfd3413edabc20156",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-personal-supabase.md": {
-    "mtime": 1790531607.9986413,
-    "ast_hash": "b807795407ed3d07e0fa97fd53240636",
+    "mtime": 1790533075.459244,
+    "ast_hash": "e34060efb50f72f31607cb3bd05c235f",
     "semantic_hash": ""
   },
   "tests/test_environment.py": {
@@ -465,8 +465,8 @@
     "semantic_hash": ""
   },
   "tui/env_presence_probe.py": {
-    "mtime": 1790531550.54056,
-    "ast_hash": "525a659956fa0b12c356d2afec86a859",
+    "mtime": 1790532985.6928613,
+    "ast_hash": "c0111b92475eb457b5e14ae1ae30bd11",
     "semantic_hash": ""
   },
   "tests/test_codex_usage.py": {

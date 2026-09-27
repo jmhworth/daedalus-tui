@@ -19,8 +19,8 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
   names). Legacy `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` and
   `SUPABASE_PRIVATE_KEY` (secret alias) still resolve. `SUPABASE_PROJECT_REF` is
   optional when the URL is `https://<ref>.supabase.co`; Daedalus derives the ref
-  and runs `supabase link --project-ref <ref>` before a token-authenticated
-  migration push. The temporary link state is restored after the push.
+  and runs `supabase link --project-ref <ref>` before each migration push. The
+  temporary link state is restored after the push.
 - **Database access is separate from API keys**: Activate / `db push` still need
   one of `SUPABASE_DB_URL`, `SUPABASE_DB_URL_IPV4`, `SUPABASE_DB_URL_IPV6`, or
   `SUPABASE_ACCESS_TOKEN`; publishable/secret keys cannot apply SQL migrations.
@@ -138,7 +138,7 @@ HACKING
 
 ## State Log
 - 2026-09-27: Routed personal-Supabase environment resolution through the TUI root `.env` and documented the CLI link step before migration pushes.
-- 2026-09-27: Replaced synthetic Supabase CLI project-ref state with an actual `supabase link --project-ref` before TUI-root migration pushes, and added focused link/push routing coverage.
+- 2026-09-27: Routed registered task pushes through the canonical project registration and TUI-root `.env`; link the Supabase CLI project even when pushing with an explicit database URL.
 - 2026-09-26: Activate now commits the matching legacy project Supabase config and schema-creation migration while continuing to block unrelated Supabase changes.
 - 2026-09-26: Fixed personal migration filename validation for underscored schemas and aligned launch bootstrap coverage with TUI-root CLI execution.
 - 2026-09-26: Removed a stray undefined-mock assertion from the migration conflict synchronization test.

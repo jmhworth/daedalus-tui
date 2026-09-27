@@ -538,6 +538,7 @@ def probe_project_personal_supabase_environment(
     env = {
         **os.environ,
         "DAEDALUS_ENV_PROBE_REQUIRE_DB": "1" if require_database_access else "0",
+        "DAEDALUS_TUI_ROOT": str(TUI_ROOT),
     }
     # cwd is the project root (not the package), so keep the TUI importable.
     existing_pythonpath = env.get("PYTHONPATH", "").strip()

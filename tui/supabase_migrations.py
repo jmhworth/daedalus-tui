@@ -119,7 +119,7 @@ def push_migrations(
     if resolved_executable is None:
         return PushResult(False, f"{executable} is not available on PATH.")
     try:
-        if project_ref and not database_url:
+        if project_ref:
             link = subprocess.run(
                 [resolved_executable, "link", "--project-ref", project_ref],
                 cwd=directory,
