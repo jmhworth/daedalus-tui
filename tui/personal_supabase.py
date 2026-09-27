@@ -14,11 +14,17 @@ import socket
 import subprocess
 import sys
 import tomllib
+from datetime import datetime
 from collections.abc import Callable, Iterator
 
 from .environment import read_env_file, redact_environment_values
 from .project_config import DAEDALUS_CONFIG_FILENAME
-from .supabase_migrations import push_migrations
+from .supabase_migrations import (
+    ROOT_MIGRATION_LOCK,
+    TUI_ROOT,
+    push_migrations,
+    synchronize_personal_migrations,
+)
 
 TUI_ROOT = Path(__file__).resolve().parents[1]
 PARAMETER_PATH = TUI_ROOT / "parameter_files" / "daedalus-tui-personal-supabase.toml"
@@ -288,8 +294,7 @@ def personal_supabase_scaffold_relative_paths(
     """Return repository-relative paths owned by personal-Supabase scaffolding."""
     values = settings or load_personal_supabase_settings()
     return (
-        "supabase/config.toml",
-        f"supabase/migrations/{values['migration_filename']}",
+        str(values["migration_directory"]),
         ".env.example",
         str(PROFILE_RELATIVE_PATHS[0]),
         str(PROFILE_RELATIVE_PATHS[1]),
@@ -320,13 +325,13 @@ def remove_personal_supabase(project_root: Path) -> PersonalSupabaseRemovalResul
         if changed:
             removed.append(str(path.relative_to(root)))
 
-    supabase = root / "supabase"
-    if supabase.is_symlink():
-        record(supabase, lambda: _remove_path(supabase))
-    elif supabase.is_dir():
-        record(supabase, lambda: _remove_path(supabase))
-    elif supabase.exists():
-        failures.append("supabase: expected a directory, so it was left untouched")
+    migrations = root / str(settings["migration_directory"])
+    if migrations.is_symlink():
+        record(migrations, lambda: _remove_path(migrations))
+    elif migrations.is_dir():
+        record(migrations, lambda: _remove_path(migrations))
+    elif migrations.exists():
+        failures.append(f"{settings['migration_directory']}: expected a directory, so it was left untouched")
 
     marker = root / DAEDALUS_CONFIG_FILENAME
     record(marker, lambda: _remove_personal_supabase_marker(marker))
@@ -648,34 +653,18 @@ def _validate_supabase_scaffold(
     settings: dict,
     project_ref: str = "",
 ) -> str | None:
-    supabase = root / "supabase"
-    migrations = supabase / "migrations"
-    config_path = supabase / "config.toml"
-    migration_path = migrations / str(settings["migration_filename"])
-    if not supabase.is_dir() or not config_path.is_file() or not migrations.is_dir():
-        return "Personal Supabase scaffold is incomplete; expected supabase/config.toml and supabase/migrations/."
-    if not migration_path.is_file():
-        return f"Personal Supabase scaffold is missing {migration_path.relative_to(root)}."
+    migration_directory = root / str(settings["migration_directory"])
+    if not migration_directory.is_dir():
+        return f"Personal Supabase scaffold is incomplete; expected {settings['migration_directory']}/."
+    migration_paths = sorted(migration_directory.glob("*.sql"))
+    if not migration_paths:
+        return f"Personal Supabase scaffold is missing SQL migrations in {settings['migration_directory']}/."
     try:
-        migration_text = migration_path.read_text(encoding="utf-8")
-        config_values = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        schema_created = any(_migration_creates_schema(path.read_text(encoding="utf-8"), schema) for path in migration_paths)
+    except (OSError, UnicodeError) as error:
         return f"Personal Supabase scaffold could not be read: {error}"
-    if not _migration_creates_schema(migration_text, schema):
-        return f"{migration_path.relative_to(root)} does not create registered schema {schema!r}."
-    project_id = config_values.get("project_id")
-    if project_id is not None and not isinstance(project_id, str):
-        return "supabase/config.toml project_id must be a string."
-    if (
-        project_ref.strip()
-        and isinstance(project_id, str)
-        and project_id.strip()
-        and project_id.strip() not in {
-            str(settings["config_project_id_placeholder"]),
-            project_ref.strip(),
-        }
-    ):
-        return "supabase/config.toml project ref conflicts with project environment."
+    if not schema_created:
+        return f"{settings['migration_directory']}/ does not create registered schema {schema!r}."
     heading = str(settings["profile_section_heading"])
     for relative in PROFILE_RELATIVE_PATHS:
         path = root / relative
@@ -696,23 +685,22 @@ def _validate_supabase_scaffold(
 
 @contextmanager
 def temporary_supabase_cli_config(project_root: Path, project_ref: str) -> Iterator[None]:
-    """Expose a real project ref to the CLI without permanently linking the project."""
-    root = project_root.expanduser().resolve()
+    """Expose the target project's ref through the TUI-root CLI configuration."""
+    root = TUI_ROOT
     config_path = root / "supabase" / "config.toml"
-    if not config_path.is_file() or not project_ref.strip():
+    if not project_ref.strip():
         yield
         return
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_existed = config_path.exists()
     settings = load_personal_supabase_settings()
-    placeholder = str(settings["config_project_id_placeholder"])
     if not re.fullmatch(r"[A-Za-z0-9_-]+", project_ref.strip()):
         raise ValueError("Project environment has a malformed Supabase project ref.")
-    original = config_path.read_text(encoding="utf-8")
+    original = config_path.read_text(encoding="utf-8") if config_existed else ""
     values = tomllib.loads(original)
     current = values.get("project_id", "")
     if not isinstance(current, str):
         raise ValueError("supabase/config.toml project_id must be a string.")
-    if current.strip() and current.strip() not in {placeholder, project_ref.strip()}:
-        raise ValueError("supabase/config.toml project ref conflicts with project environment.")
     if current.strip() == project_ref.strip():
         prepared = original
     else:
@@ -728,13 +716,13 @@ def temporary_supabase_cli_config(project_root: Path, project_ref: str) -> Itera
     linked_ref_existed = linked_ref_path.exists()
     original_linked_ref = linked_ref_path.read_bytes() if linked_ref_existed else None
     try:
-        if prepared != original:
+        if not config_existed or prepared != original:
             config_path.write_text(prepared, encoding="utf-8")
         linked_ref_path.parent.mkdir(parents=True, exist_ok=True)
         linked_ref_path.write_text(project_ref.strip(), encoding="utf-8")
         yield
     finally:
-        if prepared != original:
+        if config_existed and prepared != original:
             config_path.write_text(original, encoding="utf-8")
         if original_linked_ref is None:
             linked_ref_path.unlink(missing_ok=True)
@@ -744,6 +732,8 @@ def temporary_supabase_cli_config(project_root: Path, project_ref: str) -> Itera
                 pass
         else:
             linked_ref_path.write_bytes(original_linked_ref)
+        if not config_existed:
+            config_path.unlink(missing_ok=True)
 
 
 def is_personal_supabase_registered(project_root: Path, schema: str | None = None) -> bool:
@@ -1154,7 +1144,7 @@ def activate_personal_supabase(
 
     scaffolded = False
     if not status.registered:
-        report_progress("Scaffolding project files")
+        report_progress("Scaffolding project migration files")
         registration = register_personal_supabase(root, schema=schema_name)
         if registration.status != "success":
             return ActivationResult("failed", schema_name, registration.message, root)
@@ -1266,13 +1256,23 @@ def activate_personal_supabase(
 
     environment = prepared.environment or {}
     project_ref = (prepared.project_ref or "").strip()
-    report_progress("Pushing local migrations to the blank schema")
+    report_progress("Synchronize and apply migrations from the Daedalus TUI root")
     try:
-        with temporary_supabase_cli_config(root, project_ref):
-            push_options = {"executable": executable, "env": environment}
-            if preflight.database_url:
-                push_options["database_url"] = preflight.database_url
-            pushed = push_migrations(root, **push_options)
+        with ROOT_MIGRATION_LOCK:
+            synced = synchronize_personal_migrations(root)
+            if not synced.succeeded:
+                raise ValueError(synced.output)
+            if synced.conflicts:
+                filename, root_sql, project_sql = synced.conflicts[0]
+                raise ValueError(
+                    f"Migration filename conflict for {filename}; the TUI root migration is authoritative. "
+                    f"Root SQL:\n{root_sql}\nProject SQL:\n{project_sql}"
+                )
+            with temporary_supabase_cli_config(root, project_ref):
+                push_options = {"executable": executable, "env": environment}
+                if preflight.database_url:
+                    push_options["database_url"] = preflight.database_url
+                pushed = push_migrations(TUI_ROOT, **push_options)
     except ValueError as error:
         message = str(error)
         _write_registration_marker(
@@ -1378,12 +1378,14 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         f"default `db.schema` to `{schema}`. Do not silently fall back to `public`.\n"
         "- Never assume PostgREST or Supabase clients default to `public` for this app.\n"
         "- Auth is shared across apps on this Supabase project; reuse the existing auth setup.\n"
-        "- Agents must not run `supabase db push`; orchestration owns remote migration apply "
-        "after verification when `supabase/migrations/` changes, and Activate owns the first apply.\n"
+        f"- Put migration SQL only in `{values['migration_directory']}/`, named "
+        "`<YYYYMMDDHHMM>_<schema>_<description>.sql`. Daedalus copies these files to "
+        "the TUI migration directory and applies them after verification. Do not create "
+        "project-local `supabase/` files or run `supabase db push`; Activate owns the initial apply.\n"
         "- File scaffolding alone is not ecosystem-ready; the operator must Activate via Daedalus "
         "(from the Ctrl+K Command Menu) so the software layer commits the scaffold and pushes migrations.\n"
-        f"- The generated `supabase/config.toml` exposes `{schema}` for the local Supabase "
-        "CLI stack. This local setting does not change the hosted project's PostgREST "
+        "- Supabase CLI configuration and migration execution are owned by the Daedalus TUI root. "
+        "This does not change the hosted project's PostgREST "
         "configuration. After Activate applies the schema, add it to Supabase Dashboard "
         "Project Settings > Data API > Exposed schemas, preserving the existing entries.\n"
         f"- If a hosted request fails with `PGRST106` / `Invalid schema: {schema}`, PostgREST "
@@ -1560,31 +1562,22 @@ def _direct_database_host_project_ref(host: str) -> str | None:
 
 
 def _supabase_layout_conflict(root: Path, schema: str, settings: dict) -> str | None:
-    supabase = root / "supabase"
-    if not supabase.exists():
+    migrations = root / str(settings["migration_directory"])
+    if not migrations.exists():
         return None
-    if not supabase.is_dir():
-        return "A file named supabase exists; refusing to scaffold a directory."
-
-    migrations = supabase / "migrations"
-    if migrations.exists() and not migrations.is_dir():
-        return "supabase/migrations exists but is not a directory."
-
-    expected_name = str(settings["migration_filename"])
+    if not migrations.is_dir():
+        return f"A file named {settings['migration_directory']} exists; refusing to scaffold a directory."
     if migrations.is_dir():
         foreign = []
         for path in sorted(migrations.glob("*.sql")):
             text = path.read_text(encoding="utf-8")
             owns_schema = _migration_creates_schema(text, schema)
-            if path.name == expected_name and owns_schema:
-                continue
-            if owns_schema and path.name != expected_name:
-                # Alternate filename still claiming this schema is acceptable.
+            if owns_schema:
                 continue
             foreign.append(path.name)
         if foreign:
             return (
-                "Existing supabase/migrations content is incompatible with personal "
+                f"Existing {settings['migration_directory']} content is incompatible with personal "
                 f"schema registration ({', '.join(foreign)})."
             )
     return None
@@ -1599,27 +1592,24 @@ def _migration_creates_schema(text: str, schema: str) -> bool:
 
 
 def _ensure_supabase_scaffold(root: Path, schema: str, settings: dict) -> None:
-    supabase = root / "supabase"
-    migrations = supabase / "migrations"
+    migrations = root / str(settings["migration_directory"])
     migrations.mkdir(parents=True, exist_ok=True)
-
-    config_path = supabase / "config.toml"
-    if not config_path.exists():
-        placeholder = str(settings["config_project_id_placeholder"])
-        config_path.write_text(
-            (
-                "# Scaffolded by Daedalus personal Supabase registration.\n"
-                "# Daedalus supplies the project ref temporarily at Activate/push "
-                "(from SUPABASE_PROJECT_REF or derived from SUPABASE_URL).\n"
-                "# Phase 1 writes files only; Activate / orchestration owns `supabase db push`.\n"
-                f'project_id = "{placeholder}"\n'
-            ),
-            encoding="utf-8",
-        )
-    _ensure_local_api_schema(config_path, schema, settings)
-
-    migration_path = migrations / str(settings["migration_filename"])
-    if not migration_path.exists():
+    existing_schema_migration = any(
+        _migration_creates_schema(path.read_text(encoding="utf-8"), schema)
+        for path in migrations.glob("*.sql")
+    )
+    if not existing_schema_migration:
+        timestamp = datetime.now().strftime("%Y%m%d%H%M")
+        migration_filename = str(settings["migration_filename_pattern"])
+        for marker, value in (
+            ("<YYYYMMDDHHMM>", timestamp),
+            ("<schema>", schema),
+            ("<description>", str(settings["initial_migration_description"])),
+        ):
+            migration_filename = migration_filename.replace(marker, value)
+        migration_path = migrations / migration_filename
+        if migration_path.exists():
+            raise ValueError(f"Initial migration already exists: {migration_filename}.")
         migration_path.write_text(
             (
                 f"-- Personal shared Supabase schema for this Daedalus project.\n"
@@ -1635,55 +1625,6 @@ def _ensure_supabase_scaffold(root: Path, schema: str, settings: dict) -> None:
             ),
             encoding="utf-8",
         )
-    elif not _migration_creates_schema(migration_path.read_text(encoding="utf-8"), schema):
-        raise ValueError(
-            f"{migration_path.name} exists but does not create schema {schema!r}."
-        )
-
-
-def _ensure_local_api_schema(config_path: Path, schema: str, settings: dict) -> None:
-    """Expose the project schema in local CLI config while preserving other entries."""
-    text = config_path.read_text(encoding="utf-8")
-    api_section = re.search(r"(?ms)^\[api\]\s*$.*?(?=^\[|\Z)", text)
-    if api_section is None:
-        api_text = "[api]\n"
-        start = end = len(text)
-    else:
-        api_text = api_section.group(0)
-        start, end = api_section.span()
-
-    changed = False
-    for key, defaults in (
-        ("schemas", settings["api_base_schemas"]),
-        ("extra_search_path", settings["api_base_extra_search_path"]),
-    ):
-        assignment = re.search(rf"(?ms)^{re.escape(key)}\s*=\s*\[(.*?)\]", api_text)
-        if assignment:
-            entries = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', assignment.group(1))
-            entries = [entry.replace('\\"', '"').replace('\\\\', '\\') for entry in entries]
-            if schema in entries:
-                continue
-            entries.append(schema)
-            rendered_entries = ", ".join('"' + entry + '"' for entry in entries)
-            rendered = f"{key} = [{rendered_entries}]"
-            api_text = api_text[:assignment.start()] + rendered + api_text[assignment.end():]
-        else:
-            entries = [str(entry) for entry in defaults]
-            entries.append(schema)
-            rendered_entries = ", ".join('"' + entry + '"' for entry in entries)
-            rendered = f"{key} = [{rendered_entries}]"
-            api_text += rendered + "\n"
-        changed = True
-
-    if changed:
-        if "# The schema above applies to the local Supabase CLI stack." not in api_text:
-            api_text += (
-                "# The schema above applies to the local Supabase CLI stack. For hosted\n"
-                "# PostgREST, add the project schema under Dashboard > Project Settings >\n"
-                "# Data API > Exposed schemas after its CREATE SCHEMA migration is applied.\n"
-            )
-        updated = text[:start] + api_text + text[end:]
-        config_path.write_text(updated, encoding="utf-8")
 
 
 def _ensure_env_example(root: Path, schema: str, settings: dict) -> None:

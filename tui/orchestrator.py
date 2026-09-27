@@ -36,7 +36,13 @@ from .prompts import (
     build_sync_conflict_coding_prompt,
     build_task_prompt,
 )
-from .supabase_migrations import migrations_pending, push_migrations
+from .supabase_migrations import (
+    ROOT_MIGRATION_LOCK,
+    TUI_ROOT,
+    migrations_pending,
+    push_migrations,
+    synchronize_personal_migrations,
+)
 from .topics import load_topic_text, topic_path
 from .verification import discover_commands, run_verification, truncate_diagnostic
 
@@ -671,17 +677,48 @@ class LocalOrchestrator:
             self.emit("migrations", "Pushing pending Supabase migrations.")
             self._raise_if_stopped(control)
             if personal_registered:
-                with temporary_supabase_cli_config(context.path, project_ref):
-                    push_options = {
-                        "executable": self.settings.supabase_executable,
-                        "env": environment,
-                    }
-                    if database_url:
-                        push_options["database_url"] = database_url
-                    result = push_migrations(
-                        context.path,
-                        **push_options,
+                synced = synchronize_personal_migrations(context.path)
+                if not synced.succeeded:
+                    raise RuntimeError(synced.output)
+                if synced.conflicts:
+                    conflicts = "\n\n".join(
+                        f"Filename: {name}\nTUI root SQL (authoritative):\n{root_sql}\n"
+                        f"Project SQL:\n{project_sql}"
+                        for name, root_sql, project_sql in synced.conflicts
                     )
+                    reason = (
+                        "A project migration matches a TUI-root migration filename but has different SQL. "
+                        "Keep the TUI-root SQL as the source of truth and repair the project migration.\n\n"
+                        + conflicts
+                    )
+                    attempts += 1
+                    if attempts >= limit:
+                        raise RuntimeError(reason)
+                    self.emit("repairing", f"Launching migration conflict repair attempt {attempts}/{limit}.")
+                    repair = self.run_agent(
+                        manager,
+                        context,
+                        selection,
+                        build_migration_repair_prompt(
+                            original, reason, attempts, limit,
+                            profile_text=self.load_profile(context.path, "coding"),
+                            topic_text=self.load_topic(context.path, topic_slug),
+                        ),
+                        control,
+                    )
+                    if not repair.succeeded:
+                        raise RuntimeError(repair.error or "Migration conflict repair agent failed.")
+                    manager.commit_changes(context.path, f"Daedalus migration conflict repair {attempts}")
+                    continue
+                with ROOT_MIGRATION_LOCK:
+                    with temporary_supabase_cli_config(context.path, project_ref):
+                        push_options = {
+                            "executable": self.settings.supabase_executable,
+                            "env": environment,
+                        }
+                        if database_url:
+                            push_options["database_url"] = database_url
+                        result = push_migrations(TUI_ROOT, **push_options)
             else:
                 result = push_migrations(
                     context.path,

@@ -84,7 +84,7 @@ from .plan import (
 )
 from .prompts import build_topic_population_prompt
 from .task_coordinator import TaskCoordinator, TaskRecord
-from .supabase_migrations import push_migrations
+from .supabase_migrations import ROOT_MIGRATION_LOCK, TUI_ROOT, push_migrations, synchronize_personal_migrations
 from .topics import (
     TOPIC_NONE_VALUE,
     build_topic_template,
@@ -1521,9 +1521,20 @@ class DaedalusTuiApp(App[None]):
                                 }
                                 if preflight.database_url:
                                     push_options["database_url"] = preflight.database_url
-                                with temporary_supabase_cli_config(project_path, project_ref):
-                                    pushed = push_migrations(project_path, **push_options)
-                                if not pushed.succeeded:
+                                with ROOT_MIGRATION_LOCK:
+                                    synced = synchronize_personal_migrations(project_path)
+                                    if synced.succeeded and not synced.conflicts:
+                                        with temporary_supabase_cli_config(project_path, project_ref):
+                                            pushed = push_migrations(TUI_ROOT, **push_options)
+                                if not synced.succeeded:
+                                    push_message = synced.output
+                                elif synced.conflicts:
+                                    details = "\n\n".join(
+                                        f"{name}: root migration is authoritative.\nRoot SQL:\n{root_sql}\nProject SQL:\n{project_sql}"
+                                        for name, root_sql, project_sql in synced.conflicts
+                                    )
+                                    push_message = "Personal migration filename conflict requires repair:\n" + details
+                                elif not pushed.succeeded:
                                     push_message = _redact_supabase_diagnostic(
                                         pushed.output, runtime_environment
                                     ) or "Supabase migration push failed."

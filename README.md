@@ -72,6 +72,10 @@ marker; operators set project-local Supabase credentials manually (the Register
 setup wizard checks the active project's file). Activate assumes the remote
 schema is blank and pushes local migrations without clearing remote objects or
 migration history. Daedalus does not sync credentials into another project.
+Registered projects put SQL only in `daedalus-migrations/` using
+`<YYYYMMDDHHMM>_<schema>_<description>.sql` filenames. Daedalus synchronizes
+those files into the TUI root `supabase/migrations/` and runs the CLI from the
+TUI root for Activate, launch bootstrap, and post-verification migration work.
 When `supabase_db_push_enabled` is enabled,
 startup pushes migrations only for projects that have been Activated (ecosystem-ready);
 scaffolded projects wait for explicit Activate via the Command Menu (`Ctrl+K`).

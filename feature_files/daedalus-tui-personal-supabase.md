@@ -6,7 +6,7 @@ operator-owned shared database. Phase 1 scaffolds durable project files so
 humans and agents can develop against a dedicated schema. Phase 2 (Activate)
 is software-owned Daedalus ecosystem readiness: commit the scaffold onto the
 already-checked-out operating branch, live-preflight Supabase connectivity, and
-orchestration-owned `supabase db push`. File scaffolding alone is not
+TUI-root-owned Supabase CLI migration application. File scaffolding alone is not
 ecosystem-ready. Operators set each project's credentials manually via a setup
 wizard; Daedalus never copies credentials between project `.env` files.
 
@@ -26,11 +26,11 @@ wizard; Daedalus never copies credentials between project `.env` files.
   Optional family-specific URLs are probed in IPv4, IPv6, then default order;
   Activate pushes with the first reachable URL. The IPv4 URL should use the
   Supabase Session pooler. `SUPABASE_URL` remains the separate PostgREST/API URL.
-- **Phase 1 — Scaffold**: Writes durable project files only (`supabase/` config +
-  `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
+- **Phase 1 — Scaffold**: Writes durable project files only (`daedalus-migrations/`
+  with a uniquely named `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
-  claim ecosystem readiness. The local CLI API config includes the project schema
-  alongside the standard exposed schemas.
+  claim ecosystem readiness. Migration SQL is project-owned, while CLI configuration
+  and the aggregate migration history are owned by the Daedalus TUI root.
 - **Setup wizard**: After name confirmation, Register opens a setup wizard that
   scaffolds files, then instructs the operator to set the active project's
   ignored `.env` values and shows the absolute path of that file. Continue runs
@@ -43,7 +43,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
   gates pass: require HEAD already on the selected operating/target branch (no
   checkout/switch), refuse unrelated dirty files, software-owned local commit of
   known scaffold paths + marker, project-local env validation (read-only),
-  access-method-aware live preflight, then push local migrations into the
+  access-method-aware live preflight, then synchronize project migrations to the TUI root and apply them into the
   project's remote schema. Activate assumes the schema is a blank canvas and
   never clears remote objects or migration history.
   Remote Git publish remains the optional operator Push action in the Command Menu.
@@ -53,7 +53,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
   same name confirmation and setup wizard; skip re-scaffold when registered, validate
   completeness, and re-run Phase 2. Incomplete scaffolds fail closed.
 - **Local cleanup**: The Command Menu also offers an exact-name-confirmed debug
-  cleanup that removes the local `supabase/` directory and generated integration
+  cleanup that removes the project's `daedalus-migrations/` directory and generated integration
   content while preserving unrelated `.daedalus` and profile content. The
   operator-managed `.env` is left untouched; operators can delete personal
   Supabase variables from it manually if they are no longer needed. Cleanup never
@@ -79,7 +79,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
   elsewhere). The Register wizard presence gate probes only the active project's
   file via child exit code. Project `.env.example` documents placeholders;
   Daedalus never syncs credentials between project `.env` files.
-- **Hosted API exposure**: Local `supabase/config.toml` does not configure hosted
+- **Hosted API exposure**: The local TUI `supabase/config.toml` does not configure hosted
   PostgREST. Operators must add the project schema to Dashboard > Project Settings >
   Data API > Exposed schemas after the migration is applied. Generated agent guidance
   explains `.schema(...)` usage and how to diagnose `PGRST106`, including a stale
@@ -89,11 +89,19 @@ wizard; Daedalus never copies credentials between project `.env` files.
 - **Blank schema assumption**: Operators provide an empty project schema before
   Activate. The migration push applies local migrations without attempting to
   remove or reconcile pre-existing remote objects or migration history.
+- **Migration synchronization**: Registered projects keep SQL in
+  `daedalus-migrations/`, named `<YYYYMMDDHHMM>_<schema>_<description>.sql`.
+  Activation, launch, and post-verification handling copy missing files into the
+  TUI root `supabase/migrations/`, skip identical files, and preserve unrelated
+  root migrations. A same-name/different-content conflict trusts the root copy
+  and sends both SQL bodies to a repair agent.
+- **Root-owned CLI**: Registered-project CLI operations run with cwd at the TUI
+  repository root and use the project's `.env` for connection details.
 - **CLI launch path**: Migration pushes invoke the absolute Supabase CLI path
   resolved from the Daedalus process PATH. The project credential overlay may
   omit PATH and must not make an available CLI unlaunchable.
 - **Temporary CLI link state**: `supabase db push` reads the linked project ref
-  from `supabase/.temp/project-ref`; setting `project_id` in `config.toml` alone
+  from the TUI root `supabase/.temp/project-ref`; setting `project_id` in `config.toml` alone
   does not link the CLI. Activate supplies that file only while pushing and
   restores any prior value afterward, so operators do not need to run
   `supabase link` in every project.
@@ -115,7 +123,8 @@ wizard; Daedalus never copies credentials between project `.env` files.
   personal-Supabase credential writes); BOM-safe parse and process overrides.
 - `tui/app.py`: Command Menu, confirmation modal, setup wizard, activation progress
   modal, and scaffold+Activate / retry worker.
-- `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
+- `tui/supabase_migrations.py`: Project-to-root migration synchronization and
+  non-interactive `db push` from the TUI root for registered projects.
 - `tui/orchestrator.py`, `tui/app.py`: Preflight registered project URLs and
   explicitly pass the reachable database URL for task and launch pushes.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation and
@@ -126,6 +135,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Moved registered-project SQL to timestamped `daedalus-migrations/` files and routed synchronization and Supabase CLI work through the TUI root.
 - 2026-09-26: Changed Activate to assume a blank remote schema and push local migrations without clearing remote objects or migration history.
 - 2026-09-26: Corrected the remote-reset regression assertion to match the explicitly registered `demo-app` schema.
 - 2026-09-26: Added local-source-of-truth Activate recovery that drops only the project's remote schema, clears matching local migration versions, and reapplies local migrations after warning about data loss.

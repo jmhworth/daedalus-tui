@@ -26,8 +26,12 @@ Do not automatically read every file under `.agents/`.
 If this project has a `[personal_supabase]` registration in `.daedalus`, its
 schema and connection details belong to this project's ignored `.env`. Set those
 credentials there manually; Daedalus does not copy credentials between projects.
-Never commit credentials, use the `public` schema, or run `supabase db push`;
-orchestration prepares and applies migrations after Activate.
+Put all migration SQL in the project's `daedalus-migrations/` directory, named
+`<YYYYMMDDHHMM>_<schema>_<description>.sql`. Do not create a project-local
+`supabase/` directory or run `supabase db push`. The Daedalus TUI copies these
+migrations into its root `supabase/migrations/` directory and handles schema
+operations after verification or Activate. Never commit credentials or use the
+`public` schema for this project's application tables.
 
 ## Topics
 

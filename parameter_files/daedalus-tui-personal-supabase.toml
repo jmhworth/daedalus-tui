@@ -31,18 +31,17 @@ required_env_keys = [
   "SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SECRET_KEY",
 ]
-migration_filename = "20260101000000_create_personal_schema.sql"
+migration_directory = "daedalus-migrations"
+migration_filename_pattern = "<YYYYMMDDHHMM>_<schema>_<description>.sql"
+initial_migration_description = "create_schema"
 profile_section_heading = "## Personal Supabase Schema"
-api_base_schemas = ["public", "storage", "graphql_public"]
-api_base_extra_search_path = ["public", "extensions"]
-config_project_id_placeholder = "YOUR_SHARED_SUPABASE_PROJECT_REF"
 confirmation_title = "Activate personal Supabase?"
-confirmation_warning = "Activate assumes this project's remote schema is blank and pushes its local migrations into it. It does not clear remote objects or migration history. Set up a blank schema before activating. Activate also commits the scaffold locally and runs the migration push; it does not publish Git changes."
+confirmation_warning = "Activate assumes this project's remote schema is blank and applies its daedalus-migrations/ SQL through the Daedalus TUI root. It does not clear remote objects or migration history. Set up a blank schema before activating. Activate also commits the scaffold locally and runs the migration apply; it does not publish Git changes."
 confirmation_name_prompt = "Type this project name exactly to confirm:"
 confirmation_button_label = "Activate"
 wizard_title = "Personal Supabase setup"
 wizard_scaffold_done = "Scaffold files are in place for schema {schema}."
-wizard_env_instructions = "Next, edit this exact project .env file and set:\n\n  {env_path}\n\n  SUPABASE_URL=...\n  SUPABASE_PUBLISHABLE_KEY=...\n  SUPABASE_SECRET_KEY=...\n  SUPABASE_DB_URL=...   # required database connection\n  SUPABASE_DB_URL_IPV4=...   # optional IPv4 Session pooler connection\n  SUPABASE_DB_URL_IPV6=...   # optional IPv6 direct connection\n\nActivate assumes this project's remote schema is blank and pushes local migrations into it. It does not clear remote objects or migration history. Set up a blank schema before activating. When multiple URLs are set, Activate probes IPv4, then IPv6, then the default URL and uses the reachable URL. Copy URLs from Supabase Dashboard > Connect. Project ref is optional when SUPABASE_URL is https://<ref>.supabase.co.\nDaedalus never writes these values into tracked files, .env.example, or another project.\nContinue re-checks this project file in a separate process and only looks at the exit code.\n\nWhen the values are saved, continue."
+wizard_env_instructions = "Next, edit this exact project .env file and set:\n\n  {env_path}\n\n  SUPABASE_URL=...\n  SUPABASE_PUBLISHABLE_KEY=...\n  SUPABASE_SECRET_KEY=...\n  SUPABASE_DB_URL=...   # required database connection\n  SUPABASE_DB_URL_IPV4=...   # optional IPv4 Session pooler connection\n  SUPABASE_DB_URL_IPV6=...   # optional IPv6 direct connection\n\nActivate assumes this project's remote schema is blank and applies SQL from daedalus-migrations/ through the Daedalus TUI root. It does not clear remote objects or migration history. Set up a blank schema before activating. When multiple URLs are set, Activate probes IPv4, then IPv6, then the default URL and uses the reachable URL. Copy URLs from Supabase Dashboard > Connect. Project ref is optional when SUPABASE_URL is https://<ref>.supabase.co.\nMigration files use <YYYYMMDDHHMM>_<schema>_<description>.sql. Agents put SQL only in daedalus-migrations/ and never run Supabase CLI commands.\nDaedalus never writes these values into tracked files, .env.example, or another project.\nContinue re-checks this project file in a separate process and only looks at the exit code.\n\nWhen the values are saved, continue."
 wizard_env_missing = "Environment variables still not detected."
 wizard_continue_label = "Continue"
 wizard_cancel_label = "Cancel"
@@ -51,13 +50,13 @@ activate_status_commit_message = "Mark personal Supabase schema activated."
 preflight_timeout_seconds = 15
 direct_database_dns_hint = "The direct db.* endpoint is IPv6 by default; if this machine or network cannot use it, open Supabase Dashboard > Connect, choose Session pooler, and replace SUPABASE_DB_URL with that full connection string (port 5432)."
 activation_progress_title = "Personal Supabase activation"
-activation_progress_subtitle = "The local scaffold, Git, connectivity, and migration steps will appear here."
+activation_progress_subtitle = "The project migration files, Git, connectivity, and root-owned migration steps will appear here."
 activation_progress_stages = [
-  "Scaffold project files",
+  "Scaffold project migration files",
   "Validate scaffold",
   "Commit scaffold changes",
   "Validate environment",
   "Check Supabase connection",
-  "Push local migrations to the blank schema",
+  "Synchronize and apply migrations from the Daedalus TUI root",
 ]
 activation_progress_close_label = "Close"

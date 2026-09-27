@@ -312,7 +312,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 app.screen.query_one("#command-register-supabase-button", Button).press()
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
-                self.assertFalse((project / "supabase" / "config.toml").exists())
+                self.assertFalse((project / "supabase").exists())
+                self.assertTrue((project / "daedalus-migrations").is_dir())
                 confirmation_input = app.screen.query_one(
                     "#personal-supabase-confirmation-input",
                     Input,
@@ -353,7 +354,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     await app.screen.dismiss(True)
                     await pilot.pause()
                     self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
-                    self.assertTrue((project / "supabase" / "config.toml").exists())
+                    self.assertFalse((project / "supabase").exists())
+                    self.assertTrue((project / "daedalus-migrations").is_dir())
                     self.assertTrue((project / ".env").exists())
                     continue_button = app.screen.query_one(
                         "#continue-personal-supabase-wizard-button",
@@ -408,7 +410,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     outcomes.append,
                 )
                 await pilot.pause()
-                self.assertTrue((project / "supabase" / "config.toml").exists())
+                self.assertFalse((project / "supabase").exists())
+                self.assertTrue((project / "daedalus-migrations").is_dir())
                 self.assertFalse((project / ".env").exists())
                 status = app.screen.query_one("#personal-supabase-wizard-status", Static)
                 instructions = app.screen.query_one(
@@ -461,7 +464,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     True,
                     "Removed local personal Supabase artifacts.",
                     project,
-                    ("supabase",),
+                    ("daedalus-migrations",),
                 ),
             ) as remove:
                 async with app.run_test() as pilot:
@@ -598,6 +601,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 with patch("tui.app.bootstrap_personal_supabase", side_effect=fake_bootstrap) as bootstrap, patch(
                     "tui.app.push_migrations", push
+                ), patch(
+                    "tui.app.synchronize_personal_migrations",
+                    return_value=SimpleNamespace(succeeded=True, conflicts=(), copied=()),
                 ), patch(
                     "tui.app.preflight_personal_supabase",
                     return_value=Mock(

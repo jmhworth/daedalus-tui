@@ -96,10 +96,8 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(result.schema, "example-project")
             self.assertFalse(result.already_registered)
 
-            migration = (
-                project / "supabase" / "migrations" / "20260101000000_create_personal_schema.sql"
-            )
-            self.assertTrue((project / "supabase" / "config.toml").is_file())
+            migration = next((project / "daedalus-migrations").glob("*.sql"))
+            self.assertRegex(migration.name, r"^\d{12}_example-project_create_schema\.sql$")
             self.assertTrue(migration.is_file())
             migration_text = migration.read_text(encoding="utf-8")
             self.assertIn('CREATE SCHEMA IF NOT EXISTS "example-project";', migration_text)
@@ -138,8 +136,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(second.status, "success")
             self.assertTrue(second.already_registered)
             self.assertEqual(
-                list((project / "supabase" / "migrations").iterdir()),
-                [project / "supabase" / "migrations" / "20260101000000_create_personal_schema.sql"],
+                list((project / "daedalus-migrations").iterdir()),
             )
 
     def test_remove_personal_supabase_removes_owned_artifacts_preserves_shared_files(self):
@@ -188,7 +185,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertIn("already registered for schema 'alpha'", conflict.message)
 
             other = self._seed_project(Path(tmp), "other-app")
-            migrations = other / "supabase" / "migrations"
+            migrations = other / "daedalus-migrations"
             migrations.mkdir(parents=True)
             (migrations / "20200101000000_unrelated.sql").write_text(
                 "CREATE TABLE public.widgets (id int);\n",
@@ -220,9 +217,6 @@ class PersonalSupabaseTests(unittest.TestCase):
             self._seed_project(launch, "demo-app")
             register_personal_supabase(project, schema="demo-app")
             self._write_project_env(project)
-            config = project / "supabase" / "config.toml"
-            original = config.read_text(encoding="utf-8")
-
             result = bootstrap_personal_supabase(project)
             self.assertEqual(result.status, "success")
             self.assertEqual(result.project_ref, "shared-ref")
@@ -232,9 +226,12 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(result.environment["SUPABASE_PROJECT_REF"], "shared-ref")
             self.assertEqual(result.environment["SUPABASE_PUBLISHABLE_KEY"], "publishable-key")
             self.assertEqual(result.environment["SUPABASE_SECRET_KEY"], "secret-key")
-            with temporary_supabase_cli_config(project, "shared-ref"):
-                self.assertIn('project_id = "shared-ref"', config.read_text(encoding="utf-8"))
-            self.assertEqual(config.read_text(encoding="utf-8"), original)
+            cli_root = Path(tmp) / "tui-root"
+            with patch("tui.personal_supabase.TUI_ROOT", cli_root):
+                with temporary_supabase_cli_config(project, "shared-ref"):
+                    config = cli_root / "supabase" / "config.toml"
+                    self.assertIn('project_id = "shared-ref"', config.read_text(encoding="utf-8"))
+                self.assertFalse((cli_root / "supabase" / "config.toml").exists())
 
     def test_probe_project_env_uses_child_exit_code(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -403,7 +400,7 @@ class PersonalSupabaseTests(unittest.TestCase):
                 text=True,
                 check=True,
             ).stdout.splitlines()
-            self.assertIn("supabase/config.toml", names)
+            self.assertTrue(any(name.startswith("daedalus-migrations/") for name in names))
             self.assertIn(".daedalus", names)
             self.assertNotIn("NOTES.md", names)
             status = subprocess.run(
@@ -531,7 +528,10 @@ class PersonalSupabaseTests(unittest.TestCase):
                 push_calls.append(directory)
                 return PushResult(True, "ok")
 
-            with patch("tui.personal_supabase.push_migrations", side_effect=fake_push):
+            with patch("tui.personal_supabase.push_migrations", side_effect=fake_push), patch(
+                "tui.personal_supabase.synchronize_personal_migrations",
+                return_value=SimpleNamespace(succeeded=True, conflicts=()),
+            ):
                 result = activate_personal_supabase(
                     project,
                     "main",
@@ -551,22 +551,22 @@ class PersonalSupabaseTests(unittest.TestCase):
                 progress,
                 [
                     "Checking registration",
-                    "Scaffolding project files",
+                    "Scaffolding project migration files",
                     "Validating scaffold",
                     "Committing scaffold changes",
                     "Validating environment",
                     "Checking Supabase connection",
-                    "Pushing local migrations to the blank schema",
+                    "Synchronize and apply migrations from the Daedalus TUI root",
                     "Complete",
                 ],
             )
             status = load_personal_supabase_status(project)
             self.assertTrue(status.activated)
             self.assertEqual(status.last_activate_status, "success")
-            config = (project / "supabase" / "config.toml").read_text(encoding="utf-8")
-            self.assertIn("YOUR_SHARED_SUPABASE_PROJECT_REF", config)
+            self.assertTrue((project / "daedalus-migrations").is_dir())
+            self.assertFalse((project / "supabase").exists())
             dirty = subprocess.run(
-                ["git", "status", "--porcelain", "--", ".daedalus", "supabase", ".env.example", ".agents"],
+                ["git", "status", "--porcelain", "--", ".daedalus", "daedalus-migrations", ".env.example", ".agents"],
                 cwd=project,
                 capture_output=True,
                 text=True,
@@ -600,9 +600,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             project = self._seed_project(launch, "demo-app")
             self._init_git_repo(project, "main")
             register_personal_supabase(project, schema="demo-app")
-            migration = (
-                project / "supabase" / "migrations" / "20260101000000_create_personal_schema.sql"
-            )
+            migration = next((project / "daedalus-migrations").glob("*.sql"))
             before = migration.read_text(encoding="utf-8")
             self._write_project_env(project)
 
@@ -612,6 +610,9 @@ class PersonalSupabaseTests(unittest.TestCase):
             with patch(
                 "tui.personal_supabase.push_migrations",
                 return_value=PushResult(True, "ok"),
+            ), patch(
+                "tui.personal_supabase.synchronize_personal_migrations",
+                return_value=SimpleNamespace(succeeded=True, conflicts=()),
             ):
                 result = activate_personal_supabase(
                     project,

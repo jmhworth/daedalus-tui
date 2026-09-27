@@ -9,7 +9,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Restart recovery**: Persisted failed tasks are restored with Retry available, while tasks active during shutdown are restored as paused tasks with their existing worktree context.
 - **Verification repair**: Failed task checks launch repair attempts in the same worktree up to the configured limit.
 - **Verification diagnostics**: When every verification attempt fails, each attempt's failure output is written to the task error panel and included in the final failure message.
-- **Supabase migration push**: After verification succeeds, orchestration runs `supabase db push --yes` only when the task changed `supabase/migrations/` relative to the worktree base commit; failures emit diagnostics and launch coding-profile repairs up to the verification attempt limit before blocking integration. Launch bootstrap validates every registered personal schema against that project's ignored `.env` (read-only) and, when `supabase_db_push_enabled`, pushes only activated projects (scaffolded/blocked wait for explicit Activate); task-time verify→push behavior remains unchanged.
+- **Supabase migration apply**: After verification succeeds, ordinary projects retain their existing `supabase/migrations/` flow. For registered personal Supabase projects, orchestration detects `daedalus-migrations/` changes, synchronizes SQL into the TUI-root aggregate, and runs Supabase CLI from the TUI root. Same-name SQL conflicts preserve the root version and provide both SQL bodies to a coding-profile repair agent. Launch bootstrap validates each project's ignored `.env` and applies pending aggregate migrations only for activated projects.
 - **Integration-stage retry**: After coding, verification, and any required migration push succeed, failed integration or resolver retries resume at the integration gate instead of re-running the coding agent.
 - **Resolver fallback**: Merge conflicts and post-merge verification failures launch the selected provider as a resolver with the latest failure details.
 - **Configurable target branch**: `target_branch` (default `main`, alias
@@ -41,7 +41,8 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - `tui/topics.py`: Topic discovery and embed helpers used at prompt-build time.
 - `tui/verification.py`: Configured and convention-based verification execution.
 - `tui/supabase_migrations.py`: Pending migration detection and non-interactive `supabase db push`.
-- `tui/environment.py`, `tui/personal_supabase.py`: Canonical project-local environment loading/validation, Cursor operator credential fallbacks, and temporary project-ref preparation used by launch and task pushes.
+- `tui/environment.py`, `tui/personal_supabase.py`: Canonical project-local environment loading/validation, Cursor operator credential fallbacks, and temporary TUI-root project-ref preparation used by launch and task applies.
+- `tui/supabase_migrations.py`: Personal migration synchronization into the root aggregate and migration CLI invocation.
 - `parameter_files/daedalus-tui-orchestration.toml`: Default target branch seed, worktree, verification, migration push, and retry settings.
 
 ## Dev Mode
@@ -59,6 +60,7 @@ HACKING
 - 2026-09-13: Threaded the launch-root shared environment through task orchestration and serialized launch/task Supabase pushes per project while preserving task verify→push semantics.
 - 2026-09-13: Noted that personal shared-Supabase schema registration scaffolds migrations only; orchestration remains the sole `supabase db push` owner.
 - 2026-08-25: Added post-verification Supabase migration push with a verify→repair loop when `supabase/migrations/` changed, gated by `supabase_db_push_enabled`.
+- 2026-09-26: Added registered-project `daedalus-migrations/` synchronization and root-owned CLI migration application.
 - 2026-08-25: Clarified that remote push remains outside automated orchestration while the TUI may offer an operator-owned Push for the selected operating branch.
 - 2026-08-24: Tagged tasks embed topic markdown from the worktree into task, repair, and resolver prompts.
 - 2026-08-23: Made the orchestration parameter `target_branch` a default seed only, with per-project operating-branch overrides applied through each coordinator's cloned settings.
