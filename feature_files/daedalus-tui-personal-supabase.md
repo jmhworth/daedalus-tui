@@ -29,7 +29,8 @@ wizard; Daedalus never copies credentials between project `.env` files.
 - **Phase 1 — Scaffold**: Writes durable project files only (`supabase/` config +
   `CREATE SCHEMA` migration, `.env.example`, coding/architecture profile guidance,
   and a `.daedalus` marker with `registered=true`, `activated=false`). Does not
-  claim ecosystem readiness.
+  claim ecosystem readiness. The local CLI API config includes the project schema
+  alongside the standard exposed schemas.
 - **Setup wizard**: After name confirmation, Register opens a setup wizard that
   scaffolds files, then instructs the operator to set the active project's
   ignored `.env` values and shows the absolute path of that file. Continue runs
@@ -74,8 +75,11 @@ wizard; Daedalus never copies credentials between project `.env` files.
   elsewhere). The Register wizard presence gate probes only the active project's
   file via child exit code. Project `.env.example` documents placeholders;
   Daedalus never syncs credentials between project `.env` files.
-- **Manual API exposure**: Operators must allow-list the schema in Supabase Dashboard
-  Data API / PostgREST settings after the migration is applied remotely.
+- **Hosted API exposure**: Local `supabase/config.toml` does not configure hosted
+  PostgREST. Operators must add the project schema to Dashboard > Project Settings >
+  Data API > Exposed schemas after the migration is applied. Generated agent guidance
+  explains `.schema(...)` usage and how to diagnose `PGRST106`, including a stale
+  `authenticator` role override that can conflict with Dashboard settings.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
   commits and migration push.
 - **CLI launch path**: Migration pushes invoke the absolute Supabase CLI path
@@ -115,6 +119,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Added project schemas to the generated local API config and clarified client schema selection plus hosted PostgREST `PGRST106` troubleshooting in generated agent guidance.
 - 2026-09-26: Updated launch-bootstrap regression coverage to mock a successful IPv4 preflight and verify the reachable pooler URL reaches the activated-project migration push.
 - 2026-09-26: Routed personal-Supabase task and launch pushes through endpoint preflight, passing a reachable configured database URL explicitly and surfacing IPv4 Session pooler guidance before any migration repair retries.
 - 2026-09-26: Added optional IPv4/IPv6 Postgres URLs and use the first reachable endpoint explicitly for migration pushes, keeping the PostgREST API URL independent.

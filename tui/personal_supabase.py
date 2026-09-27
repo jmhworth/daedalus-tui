@@ -1393,14 +1393,25 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "`https://<ref>.supabase.co`. Operators set those values manually; Daedalus "
         "never writes credentials into project `.env` files.\n"
         f"- Qualify SQL, migrations, RLS policies, and client/API configuration for `{schema}`.\n"
+        f"- With supabase-js, select this schema explicitly (for example, "
+        f"`supabase.schema('{schema}').from('table_name')`) or set the client's "
+        f"default `db.schema` to `{schema}`. Do not silently fall back to `public`.\n"
         "- Never assume PostgREST or Supabase clients default to `public` for this app.\n"
         "- Auth is shared across apps on this Supabase project; reuse the existing auth setup.\n"
         "- Agents must not run `supabase db push`; orchestration owns remote migration apply "
         "after verification when `supabase/migrations/` changes, and Activate owns the first apply.\n"
         "- File scaffolding alone is not ecosystem-ready; the operator must Activate via Daedalus "
         "(from the Ctrl+K Command Menu) so the software layer commits the scaffold and pushes migrations.\n"
-        "- After the first remote apply, the operator must allow-list this schema in the "
-        "Supabase Dashboard Data API / PostgREST exposed-schemas settings.\n"
+        f"- The generated `supabase/config.toml` exposes `{schema}` for the local Supabase "
+        "CLI stack. This local setting does not change the hosted project's PostgREST "
+        "configuration. After Activate applies the schema, add it to Supabase Dashboard "
+        "Project Settings > Data API > Exposed schemas, preserving the existing entries.\n"
+        f"- If a hosted request fails with `PGRST106` / `Invalid schema: {schema}`, PostgREST "
+        "does not currently expose the requested schema. Check the hosted Exposed schemas "
+        "list first. If the schema is already listed but the error remains, check whether "
+        "the database role `authenticator` has a stale `pgrst.db_schemas` role setting; "
+        "only when confirmed, reset that override with `ALTER ROLE authenticator RESET "
+        "pgrst.db_schemas;` so the Dashboard configuration can take effect.\n"
     )
 
 
@@ -1622,14 +1633,10 @@ def _ensure_supabase_scaffold(root: Path, schema: str, settings: dict) -> None:
                 "(from SUPABASE_PROJECT_REF or derived from SUPABASE_URL).\n"
                 "# Phase 1 writes files only; Activate / orchestration owns `supabase db push`.\n"
                 f'project_id = "{placeholder}"\n'
-                "\n"
-                "[api]\n"
-                "# Exposed schemas for a shared project are allow-listed in the Supabase\n"
-                "# Dashboard (Data API / PostgREST). Manually add this project's schema\n"
-                "# after the CREATE SCHEMA migration is applied remotely.\n"
             ),
             encoding="utf-8",
         )
+    _ensure_local_api_schema(config_path, schema, settings)
 
     migration_path = migrations / str(settings["migration_filename"])
     if not migration_path.exists():
@@ -1652,6 +1659,51 @@ def _ensure_supabase_scaffold(root: Path, schema: str, settings: dict) -> None:
         raise ValueError(
             f"{migration_path.name} exists but does not create schema {schema!r}."
         )
+
+
+def _ensure_local_api_schema(config_path: Path, schema: str, settings: dict) -> None:
+    """Expose the project schema in local CLI config while preserving other entries."""
+    text = config_path.read_text(encoding="utf-8")
+    api_section = re.search(r"(?ms)^\[api\]\s*$.*?(?=^\[|\Z)", text)
+    if api_section is None:
+        api_text = "[api]\n"
+        start = end = len(text)
+    else:
+        api_text = api_section.group(0)
+        start, end = api_section.span()
+
+    changed = False
+    for key, defaults in (
+        ("schemas", settings["api_base_schemas"]),
+        ("extra_search_path", settings["api_base_extra_search_path"]),
+    ):
+        assignment = re.search(rf"(?ms)^{re.escape(key)}\s*=\s*\[(.*?)\]", api_text)
+        if assignment:
+            entries = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', assignment.group(1))
+            entries = [entry.replace('\\"', '"').replace('\\\\', '\\') for entry in entries]
+            if schema in entries:
+                continue
+            entries.append(schema)
+            rendered_entries = ", ".join('"' + entry + '"' for entry in entries)
+            rendered = f"{key} = [{rendered_entries}]"
+            api_text = api_text[:assignment.start()] + rendered + api_text[assignment.end():]
+        else:
+            entries = [str(entry) for entry in defaults]
+            entries.append(schema)
+            rendered_entries = ", ".join('"' + entry + '"' for entry in entries)
+            rendered = f"{key} = [{rendered_entries}]"
+            api_text += rendered + "\n"
+        changed = True
+
+    if changed:
+        if "# The schema above applies to the local Supabase CLI stack." not in api_text:
+            api_text += (
+                "# The schema above applies to the local Supabase CLI stack. For hosted\n"
+                "# PostgREST, add the project schema under Dashboard > Project Settings >\n"
+                "# Data API > Exposed schemas after its CREATE SCHEMA migration is applied.\n"
+            )
+        updated = text[:start] + api_text + text[end:]
+        config_path.write_text(updated, encoding="utf-8")
 
 
 def _ensure_env_example(root: Path, schema: str, settings: dict) -> None:
@@ -1757,11 +1809,22 @@ def _ensure_profile_guidance(root: Path, schema: str, settings: dict) -> None:
         if path.is_file():
             text = path.read_text(encoding="utf-8")
             if heading in text:
-                if schema not in text.split(heading, 1)[1]:
+                existing_section = re.search(
+                    rf"(?ms)^{re.escape(heading)}\n.*?(?=^## |\Z)", text
+                )
+                if existing_section is None or schema not in existing_section.group(0):
                     raise ValueError(
                         f"{relative} already has a Personal Supabase Schema section "
                         f"that does not reference {schema!r}."
                     )
+                if "PGRST106" not in existing_section.group(0):
+                    updated = (
+                        text[:existing_section.start()]
+                        + section.rstrip()
+                        + "\n\n"
+                        + text[existing_section.end():].lstrip()
+                    )
+                    path.write_text(updated, encoding="utf-8")
                 continue
             path.write_text(text.rstrip() + "\n\n" + section, encoding="utf-8")
         else:

@@ -33,6 +33,8 @@ required_env_keys = [
 ]
 migration_filename = "20260101000000_create_personal_schema.sql"
 profile_section_heading = "## Personal Supabase Schema"
+api_base_schemas = ["public", "storage", "graphql_public"]
+api_base_extra_search_path = ["public", "extensions"]
 config_project_id_placeholder = "YOUR_SHARED_SUPABASE_PROJECT_REF"
 confirmation_title = "Activate personal Supabase?"
 confirmation_warning = "This scaffolds a project schema (if needed) and then activates it for the Daedalus ecosystem: a local software-owned commit on the selected operating branch, live Supabase connectivity preflight, and orchestration-owned migration push. Remote Git publish is not part of Activate. Only continue if this project should join your internal Supabase ecosystem."
