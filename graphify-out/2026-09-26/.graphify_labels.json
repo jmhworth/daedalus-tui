@@ -95,11 +95,7 @@
   "93": ".on_mount",
   "94": "._run_clarification",
   "95": "_literal_select_options",
-  "96": ".on_unmount",
-  "97": ".on_unmount",
   "98": ".has_active_sync_recovery",
-  "99": ".edit_paste_before",
   "100": ".enter_insert_mode",
-  "101": ".edit_paste_after",
   "102": ".nav_word_end"
 }
