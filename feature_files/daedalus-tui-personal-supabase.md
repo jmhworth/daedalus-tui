@@ -43,8 +43,11 @@ wizard; Daedalus never copies credentials between project `.env` files.
   gates pass: require HEAD already on the selected operating/target branch (no
   checkout/switch), refuse unrelated dirty files, software-owned local commit of
   known scaffold paths + marker, project-local env validation (read-only),
-  access-method-aware live preflight, then `db push`. Remote Git publish remains
-  the optional operator Push action in the Command Menu.
+  access-method-aware live preflight, then reset only the project's remote schema
+  and apply local migrations. This temporary recovery drops the schema with
+  CASCADE and deletes migration-ledger rows only for versions present in the
+  project's local migration directory. It requires `psql` and a database URL.
+  Remote Git publish remains the optional operator Push action in the Command Menu.
 - **Existing projects only**: Personal Supabase is post-init for projects already
   in the Daedalus format. New Project has no personal-Supabase opt-in.
 - **Retry**: Scaffolded or Activate-blocked projects reuse the Command Menu (`Ctrl+K`) with the
@@ -84,6 +87,10 @@ wizard; Daedalus never copies credentials between project `.env` files.
   `authenticator` role override that can conflict with Dashboard settings.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
   commits and migration push.
+- **Temporary local-source recovery**: Activate warns that it permanently deletes
+  all objects and data in the project's remote schema, then recreates it from local
+  migrations. Other schemas and migration-ledger rows for versions not present
+  locally are preserved.
 - **CLI launch path**: Migration pushes invoke the absolute Supabase CLI path
   resolved from the Daedalus process PATH. The project credential overlay may
   omit PATH and must not make an available CLI unlaunchable.
@@ -102,8 +109,8 @@ wizard; Daedalus never copies credentials between project `.env` files.
 
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
-  gate/commit, live preflight, Activate orchestration, project-local env validation,
-  child-process env presence probe, and temporary CLI configuration.
+  gate/commit, live preflight, scoped remote schema reset, Activate orchestration,
+  project-local env validation, child-process env presence probe, and temporary CLI configuration.
 - `tui/env_presence_probe.py`: Project-root cwd child entry that exits 0/1 after
   resolving required Supabase keys (stderr key names only).
 - `tui/environment.py`: Comment-preserving `.env` reading/loading helpers (no
@@ -121,6 +128,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Added local-source-of-truth Activate recovery that drops only the project's remote schema, clears matching local migration versions, and reapplies local migrations after warning about data loss.
 - 2026-09-26: Personal Supabase cleanup now leaves the operator-managed `.env` untouched and reminds operators to remove Supabase variables manually if desired.
 - 2026-09-26: Added project schemas to the generated local API config and clarified client schema selection plus hosted PostgREST `PGRST106` troubleshooting in generated agent guidance.
 - 2026-09-26: Updated launch-bootstrap regression coverage to mock a successful IPv4 preflight and verify the reachable pooler URL reaches the activated-project migration push.

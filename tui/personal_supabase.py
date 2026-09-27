@@ -1266,7 +1266,33 @@ def activate_personal_supabase(
 
     environment = prepared.environment or {}
     project_ref = (prepared.project_ref or "").strip()
-    report_progress("Pushing migrations")
+    report_progress("Resetting remote schema and pushing local migrations")
+    reset_error = _reset_remote_personal_schema(
+        root,
+        schema_name,
+        preflight.database_url,
+        run_process=run_process,
+        find_executable=find_executable,
+        timeout=float(settings["preflight_timeout_seconds"]),
+        environment=environment,
+    )
+    if reset_error:
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+            last_activate_error=_short_error(reset_error),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            reset_error,
+            root,
+            scaffolded=scaffolded,
+            committed=git_result.committed,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+        )
     try:
         with temporary_supabase_cli_config(root, project_ref):
             push_options = {"executable": executable, "env": environment}
@@ -1546,6 +1572,67 @@ def _probe_database_url(
             )
         return PreflightResult(False, message)
     return PreflightResult(True, f"Database host {host}:{port} is reachable.")
+
+
+def _reset_remote_personal_schema(
+    project_root: Path,
+    schema: str,
+    database_url: str | None,
+    *,
+    run_process,
+    find_executable,
+    timeout: float,
+    environment: dict[str, str],
+) -> str | None:
+    """Reset only this project's remote schema and its locally known migration rows."""
+    if not database_url:
+        return "Remote schema reset requires a reachable database URL. Set SUPABASE_DB_URL (or a family-specific URL)."
+    psql = find_executable("psql")
+    if psql is None:
+        return "Remote schema reset requires psql on PATH. Install the PostgreSQL client, then retry Activate."
+
+    migrations = project_root / "supabase" / "migrations"
+    versions = sorted(
+        {
+            path.name.split("_", 1)[0]
+            for path in migrations.glob("*.sql")
+            if re.fullmatch(r"\d+", path.name.split("_", 1)[0])
+        }
+    )
+    if not versions:
+        return "Remote schema reset is blocked because no local migration versions were found."
+    quoted_schema = '"' + schema.replace('"', '""') + '"'
+    version_values = ", ".join("'" + version + "'" for version in versions)
+    sql = (
+        "BEGIN; "
+        f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE; "
+        f"CREATE SCHEMA {quoted_schema}; "
+        "DO $$ BEGIN "
+        "IF to_regclass('supabase_migrations.schema_migrations') IS NOT NULL THEN "
+        "DELETE FROM supabase_migrations.schema_migrations "
+        f"WHERE version IN ({version_values}); "
+        "END IF; END $$; "
+        "COMMIT;"
+    )
+    try:
+        process = run_process(
+            [psql, database_url, "-v", "ON_ERROR_STOP=1", "-c", sql],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=environment,
+            cwd=project_root,
+        )
+    except subprocess.TimeoutExpired:
+        return "Remote schema reset timed out before local migrations could be applied."
+    except OSError as error:
+        return f"Could not start psql for remote schema reset ({error})."
+    if process.returncode == 0:
+        return None
+    output = "\n".join(
+        part.strip() for part in (process.stdout, process.stderr) if part and part.strip()
+    )
+    return redact_environment_values(output, environment) or "Remote schema reset failed."
 
 
 def _direct_database_host_project_ref(host: str) -> str | None:

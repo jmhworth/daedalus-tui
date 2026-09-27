@@ -24,6 +24,7 @@ from tui.personal_supabase import (
     resolve_project_ref_from_environment,
     schema_from_project_root,
     temporary_supabase_cli_config,
+    _reset_remote_personal_schema,
 )
 from tui.supabase_migrations import PushResult
 
@@ -128,6 +129,35 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(status.schema, "example-project")
             self.assertTrue(is_personal_supabase_registered(project, "example-project"))
             self.assertFalse(is_personal_supabase_activated(project, "example-project"))
+
+    def test_remote_reset_is_scoped_to_schema_and_local_migration_versions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp), "demo-app")
+            register_personal_supabase(project, schema="demo-app")
+            captured = []
+
+            def fake_run(command, **options):
+                captured.append((command, options))
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            error = _reset_remote_personal_schema(
+                project,
+                "demo-app",
+                "postgres://user:dbpass@example.test:5432/db",
+                run_process=fake_run,
+                find_executable=lambda name: "/usr/bin/psql" if name == "psql" else None,
+                timeout=15,
+                environment={"SUPABASE_DB_URL": "postgres://user:dbpass@example.test:5432/db"},
+            )
+
+            self.assertIsNone(error)
+            command, _ = captured[0]
+            sql = command[-1]
+            self.assertIn('DROP SCHEMA IF EXISTS "demo-app" CASCADE', sql)
+            self.assertIn('CREATE SCHEMA "demo-app"', sql)
+            self.assertIn("DELETE FROM supabase_migrations.schema_migrations", sql)
+            self.assertIn("version IN ('20260101000000')", sql)
+            self.assertNotIn("DELETE FROM supabase_migrations.schema_migrations;", sql)
 
             with (project / ".daedalus").open("rb") as source:
                 values = tomllib.load(source)
@@ -522,16 +552,16 @@ class PersonalSupabaseTests(unittest.TestCase):
             launch = root / "launch"
             project = self._seed_project(launch, "demo-app")
             self._init_git_repo(project, "main")
-            self._write_project_env(project, token=True)
+            self._write_project_env(project)
             push_calls = []
             progress = []
 
             def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
-                if command[:3] == ["supabase", "projects", "list"]:
-                    return SimpleNamespace(returncode=0, stdout="shared-ref\n", stderr="")
+                if command[0] in {"psql", "/bin/psql"}:
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
                 raise AssertionError(f"Unexpected command: {command}")
 
-            def fake_push(directory, *, executable="supabase", env=None):
+            def fake_push(directory, *, executable="supabase", env=None, database_url=None):
                 push_calls.append(directory)
                 return PushResult(True, "ok")
 
@@ -558,7 +588,7 @@ class PersonalSupabaseTests(unittest.TestCase):
                     "Committing scaffold changes",
                     "Validating environment",
                     "Checking Supabase connection",
-                    "Pushing migrations",
+                    "Resetting remote schema and pushing local migrations",
                     "Complete",
                 ],
             )
@@ -606,7 +636,7 @@ class PersonalSupabaseTests(unittest.TestCase):
                 project / "supabase" / "migrations" / "20260101000000_create_personal_schema.sql"
             )
             before = migration.read_text(encoding="utf-8")
-            self._write_project_env(project, token=True)
+            self._write_project_env(project)
 
             def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
                 return SimpleNamespace(returncode=0, stdout="shared-ref\n", stderr="")
@@ -634,7 +664,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             launch = root / "launch"
             project = self._seed_project(launch, "demo-app")
             self._init_git_repo(project, "main")
-            self._write_project_env(project, token=True)
+            self._write_project_env(project)
 
             def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
                 return SimpleNamespace(returncode=1, stdout="", stderr="auth failed")
