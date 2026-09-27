@@ -79,8 +79,12 @@ def synchronize_personal_migrations(project: Path) -> MigrationSyncResult:
         copied: list[str] = []
         conflicts: list[tuple[str, str, str]] = []
         for source in sorted(source_dir.glob("*.sql")):
-            match = re.fullmatch(r"(\d{12})_([A-Za-z0-9_-]+)_([A-Za-z0-9_-]+)\.sql", source.name)
-            if match is None or match.group(2) != schema:
+            # Match the known schema as a literal prefix. Splitting on underscores
+            # is ambiguous because both schema names and descriptions may contain them.
+            expected_name = re.compile(
+                rf"\d{{12}}_{re.escape(schema)}_[A-Za-z0-9_-]+\.sql"
+            )
+            if expected_name.fullmatch(source.name) is None:
                 return MigrationSyncResult(
                     False,
                     output=(

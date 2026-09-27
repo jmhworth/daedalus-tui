@@ -24,6 +24,7 @@ from tui.app import (
     PersonalSupabaseRemovalConfirmationScreen,
     PersonalSupabaseSetupWizardScreen,
     ProjectInitializerScreen,
+    TUI_ROOT,
     TopicViewerScreen,
 )
 from tui.codex_usage import CodexUsageSnapshot, CodexUsageWindow
@@ -627,7 +628,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     await pilot.pause()
                 self.assertEqual(bootstrap.call_count, 2)
                 self.assertEqual(push.call_count, 1)
-                self.assertEqual(push.call_args.args[0], activated.resolve())
+                self.assertEqual(push.call_args.args[0], TUI_ROOT)
                 self.assertEqual(
                     push.call_args.kwargs["database_url"],
                     "postgresql://pooler.example/shared",
