@@ -162,7 +162,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             with (project / ".daedalus").open("rb") as source:
                 values = tomllib.load(source)
             self.assertEqual(values["worktree"]["install_command"], [])
-            self.assertEqual(values["personal_supabase"]["schema"], "example-project")
+            self.assertEqual(values["personal_supabase"]["schema"], "demo-app")
             self.assertFalse(values["personal_supabase"]["activated"])
 
     def test_registration_is_idempotent_for_same_schema(self):

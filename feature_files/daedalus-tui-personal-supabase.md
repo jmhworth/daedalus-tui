@@ -128,6 +128,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Corrected the remote-reset regression assertion to match the explicitly registered `demo-app` schema.
 - 2026-09-26: Added local-source-of-truth Activate recovery that drops only the project's remote schema, clears matching local migration versions, and reapplies local migrations after warning about data loss.
 - 2026-09-26: Personal Supabase cleanup now leaves the operator-managed `.env` untouched and reminds operators to remove Supabase variables manually if desired.
 - 2026-09-26: Added project schemas to the generated local API config and clarified client schema selection plus hosted PostgREST `PGRST106` troubleshooting in generated agent guidance.
