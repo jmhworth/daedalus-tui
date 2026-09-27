@@ -1,16 +1,16 @@
 # Graph Report - daedalus-tui  (2026-09-26)
 
 ## Corpus Check
-- 96 files · ~93,260 words
+- 96 files · ~93,666 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1865 nodes · 5162 edges · 103 communities (83 shown, 20 thin omitted)
+- 1867 nodes · 5166 edges · 98 communities (87 shown, 11 thin omitted)
 - Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 595 edges (avg confidence: 0.54)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7a935ac6`
+- Built from commit: `f19357ac`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -111,11 +111,7 @@
 - ._run_clarification
 - _literal_select_options
 - .on_unmount
-- .submit_sync_recovery
-- .nav_word_end
 - .edit_paste_after
-- .edit_paste_before
-- .enter_insert_mode
 
 ## God Nodes (most connected - your core abstractions)
 1. `DaedalusTuiApp` - 182 edges
@@ -132,30 +128,30 @@
 ## Surprising Connections (you probably didn't know these)
 - `FakeStream` --uses--> `AgentControl`  [INFERRED]
   tests/test_agent_runner.py → tui/agent_runner.py
-- `FakeStream` --uses--> `AgentRunner`  [INFERRED]
-  tests/test_agent_runner.py → tui/agent_runner.py
 - `FakeProcess` --uses--> `AgentControl`  [INFERRED]
   tests/test_agent_runner.py → tui/agent_runner.py
-- `FakeProcess` --uses--> `AgentLogEvent`  [INFERRED]
+- `InterruptibleProcess` --uses--> `AgentControl`  [INFERRED]
   tests/test_agent_runner.py → tui/agent_runner.py
-- `FakeProcess` --uses--> `AgentRequest`  [INFERRED]
+- `AgentRunnerTests` --uses--> `AgentControl`  [INFERRED]
   tests/test_agent_runner.py → tui/agent_runner.py
+- `FakeRunner` --uses--> `CodingStatisticsScreen`  [INFERRED]
+  tests/test_app.py → tui/app.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (103 total, 20 thin omitted)
+## Communities (98 total, 11 thin omitted)
 
 ### Community 0 - "PlanQuestion"
 Cohesion: 0.14
 Nodes (31): CandidateFeatureGroup, A deterministic connected component of qualifying similarity relations., Return the stable identifier using the concise ``id`` spelling., score_band(), SimilarityResult, _canonical_tree_name(), _feature_ids_by_member(), _histogram_bars() (+23 more)
 
 ### Community 1 - "DaedalusVimTextArea"
-Cohesion: 0.03
-Nodes (46): DaedalusTuiApp, Key, Resize, Remove known credential values before diagnostics reach the UI or log., Synchronize registered projects; push migrations only when activated., Add Vim-like navigation without changing TextArea insert behavior., Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com (+38 more)
+Cohesion: 0.06
+Nodes (14): DaedalusTuiApp, Resize, Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com, Measure wide controls after their current layout pass completes., Run the wide-layout measurement after the next screen refresh., Switch to compact mode when wide controls extend past their bars., Return whether wide-layout controls are clipped or too narrow. (+6 more)
 
 ### Community 2 - "AgentRunner"
-Cohesion: 0.12
+Cohesion: 0.10
 Nodes (7): FakeCoordinator, FakeRunner, settings(), PersonalSupabaseRemovalResult, Outcome of removing the local personal-Supabase integration artifacts., DaedalusProject, A repository recognized by the presence of a ``feature_files`` folder.
 
 ### Community 3 - "DaedalusTuiApp"
@@ -171,16 +167,16 @@ Cohesion: 0.29
 Nodes (6): Applying answers, Bridge Agent Profile, Build-loop tasking, cp_doc structure, Hard rules, Purpose
 
 ### Community 6 - "GitWorktreeManager"
-Cohesion: 0.08
-Nodes (18): Strip, Style, Resize, Selectable transcript rendering with semantic assistant-message emphasis., Return the width available for transcript text inside the Log., Wrap one logical line at word boundaries when the width permits., A selectable log that can emphasize a task's final assistant message.      ``Log, Split an overlong word with visible hyphens at cell boundaries. (+10 more)
+Cohesion: 0.10
+Nodes (14): Resize, Selectable transcript rendering with semantic assistant-message emphasis., Return the width available for transcript text inside the Log., Wrap one logical line at word boundaries when the width permits., A selectable log that can emphasize a task's final assistant message.      ``Log, Split an overlong word with visible hyphens at cell boundaries., Return the tone assigned to each rendered transcript line., Reflow stored messages when the output box changes width. (+6 more)
 
 ### Community 7 - "Daedalus TUI Local Token Usage Memory"
 Cohesion: 0.29
 Nodes (6): Daedalus TUI Local Persistent Memory, Dev Mode, Key Points, Relevant Files, State Log, Summary
 
 ### Community 8 - "update_repository"
-Cohesion: 0.11
-Nodes (25): TopicsTests, build_topic_instructions(), build_topic_template(), embed_topic(), list_topic_slugs(), load_topic_settings(), load_topic_text(), Path (+17 more)
+Cohesion: 0.14
+Nodes (16): TopicsTests, build_topic_instructions(), build_topic_template(), embed_topic(), load_topic_settings(), Topic file discovery, creation, loading, and prompt embedding., Return missing required headings; empty list means structurally complete., Mode-specific rules for using an embedded topic file. (+8 more)
 
 ### Community 11 - "Key"
 Cohesion: 0.14
@@ -215,12 +211,12 @@ Cohesion: 0.40
 Nodes (4): Development Lifecycle, Execution Boundaries (CRITICAL), Integration Boundaries, Parameter Files
 
 ### Community 20 - "TaskRecord"
-Cohesion: 0.14
+Cohesion: 0.16
 Nodes (17): ProgressCallback, ProjectInitializerTests, find_github_url(), initialize_project(), load_initializer_settings(), matching_request_marker(), materialize_templates(), normalize_github_url() (+9 more)
 
 ### Community 21 - "._shutdown_coordinators"
-Cohesion: 0.19
-Nodes (10): AgentControl, Cooperative stop signals shared by a task and its active subprocess., AgentStopped, OrchestrationResult, Path, RuntimeError, Plan or resolve Sync merge conflicts in a preserved sync worktree., Load a repository-owned profile immediately before building a prompt. (+2 more)
+Cohesion: 0.17
+Nodes (11): AgentControl, Cooperative stop signals shared by a task and its active subprocess., AgentStopped, OrchestrationResult, Path, RuntimeError, Plan or resolve Sync merge conflicts in a preserved sync worktree., Load a repository-owned profile immediately before building a prompt. (+3 more)
 
 ### Community 22 - "._set_status"
 Cohesion: 0.29
@@ -235,28 +231,28 @@ Cohesion: 0.29
 Nodes (6): Daedalus TUI Coding Statistics, Dev Mode, Key Points, Relevant Files, State Log, Summary
 
 ### Community 25 - "._set_status"
-Cohesion: 0.15
-Nodes (6): OutputCallback, Thread, AgentRunner, Run Codex or Cursor directly and emit only assistant-facing messages., Return assistant text deltas from Cursor's stream-json events., Prefer Codex JSONL error events over benign stderr noise.
+Cohesion: 0.05
+Nodes (29): OutputCallback, AgentRunnerTests, FakeProcess, FakeStream, InterruptibleProcess, EnvironmentTests, Thread, AgentLogEvent (+21 more)
 
 ### Community 26 - ".provider_split"
-Cohesion: 0.16
-Nodes (10): Persist task state, coalescing high-frequency streamed messages., Force-remove leftover sync worktrees from interrupted recoveries for ``branch``., Attach plan-mode recovery to a preserved Sync conflict worktree., Send selected plan answers back to the planning agent for confirmation., Ask a side-channel clarification about one plan question without plan follow-up., Auto-start coding in the same conflict worktree after a confirmed sync plan., Run another planning pass while keeping the task in questioning., Promote a reviewed plan into the normal coding and verification route. (+2 more)
+Cohesion: 0.10
+Nodes (17): Path, Parse plan JSON from one turn without letting join separators break it., Remove the clean, read-only planning worktree after coding is queued., Persist task state, coalescing high-frequency streamed messages., Force-remove leftover sync worktrees from interrupted recoveries for ``branch``., Attach plan-mode recovery to a preserved Sync conflict worktree., Send selected plan answers back to the planning agent for confirmation., Ask a side-channel clarification about one plan question without plan follow-up. (+9 more)
 
 ### Community 27 - ".on_mount"
-Cohesion: 0.17
-Nodes (15): Popen, Protocol, VerificationTests, discover_commands(), format_process_result(), package_has_test_script(), CompletedProcess, Path (+7 more)
+Cohesion: 0.13
+Nodes (18): Popen, Protocol, VerificationTests, Small local JSON stores for persistent task history., discover_commands(), format_process_result(), package_has_test_script(), CompletedProcess (+10 more)
 
 ### Community 28 - "log_exception"
 Cohesion: 0.29
 Nodes (6): Daedalus TUI Topics, Dev Mode, Key Points, Relevant Files, State Log, Summary
 
 ### Community 29 - "CodingStatisticsScreen"
-Cohesion: 0.23
-Nodes (6): GraphifyTests, Path, Best-effort graph refresh owned by the local orchestration layer., Refresh the primary repository graph without affecting task success., update_repository(), Refresh graph metadata after promotion without blocking the task.
+Cohesion: 0.29
+Nodes (5): GraphifyTests, Path, Best-effort graph refresh owned by the local orchestration layer., Refresh the primary repository graph without affecting task success., update_repository()
 
 ### Community 30 - "calculate_token_usage"
-Cohesion: 0.05
-Nodes (32): TaskMemoryStoreTests, TokenUsageTests, Path, Small local JSON stores for persistent task history., Remove one project's operating-branch override (absent = use default)., Return the remembered default topic for a project, if any., Remember one project's default topic without losing other entries., Remove one project's topic override (absent = no default topic). (+24 more)
+Cohesion: 0.15
+Nodes (11): Path, Remove one project's operating-branch override (absent = use default)., Return the remembered default topic for a project, if any., Remember one project's default topic without losing other entries., Remove one project's topic override (absent = no default topic)., Upsert a task snapshot keyed by the task worktree's directory name., Return the remembered project path, if the memory contains one., Set the single project marker without losing task records. (+3 more)
 
 ### Community 31 - "PlanAnswerSelect"
 Cohesion: 0.29
@@ -267,8 +263,8 @@ Cohesion: 0.25
 Nodes (7): 4-Stage Development Lifecycle, Alignment, Debugging, Execution Boundaries (CRITICAL), Feature File Automation, Parameter File Centralization, Topics (when tagged)
 
 ### Community 33 - ".on_button_pressed"
-Cohesion: 0.26
-Nodes (7): ProjectDiscoveryTests, discover_projects(), is_direct_child_project(), Path, Discovery of Daedalus-supported repositories beneath a launch root., Return whether ``path`` is an immediate child of ``launch_root``., Find immediate child folders containing a direct ``feature_files`` child.      G
+Cohesion: 0.14
+Nodes (10): Log, ProjectDiscoveryTests, Synchronize registered projects; push migrations only when activated., Return only direct-child projects, or the empty-root fallback., discover_projects(), is_direct_child_project(), Path, Discovery of Daedalus-supported repositories beneath a launch root. (+2 more)
 
 ### Community 34 - "._render_line_strip"
 Cohesion: 0.25
@@ -291,40 +287,40 @@ Cohesion: 0.33
 Nodes (5): Daedalus Project Instructions, graphify, Shared personal Supabase, Task mode, Topics
 
 ### Community 41 - "KeyboardShortcutsScreen"
-Cohesion: 0.13
-Nodes (29): Remove values loaded for a subprocess from a user-facing diagnostic., redact_environment_values(), activate_personal_supabase(), _allow_list_comment(), _commit_paths(), commit_personal_supabase_scaffold(), _ensure_env_example(), _env_example_block() (+21 more)
+Cohesion: 0.12
+Nodes (31): _allow_list_comment(), _commit_paths(), commit_personal_supabase_scaffold(), _ensure_env_example(), _ensure_local_api_schema(), _ensure_profile_guidance(), _ensure_supabase_scaffold(), _env_example_block() (+23 more)
 
 ### Community 42 - "debug_log.py"
-Cohesion: 0.16
-Nodes (15): PromptTests, Single-run local agent orchestration without daemon or database dependencies., build_migration_repair_prompt(), build_repair_prompt(), build_resolver_prompt(), build_sync_conflict_coding_prompt(), build_sync_conflict_plan_prompt(), build_task_prompt() (+7 more)
+Cohesion: 0.17
+Nodes (14): PromptTests, build_migration_repair_prompt(), build_repair_prompt(), build_resolver_prompt(), build_sync_conflict_coding_prompt(), build_sync_conflict_plan_prompt(), build_task_prompt(), build_topic_population_prompt() (+6 more)
 
 ### Community 43 - "._rebuild_plan_questions"
 Cohesion: 0.12
 Nodes (13): Path, Unit tests for AST variable-lineage analysis., _sample_files(), parent_child_score_map(), build_tree(), datetime, Build a call tree from *root* with cycle and depth limits., Render a self-contained HTML page for the call trees. (+5 more)
 
 ### Community 44 - "CandidateFeatureGroup"
-Cohesion: 0.15
-Nodes (12): EnvironmentTests, apply_process_supabase_overrides(), cursor_environment(), Path, Small, dependency-free environment-file loading for local CLI providers., Return file values with non-empty process ``SUPABASE_*`` overrides applied., Return ``.env`` beside the installed ``tui`` package root., Return the process environment plus local Cursor credentials.      Explicit proc (+4 more)
+Cohesion: 0.07
+Nodes (14): Key, Remove known credential values before diagnostics reach the UI or log., Add Vim-like navigation without changing TextArea insert behavior., Confirm, then scaffold (if needed) and Activate personal Supabase., Confirm, then remove local personal-Supabase artifacts for the project., Scaffold files, then guide manual project env setup before Activate., Run scaffold+Activate in a background worker so the TUI stays responsive., Return provider metadata from the shared controls for a new task. (+6 more)
 
 ### Community 45 - "KeyboardShortcutsScreen"
 Cohesion: 0.20
 Nodes (9): Constraints and Design Principles, Desired End State, Intended Import Workflow, Open Questions, Project Imports to the Daedalus Format, Scope and Durable Context, State Log, Topic Goal (+1 more)
 
 ### Community 46 - "._handle_visual_line_mode"
-Cohesion: 0.21
-Nodes (12): ConfigTests, LayoutSettings, load_codex_usage_settings(), load_coding_statistics_settings(), load_command_menu_settings(), load_orchestration_settings(), load_tui_settings(), ModelOption (+4 more)
+Cohesion: 0.20
+Nodes (13): ConfigTests, LayoutSettings, load_codex_usage_settings(), load_coding_statistics_settings(), load_command_menu_settings(), load_orchestration_settings(), load_tui_settings(), ModelOption (+5 more)
 
 ### Community 47 - "DaedalusTuiApp"
 Cohesion: 0.14
 Nodes (8): Key, Keep Enter as a newline; Ctrl+Enter remains the app submit key., Route visual-line mode and mirror new yanks to the host clipboard., Add Daedalus prompt commands that the dependency does not provide., Select the current line and enter Vim visual-line mode., Select every character in the lines between the start and cursor., Handle movement and operators while whole lines are selected., Expose operator-pending so the caret can become an underline.
 
 ### Community 48 - "._persist_task"
-Cohesion: 0.18
-Nodes (4): TaskCoordinatorTests, OrchestrationSettings, Submit independent prompts while sharing a serialized integration gate., TaskCoordinator
+Cohesion: 0.15
+Nodes (6): FakeOrchestrator, TaskCoordinatorTests, OrchestrationSettings, Submit independent prompts while sharing a serialized integration gate., Return whether a Sync conflict recovery is still in flight for this project., TaskCoordinator
 
 ### Community 49 - "._render_line_strip"
-Cohesion: 0.19
-Nodes (8): Agent plan text must not be parsed as Textual/Rich markup., Follow-up questions must not crash when old option ids linger on widgets., Deferred Select init must not fatal-exit on a leftover option id., Clearing questions after confirmation must keep the TUI alive., build_plan_clarification_prompt(), PlanOption, PlanQuestion, Build a read-only ask prompt for one plan question, without other questions.
+Cohesion: 0.10
+Nodes (12): Open the selected project topic in a read-only modal., Apply provider-specific model and reasoning choices to all controls., Return labels and values for one compact settings category., Read the current value from the same selectors used for submission., Populate the compact value Select while retaining its active category., Apply a compact value through the existing wide-control state., Remember the selected topic as the default for the active project., Enable Push only when an origin remote and operating branch are available. (+4 more)
 
 ### Community 50 - "environment.py"
 Cohesion: 0.29
@@ -344,19 +340,19 @@ Nodes (21): alpha(), Entry helper that fans out into order and UI branches., bet
 
 ### Community 54 - "update_repository"
 Cohesion: 0.16
-Nodes (7): FakeStream, InterruptibleProcess, AgentLogEvent, AgentRequest, Provider-specific subprocess execution with normalized agent messages., __getattr__(), Standalone Textual interface and local agent orchestration.
+Nodes (14): TokenUsageTests, calculate_token_usage(), merge_usage_entries(), _parse_timestamp(), datetime, Token usage records and derived coding statistics., The token usage attributed to one submitted task., Convert persisted task snapshots into usage records. (+6 more)
 
 ### Community 55 - "conftest.py"
 Cohesion: 0.50
 Nodes (3): pytest_configure(), Pytest hooks shared across the test suite., Install pyan3 when call-graph tests run in an environment missing it.
 
 ### Community 57 - "DescriptorEmbedder"
-Cohesion: 0.10
-Nodes (24): PlanTests, Cursor may include prose and omit redundant false confirmation., Resolve a Select value that is legal for the current question options., build_implementation_prompt(), build_plan_followup_prompt(), custom_answer_text(), _escape_unescaped_controls_in_json_strings(), _loads_plan_json() (+16 more)
+Cohesion: 0.07
+Nodes (36): Agent plan text must not be parsed as Textual/Rich markup., Follow-up questions must not crash when old option ids linger on widgets., Deferred Select init must not fatal-exit on a leftover option id., Clearing questions after confirmation must keep the TUI alive., PlanTests, Cursor may include prose and omit redundant false confirmation., Resolve a Select value that is legal for the current question options., build_implementation_prompt() (+28 more)
 
 ### Community 59 - "PlanClarification"
-Cohesion: 0.05
-Nodes (52): Binding, ComposeResult, Mount, CommandMenuScreen, CompactSettingsSelect, CreateTopicScreen, _format_codex_usage(), _format_codex_window() (+44 more)
+Cohesion: 0.08
+Nodes (23): Binding, ComposeResult, CommandMenuScreen, KeyboardShortcutsScreen, _LegacyCompatibleBinding, PersonalSupabaseSetupWizardScreen, PlanClarificationScreen, Display a topic markdown file without allowing edits. (+15 more)
 
 ### Community 60 - "trading.py"
 Cohesion: 0.32
@@ -383,8 +379,12 @@ Cohesion: 0.33
 Nodes (6): is_personal_supabase_registered(), load_personal_supabase_status(), PersonalSupabaseStatus, Registration / activation marker loaded from a target project's ``.daedalus``., Return the ``[personal_supabase]`` marker, or an unregistered default., True when the project is marked registered for ``schema`` (or any schema if omit
 
 ### Community 69 - "PersonalSupabaseActivationProgressScreen"
-Cohesion: 0.33
-Nodes (7): _direct_database_host_project_ref(), preflight_personal_supabase(), PreflightResult, _probe_database_url(), Run access-method-aware live connectivity checks; never mutates schema., Return the project ref from a canonical Supabase direct DB hostname., Outcome of the access-method-aware live Supabase connectivity probe.
+Cohesion: 0.17
+Nodes (4): TaskMemoryStoreTests, Return persisted task snapshots keyed by their stable task ID., Persist task history, last project, and per-project task defaults., TaskMemoryStore
+
+### Community 70 - "configure_debug_logging"
+Cohesion: 0.16
+Nodes (4): Path, Memory override for the project, else the parameter-file default., Update the project's coordinator so later submits use ``branch``., Refresh Branch Select options for the active project and sync coordinator.
 
 ### Community 71 - "_collapse_inner_safe"
 Cohesion: 0.17
@@ -407,36 +407,40 @@ Cohesion: 0.08
 Nodes (4): TuiAppTests, DaedalusVimTextArea, VimTextArea with multiline prompt behavior and system clipboard sync., VimTextArea
 
 ### Community 77 - "push_migrations"
-Cohesion: 0.23
-Nodes (7): SupabaseMigrationsTests, migrations_pending(), push_migrations(), Path, Orchestration-owned Supabase migration push for target project worktrees., Return True when the worktree differs from base under supabase/migrations/., Run non-interactive `supabase db push --yes` in the target worktree.
+Cohesion: 0.21
+Nodes (8): SupabaseMigrationsTests, Single-run local agent orchestration without daemon or database dependencies., migrations_pending(), push_migrations(), Path, Orchestration-owned Supabase migration push for target project worktrees., Return True when the worktree differs from base under supabase/migrations/., Run non-interactive `supabase db push --yes` in the target worktree.
 
 ### Community 78 - "load_project_worktree_settings"
-Cohesion: 0.13
-Nodes (10): FakeOrchestrator, Prefer mounted selector values so clarification refreshes keep choices., encode_custom_answer(), is_valid_plan_answer(), Encode free text without confusing it with an agent option id., Validate agent option ids and the software-owned custom answer format., Parse plan JSON from one turn without letting join separators break it., Remove the clean, read-only planning worktree after coding is queued. (+2 more)
+Cohesion: 0.18
+Nodes (7): Mount, Select, CompactSettingsSelect, PlanAnswerSelect, Avoid posting Select.Changed events when the options are unchanged., Initialize dynamic plan selectors after their nested children mount., Keep only the latest value-change event for rebuilt compact controls.
+
+### Community 79 - "push_branch"
+Cohesion: 0.20
+Nodes (3): Return bar, underline, or block for the current Vim state., Return to Insert mode after programmatic prompt operations., Move to the end of the current word, or the next word when needed.
 
 ### Community 80 - ".edit_paste_after"
-Cohesion: 0.13
-Nodes (19): main(), Child-process probe for project-local Supabase env key presence.  Invoke as ``py, _ensure_profile_guidance(), _first_filled_env_value(), _key_or_aliases_label(), load_personal_supabase_settings(), personal_supabase_environment_settings(), profile_guidance_section() (+11 more)
+Cohesion: 0.10
+Nodes (33): main(), Child-process probe for project-local Supabase env key presence.  Invoke as ``py, activate_personal_supabase(), bootstrap_personal_supabase(), _direct_database_host_project_ref(), _first_filled_env_value(), _key_or_aliases_label(), load_personal_supabase_settings() (+25 more)
 
 ### Community 81 - ".enter_insert_mode"
-Cohesion: 0.11
-Nodes (14): TaskEventCallback, IntegrationCoordinator, _nonnegative_int(), _phase_for_status(), Lock, Path, Concurrent task state and serialized local integration., Rehydrate this project's persisted tasks after a TUI restart. (+6 more)
+Cohesion: 0.10
+Nodes (15): TaskEventCallback, __getattr__(), Standalone Textual interface and local agent orchestration., IntegrationCoordinator, _nonnegative_int(), _phase_for_status(), Lock, Concurrent task state and serialized local integration. (+7 more)
 
 ### Community 82 - "paste_from_system_clipboard"
-Cohesion: 0.13
-Nodes (8): Changed, Select, CodingStatisticsScreen, _format_count(), _format_tokens(), Show token or task usage history and derived coding statistics., merge_usage_entries(), Merge snapshots by task ID, allowing live records to replace history.
+Cohesion: 0.26
+Nodes (5): CodingStatisticsScreen, _format_count(), _format_tokens(), Show token or task usage history and derived coding statistics., CodingStatisticsSettings
 
 ### Community 83 - ".cursor_shape"
-Cohesion: 0.20
-Nodes (13): CodexUsageTests, CodexUsageWindow, fetch_codex_usage(), _find_response(), _first_undimensioned_window(), parse_codex_usage(), _parse_reset(), _parse_window() (+5 more)
+Cohesion: 0.22
+Nodes (14): CodexUsageTests, CodexUsageWindow, fetch_codex_usage(), _find_response(), _first_undimensioned_window(), parse_codex_usage(), _parse_reset(), _parse_window() (+6 more)
 
 ### Community 84 - "._handle_visual_line_mode"
-Cohesion: 0.11
-Nodes (4): Pressed, Submitted, PersonalSupabaseRemovalConfirmationScreen, Require an exact project-name confirmation before local cleanup.
+Cohesion: 0.08
+Nodes (9): Changed, Pressed, Submitted, CreateTopicScreen, PersonalSupabaseConfirmationScreen, PersonalSupabaseRemovalConfirmationScreen, Require an explicit confirmation before scaffolding/Activating a shared schema., Require an exact project-name confirmation before local cleanup. (+1 more)
 
 ### Community 85 - "._focus_submitted_task"
-Cohesion: 0.07
-Nodes (16): Log, RowSelected, Path, Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive., Promote only events that need the user's attention in the inbox., Memory override for the project, else the parameter-file default., Update the project's coordinator so later submits use ``branch``. (+8 more)
+Cohesion: 0.10
+Nodes (11): RowSelected, Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive., Promote only events that need the user's attention in the inbox., Refresh the account usage line without blocking the TUI event loop., Render actionable history and tasks created during this session., Keep failures, active work, and all tasks submitted in this launch., Keep inbox cells within their fixed width with a visible ellipsis. (+3 more)
 
 ### Community 86 - "._set_status"
 Cohesion: 0.21
@@ -446,44 +450,56 @@ Nodes (8): GitWorktreeError, push_branch(), CompletedProcess, RuntimeError, Push
 Cohesion: 0.40
 Nodes (3): Forward worker phases to the modal and the main status line., Mark the current activation phase and retain a readable status line., Update mounted progress widgets for one worker phase.
 
+### Community 88 - "Path"
+Cohesion: 0.27
+Nodes (9): list_topic_slugs(), load_topic_text(), Path, Return sorted topic filename stems from ``topic_files/*.md``., Resolve ``topic_files/{slug}.md`` under the project checkout., Load topic markdown for ``slug``, or ``None`` when missing/unreadable., Build Select options: ``(None)`` plus each discovered topic slug., topic_path() (+1 more)
+
 ### Community 89 - "PersonalSupabaseSetupWizardScreen"
-Cohesion: 0.17
-Nodes (15): bootstrap_personal_supabase(), _ensure_supabase_scaffold(), load_project_personal_supabase_env_values(), _migration_creates_schema(), probe_project_personal_supabase_environment(), project_personal_supabase_env_path(), Path, Return the project-local ``.env`` path operators must edit. (+7 more)
+Cohesion: 0.25
+Nodes (6): load_project_personal_supabase_env_values(), probe_project_personal_supabase_environment(), project_personal_supabase_env_path(), Return the project-local ``.env`` path operators must edit., Load values from the project ``.env`` only (no process overrides).      Wizard C, Check required project Supabase keys via a child process exit code.      The par
 
 ### Community 90 - "remove_personal_supabase"
 Cohesion: 0.14
 Nodes (18): personal_supabase_managed_env_keys(), Return every env key this feature may clean up (preferred + aliases)., Remove local personal-Supabase artifacts without touching remote state.      The, Remove only the personal-Supabase table from a project marker., Remove one already-resolved file, symlink, or directory., Remove the generated shared-Supabase block from ``.env.example``., Remove synchronized Supabase assignments while preserving other env values., Return env text without the configured Supabase assignments. (+10 more)
 
 ### Community 91 - "._finish_personal_supabase_progress"
-Cohesion: 0.25
-Nodes (4): Finish a queued modal update only if its screen is still mounted., Apply worker results that arrived while this modal was mounting., Freeze the progress display and allow the operator to close it., Render a completion state after all modal widgets are mounted.
+Cohesion: 0.19
+Nodes (7): PersonalSupabaseActivationProgressScreen, Finish a queued modal update only if its screen is still mounted., Show the durable activation phases while the worker runs., Whether the activation worker still owns this progress surface., Apply worker results that arrived while this modal was mounting., Freeze the progress display and allow the operator to close it., Render a completion state after all modal widgets are mounted.
 
 ### Community 92 - ".__init__"
 Cohesion: 0.40
 Nodes (3): EventCallback, IntegrationGate, Lock
 
 ### Community 93 - ".on_mount"
-Cohesion: 0.08
-Nodes (20): AbstractEventLoop, BaseException, Exception, Pause active agents before ThreadPoolExecutor joins its workers.      CPython ex, Stop agents before an explicit Textual exit begins., Persist Textual failures that would otherwise only flash on screen., Run before ThreadPoolExecutor's internal interpreter-exit join., Clean up if Textual's run loop returns without its unmount hook. (+12 more)
+Cohesion: 0.06
+Nodes (24): AbstractEventLoop, BaseException, Exception, Pause active agents before ThreadPoolExecutor joins its workers.      CPython ex, Stop agents before an explicit Textual exit begins., Persist Textual failures that would otherwise only flash on screen., Cover terminal and event-loop exits that bypass Textual unmount., Run before ThreadPoolExecutor's internal interpreter-exit join. (+16 more)
 
 ### Community 95 - "_literal_select_options"
-Cohesion: 0.67
-Nodes (3): Text, _literal_select_options(), Build Select prompts that Rich will not parse as markup.
+Cohesion: 0.22
+Nodes (7): Strip, Style, Text, _literal_select_options(), Build Select prompts that Rich will not parse as markup., Render a line with the final-message color before selection styling., Render the native cursor without a background in visible modes.
+
+### Community 96 - ".on_unmount"
+Cohesion: 0.33
+Nodes (4): Aggregates used by the coding statistics screen., Return provider and absolute usage pairs for the selected unit., Return per-provider average usage per prompt for the selected unit., TokenUsageStats
+
+### Community 101 - ".edit_paste_after"
+Cohesion: 0.14
+Nodes (14): _format_codex_usage(), _format_codex_window(), Textual interface for concurrent local agent tasks., Return Textual's event name for a user-facing shortcut label., _shortcut_binding_key(), copy_to_system_clipboard(), paste_from_system_clipboard(), System clipboard helpers for terminals without OSC 52 support. (+6 more)
 
 ## Knowledge Gaps
 - **117 isolated node(s):** `daedalus-tui`, `Execution Boundaries (CRITICAL)`, `Evidence Extraction`, `Architecture Boundaries`, `Parameter Files` (+112 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **20 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `.on_unmount`, `AgentRunner`, `GitWorktreeManager`, `._finish_personal_supabase_progress`, `bootstrap_personal_supabase`, `load_project_worktree_settings`, `._persist_task`, `._render_line_strip`, `paste_from_system_clipboard`, `._focus_submitted_task`, `._set_status`, `._switch_project`, `update_repository`, `._set_status`, `PlanClarification`, `.on_mount`, `calculate_token_usage`, `DescriptorEmbedder`?**
-  _High betweenness centrality (0.131) - this node is a cross-community bridge._
-- **Why does `AgentRunner` connect `._set_status` to `DaedalusVimTextArea`, `configure_debug_logging`, `debug_log.py`, `load_project_worktree_settings`, `._persist_task`, `.enter_insert_mode`, `paste_from_system_clipboard`, `._handle_visual_line_mode`, `._focus_submitted_task`, `update_repository`, `._shutdown_coordinators`, `Path`, `PlanClarification`, `.__init__`, `CodingStatisticsScreen`?**
-  _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Why does `TuiAppTests` connect `bootstrap_personal_supabase` to `DaedalusVimTextArea`, `AgentRunner`, `.finish`, `._handle_visual_line_mode`, `load_project_worktree_settings`, `._render_line_strip`, `paste_from_system_clipboard`, `.cursor_shape`, `._handle_visual_line_mode`, `._set_status`, `PlanClarification`?**
+- **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `AgentRunner`, `GitWorktreeManager`, `._set_status`, `.provider_split`, `.on_button_pressed`, `CandidateFeatureGroup`, `._handle_visual_line_mode`, `._persist_task`, `._render_line_strip`, `update_repository`, `DescriptorEmbedder`, `PlanClarification`, `PersonalSupabaseActivationProgressScreen`, `configure_debug_logging`, `bootstrap_personal_supabase`, `load_project_worktree_settings`, `.enter_insert_mode`, `paste_from_system_clipboard`, `.cursor_shape`, `._focus_submitted_task`, `._set_status`, `._switch_project`, `._finish_personal_supabase_progress`, `.on_mount`, `.edit_paste_after`?**
+  _High betweenness centrality (0.129) - this node is a cross-community bridge._
+- **Why does `AgentRunner` connect `._set_status` to `DaedalusVimTextArea`, `.edit_paste_after`, `configure_debug_logging`, `._finish_personal_supabase_progress`, `push_migrations`, `load_project_worktree_settings`, `._persist_task`, `.enter_insert_mode`, `paste_from_system_clipboard`, `._handle_visual_line_mode`, `._shutdown_coordinators`, `.provider_split`, `PlanClarification`, `.__init__`, `CodingStatisticsScreen`, `._run_clarification`?**
   _High betweenness centrality (0.055) - this node is a cross-community bridge._
+- **Why does `TuiAppTests` connect `bootstrap_personal_supabase` to `DaedalusVimTextArea`, `AgentRunner`, `.edit_paste_after`, `._finish_personal_supabase_progress`, `._handle_visual_line_mode`, `load_project_worktree_settings`, `paste_from_system_clipboard`, `.cursor_shape`, `._handle_visual_line_mode`, `._set_status`, `DescriptorEmbedder`, `.provider_split`, `PlanClarification`, `._run_clarification`?**
+  _High betweenness centrality (0.054) - this node is a cross-community bridge._
 - **Are the 22 inferred relationships involving `DaedalusTuiApp` (e.g. with `FakeCoordinator` and `FakeRunner`) actually correct?**
   _`DaedalusTuiApp` has 22 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 29 inferred relationships involving `TuiAppTests` (e.g. with `CodingStatisticsScreen` and `CommandMenuScreen`) actually correct?**
