@@ -302,10 +302,9 @@ def remove_personal_supabase(project_root: Path) -> PersonalSupabaseRemovalResul
 
     The Supabase directory is owned wholly by this feature and is removed in
     full. Shared project files are edited surgically: the personal marker table,
-    generated env assignments, and generated profile sections are removed while
-    unrelated project configuration and guidance remain intact. The ignored
-    project ``.env`` is reduced to non-Supabase settings rather than deleting
-    unrelated application credentials.
+    generated env-example content, and generated profile sections are removed
+    while unrelated project configuration and guidance remain intact. The
+    ignored project ``.env`` is operator-managed and is left untouched.
     """
     root = project_root.expanduser().resolve()
     settings = load_personal_supabase_settings()
@@ -334,9 +333,6 @@ def remove_personal_supabase(project_root: Path) -> PersonalSupabaseRemovalResul
 
     env_example = root / ".env.example"
     record(env_example, lambda: _remove_personal_supabase_env_example(env_example))
-
-    project_env = root / ".env"
-    record(project_env, lambda: _remove_personal_supabase_env_values(project_env, settings))
 
     for relative in PROFILE_RELATIVE_PATHS:
         profile = root / relative
@@ -411,22 +407,6 @@ def _remove_personal_supabase_env_example(path: Path) -> bool:
         updated,
     )
     updated = _without_personal_supabase_env_values(updated)
-    if updated == text:
-        return False
-    if updated.strip():
-        path.write_text(updated, encoding="utf-8")
-    else:
-        path.unlink()
-    return True
-
-
-def _remove_personal_supabase_env_values(path: Path, settings: dict) -> bool:
-    """Remove synchronized Supabase assignments while preserving other env values."""
-    if not path.is_file():
-        return False
-    keys = personal_supabase_managed_env_keys(settings)
-    text = path.read_text(encoding="utf-8")
-    updated = _without_personal_supabase_env_values(text, keys)
     if updated == text:
         return False
     if updated.strip():

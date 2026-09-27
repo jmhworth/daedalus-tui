@@ -74,10 +74,12 @@ values into another project. When `supabase_db_push_enabled` is enabled,
 startup pushes migrations only for projects that have been Activated (ecosystem-ready);
 scaffolded projects wait for explicit Activate via the Command Menu (`Ctrl+K`).
 The same menu provides an exact-project-name-confirmed local cleanup action for
-removing a broken personal-Supabase scaffold; cleanup does not change the remote
-database. Process environment variables remain runtime overrides and are never
-written to disk. Copy the project's `.env.example` to `.env`; do not put
-Supabase credentials in tracked feature, parameter, or `.env.example` files.
+removing a broken personal-Supabase scaffold; cleanup leaves the project `.env`
+untouched, so remove its personal Supabase variables manually if they are no
+longer needed. Cleanup does not change the remote database. Process environment
+variables remain runtime overrides and are never written to disk. Copy the
+project's `.env.example` to `.env`; do not put Supabase credentials in tracked
+feature, parameter, or `.env.example` files.
 
 Each prompt creates an independent local Git worktree based on the configured
 `target_branch` (default `main`; `primary_branch` remains accepted as an

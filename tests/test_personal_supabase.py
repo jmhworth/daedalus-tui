@@ -162,7 +162,10 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertTrue(result.succeeded)
             self.assertFalse((project / "supabase").exists())
             self.assertFalse((project / ".env.example").exists())
-            self.assertEqual((project / ".env").read_text(encoding="utf-8"), "APP_SETTING=keep\n")
+            self.assertEqual(
+                (project / ".env").read_text(encoding="utf-8"),
+                "APP_SETTING=keep\nSUPABASE_PROJECT_REF=shared-ref\nSUPABASE_SCHEMA=demo-app\n",
+            )
             self.assertEqual(
                 (project / ".agents" / "profiles" / "coding.md").read_text(encoding="utf-8"),
                 "# Coding\n",

@@ -52,8 +52,10 @@ wizard; Daedalus never copies credentials between project `.env` files.
   completeness, and re-run Phase 2. Incomplete scaffolds fail closed.
 - **Local cleanup**: The Command Menu also offers an exact-name-confirmed debug
   cleanup that removes the local `supabase/` directory and generated integration
-  content while preserving unrelated `.daedalus`, profile, and environment values;
-  it never changes the remote database.
+  content while preserving unrelated `.daedalus` and profile content. The
+  operator-managed `.env` is left untouched; operators can delete personal
+  Supabase variables from it manually if they are no longer needed. Cleanup never
+  changes the remote database.
 - **Status model**: Distinguish unregistered, scaffolded (`registered`, not
   `activated`), activated, and blocked reasons (`last_activate_status` /
   redacted error class—no credentials). Launch validates all registered projects;
@@ -119,6 +121,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Personal Supabase cleanup now leaves the operator-managed `.env` untouched and reminds operators to remove Supabase variables manually if desired.
 - 2026-09-26: Added project schemas to the generated local API config and clarified client schema selection plus hosted PostgREST `PGRST106` troubleshooting in generated agent guidance.
 - 2026-09-26: Updated launch-bootstrap regression coverage to mock a successful IPv4 preflight and verify the reachable pooler URL reaches the activated-project migration push.
 - 2026-09-26: Routed personal-Supabase task and launch pushes through endpoint preflight, passing a reachable configured database URL explicitly and surfacing IPv4 Session pooler guidance before any migration repair retries.

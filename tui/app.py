@@ -636,7 +636,7 @@ class PersonalSupabaseRemovalConfirmationScreen(ModalScreen[bool]):
         with Vertical(id="personal-supabase-removal-dialog"):
             yield Static("Remove personal Supabase", id="personal-supabase-removal-title")
             yield Static(
-                "This removes the local supabase folder, registration marker, generated profile guidance, and Supabase environment values. It does not change the remote database.",
+                "This removes the local supabase folder, registration marker, and generated profile guidance. The project .env is left untouched; remove its personal Supabase variables yourself if they are no longer needed. It does not change the remote database.",
                 id="personal-supabase-removal-warning",
                 markup=False,
             )
