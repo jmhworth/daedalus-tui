@@ -115,6 +115,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Updated launch-bootstrap regression coverage to mock a successful IPv4 preflight and verify the reachable pooler URL reaches the activated-project migration push.
 - 2026-09-26: Routed personal-Supabase task and launch pushes through endpoint preflight, passing a reachable configured database URL explicitly and surfacing IPv4 Session pooler guidance before any migration repair retries.
 - 2026-09-26: Added optional IPv4/IPv6 Postgres URLs and use the first reachable endpoint explicitly for migration pushes, keeping the PostgREST API URL independent.
 - 2026-09-26: Fixed Activate pushes failing with “Cannot find project ref” by temporarily supplying the derived ref in the Supabase CLI link-state file and restoring it after the push.

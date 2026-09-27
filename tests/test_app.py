@@ -584,7 +584,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     schema=project_path.name,
                     project_ref="shared-ref",
                     message="ok",
-                    environment={"SUPABASE_PROJECT_REF": "shared-ref"},
+                    environment={
+                        "SUPABASE_PROJECT_REF": "shared-ref",
+                        "SUPABASE_DB_URL_IPV4": "postgresql://pooler.example/shared",
+                    },
                 )
 
             push = Mock(return_value=Mock(succeeded=True, output="ok"))
@@ -595,9 +598,20 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 with patch("tui.app.bootstrap_personal_supabase", side_effect=fake_bootstrap) as bootstrap, patch(
                     "tui.app.push_migrations", push
-                ), patch("tui.app.temporary_supabase_cli_config"), patch(
+                ), patch(
+                    "tui.app.preflight_personal_supabase",
+                    return_value=Mock(
+                        succeeded=True,
+                        database_url="postgresql://pooler.example/shared",
+                    ),
+                ), patch(
+                    "tui.app.temporary_supabase_cli_config"
+                ), patch(
                     "tui.app.cursor_environment",
-                    return_value={"SUPABASE_PROJECT_REF": "shared-ref"},
+                    return_value={
+                        "SUPABASE_PROJECT_REF": "shared-ref",
+                        "SUPABASE_DB_URL_IPV4": "postgresql://pooler.example/shared",
+                    },
                 ), patch("tui.app.is_direct_child_project", return_value=True), patch.object(
                     app, "run_worker", side_effect=run_inline
                 ), patch.object(app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)):
@@ -607,6 +621,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(bootstrap.call_count, 2)
                 self.assertEqual(push.call_count, 1)
                 self.assertEqual(push.call_args.args[0], activated.resolve())
+                self.assertEqual(
+                    push.call_args.kwargs["database_url"],
+                    "postgresql://pooler.example/shared",
+                )
 
     async def test_responsive_layout_transitions_restore_wide_dimensions(self):
         app = DaedalusTuiApp(
