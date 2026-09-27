@@ -55,7 +55,6 @@ class SupabaseMigrationsTests(unittest.TestCase):
             self.assertTrue(result.succeeded)
             self.assertEqual(result.conflicts, ((name, root_sql, project_sql),))
             self.assertEqual((destination / name).read_text(encoding="utf-8"), root_sql)
-        self.assertEqual(run.call_args.kwargs["cwd"], Path("/worktree"))
 
     @patch("tui.supabase_migrations.subprocess.run")
     def test_not_pending_when_migration_paths_unchanged(self, run):

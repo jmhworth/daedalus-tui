@@ -136,6 +136,7 @@ HACKING
 
 ## State Log
 - 2026-09-26: Fixed personal migration filename validation for underscored schemas and aligned launch bootstrap coverage with TUI-root CLI execution.
+- 2026-09-26: Removed a stray undefined-mock assertion from the migration conflict synchronization test.
 - 2026-09-26: Fixed migration-directory Git ownership checks, made parameter lookup independent of a patched CLI root, and aligned generated guidance and regression fixtures with the current setup flow.
 - 2026-09-26: Moved registered-project SQL to timestamped `daedalus-migrations/` files and routed synchronization and Supabase CLI work through the TUI root.
 - 2026-09-26: Changed Activate to assume a blank remote schema and push local migrations without clearing remote objects or migration history.
