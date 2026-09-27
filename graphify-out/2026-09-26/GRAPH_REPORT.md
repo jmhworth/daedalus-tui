@@ -1,16 +1,16 @@
 # Graph Report - daedalus-tui  (2026-09-26)
 
 ## Corpus Check
-- 96 files · ~92,747 words
+- 96 files · ~93,014 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1865 nodes · 5158 edges · 105 communities (83 shown, 22 thin omitted)
+- 1865 nodes · 5158 edges · 104 communities (82 shown, 22 thin omitted)
 - Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 595 edges (avg confidence: 0.54)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1738e714`
+- Built from commit: `ff7d9b90`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -109,7 +109,6 @@
 - .__init__
 - .on_mount
 - ._run_clarification
-- profile_guidance_section
 - .on_unmount
 - RegistrationResult
 - .submit_sync_recovery
@@ -146,15 +145,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (105 total, 22 thin omitted)
+## Communities (104 total, 22 thin omitted)
 
 ### Community 0 - "PlanQuestion"
 Cohesion: 0.14
 Nodes (32): CandidateFeatureGroup, A deterministic connected component of qualifying similarity relations., Return the stable identifier using the concise ``id`` spelling., score_band(), SimilarityResult, _canonical_tree_name(), _feature_ids_by_member(), _histogram_bars() (+24 more)
 
 ### Community 1 - "DaedalusVimTextArea"
-Cohesion: 0.04
-Nodes (35): DaedalusTuiApp, Key, Resize, Synchronize registered projects; push migrations only when activated., Add Vim-like navigation without changing TextArea insert behavior., Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com, Measure wide controls after their current layout pass completes. (+27 more)
+Cohesion: 0.03
+Nodes (46): DaedalusTuiApp, Key, Resize, Remove known credential values before diagnostics reach the UI or log., Synchronize registered projects; push migrations only when activated., Add Vim-like navigation without changing TextArea insert behavior., Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com (+38 more)
 
 ### Community 2 - "AgentRunner"
 Cohesion: 0.12
@@ -438,7 +437,7 @@ Nodes (4): Pressed, Submitted, PersonalSupabaseRemovalConfirmationScreen, Requir
 
 ### Community 85 - "._focus_submitted_task"
 Cohesion: 0.06
-Nodes (19): Log, RowSelected, Text, _literal_select_options(), Path, Build Select prompts that Rich will not parse as markup., Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive. (+11 more)
+Nodes (18): Log, RowSelected, Text, _literal_select_options(), Path, Build Select prompts that Rich will not parse as markup., Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive. (+10 more)
 
 ### Community 86 - "._set_status"
 Cohesion: 0.21
@@ -464,10 +463,6 @@ Nodes (3): EventCallback, IntegrationGate, Lock
 Cohesion: 0.08
 Nodes (20): AbstractEventLoop, BaseException, Exception, Pause active agents before ThreadPoolExecutor joins its workers.      CPython ex, Stop agents before an explicit Textual exit begins., Persist Textual failures that would otherwise only flash on screen., Run before ThreadPoolExecutor's internal interpreter-exit join., Clean up if Textual's run loop returns without its unmount hook. (+12 more)
 
-### Community 95 - "profile_guidance_section"
-Cohesion: 0.12
-Nodes (10): Remove known credential values before diagnostics reach the UI or log., Confirm, then remove local personal-Supabase artifacts for the project., Run scaffold+Activate in a background worker so the TUI stays responsive., Return provider metadata from the shared controls for a new task., Queue a coding task that writes and expands the requested topic file., Surface Sync conflict recovery progress in the status bar., Launch plan-mode recovery against the preserved Sync conflict worktree., _redact_supabase_diagnostic() (+2 more)
-
 ### Community 97 - "RegistrationResult"
 Cohesion: 0.50
 Nodes (3): _ensure_profile_guidance(), profile_guidance_section(), Return the markdown section appended to coding/architecture profiles.
@@ -480,7 +475,7 @@ Nodes (3): _ensure_profile_guidance(), profile_guidance_section(), Return the ma
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `AgentRunner`, `GitWorktreeManager`, `._set_status`, `calculate_token_usage`, `._persist_task`, `._render_line_strip`, `update_repository`, `DescriptorEmbedder`, `PlanClarification`, `PersonalSupabaseActivationProgressScreen`, `bootstrap_personal_supabase`, `load_project_worktree_settings`, `paste_from_system_clipboard`, `._focus_submitted_task`, `._set_status`, `._finish_personal_supabase_progress`, `.on_mount`, `profile_guidance_section`, `.on_unmount`?**
+- **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `.on_unmount`, `AgentRunner`, `PersonalSupabaseActivationProgressScreen`, `GitWorktreeManager`, `._finish_personal_supabase_progress`, `bootstrap_personal_supabase`, `load_project_worktree_settings`, `._persist_task`, `._render_line_strip`, `paste_from_system_clipboard`, `._focus_submitted_task`, `._set_status`, `update_repository`, `._set_status`, `PlanClarification`, `.on_mount`, `calculate_token_usage`, `DescriptorEmbedder`?**
   _High betweenness centrality (0.131) - this node is a cross-community bridge._
 - **Why does `AgentRunner` connect `._set_status` to `DaedalusVimTextArea`, `configure_debug_logging`, `debug_log.py`, `load_project_worktree_settings`, `._persist_task`, `.enter_insert_mode`, `paste_from_system_clipboard`, `._handle_visual_line_mode`, `._focus_submitted_task`, `update_repository`, `._shutdown_coordinators`, `Path`, `PlanClarification`, `.__init__`, `CodingStatisticsScreen`?**
   _High betweenness centrality (0.056) - this node is a cross-community bridge._

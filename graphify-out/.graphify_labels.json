@@ -94,13 +94,12 @@
   "92": ".__init__",
   "93": ".on_mount",
   "94": "._run_clarification",
+  "95": "_literal_select_options",
   "96": ".on_unmount",
-  "97": "RegistrationResult",
   "98": ".submit_sync_recovery",
   "99": ".nav_word_end",
   "100": ".finish",
   "101": ".edit_paste_after",
   "102": ".edit_paste_before",
-  "103": ".enter_insert_mode",
-  "104": "RegistrationResult"
+  "103": ".enter_insert_mode"
 }

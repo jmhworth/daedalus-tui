@@ -94,7 +94,6 @@
   "92": ".__init__",
   "93": ".on_mount",
   "94": "._run_clarification",
-  "95": "profile_guidance_section",
   "96": ".on_unmount",
   "97": "RegistrationResult",
   "98": ".submit_sync_recovery",
