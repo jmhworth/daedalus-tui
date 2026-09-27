@@ -46,20 +46,20 @@ defaults in the `[layout]` table of
 `parameter_files/daedalus-tui.toml` (`compact_width`, `short_height`,
 `compact_task_sidebar_height`, and `compact_prompt_height`).
 
-For Cursor CLI, set `CURSOR_API_KEY` once in the launch-root `.env` (copy
-`.env.example` from the Daedalus TUI checkout if needed). Target projects such
-as `wfinance2` do not need their own copy; the TUI injects the operator key
-into Cursor worktree processes. When developing against an editable TUI
-checkout, the package-root `.env` is also consulted as a fallback.
+For Cursor CLI, set `CURSOR_API_KEY` in the Daedalus TUI checkout's `.env`
+(copy `.env.example` there if needed). The TUI reads that file for its agent
+credential; target project and launch-directory `.env` files are not loaded
+into agent processes. You can also authenticate with `agent login`.
 
 ```bash
-cp /path/to/daedalus-tui/.env.example .env   # in the launch root
-# edit .env and set CURSOR_API_KEY=...
+cp /path/to/daedalus-tui/.env.example /path/to/daedalus-tui/.env
+# edit /path/to/daedalus-tui/.env and set CURSOR_API_KEY=...
 ```
 
-The TUI passes `CURSOR_API_KEY` to Cursor only when it is not already present
-in the process environment or the active project's `.env`. You can also
-authenticate with `agent login` instead of an API key.
+An existing `CURSOR_API_KEY` in the TUI process environment takes precedence
+over the package `.env` value. Personal Supabase integrations keep their
+separate per-project credential requirement described below; those credentials
+are read only by Supabase setup and migration operations.
 
 For personal shared Supabase projects, keep `SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in the active project's

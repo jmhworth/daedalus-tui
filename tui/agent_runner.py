@@ -154,7 +154,11 @@ class AgentRunner:
         environment = None
         if request.provider == "cursor":
             environment = with_agent_credential_fallbacks(
-                cursor_environment(request.directory, request.environment_files),
+                cursor_environment(
+                    request.directory,
+                    request.environment_files,
+                    include_directory_env=False,
+                ),
                 request.credential_files,
             )
         try:
@@ -297,8 +301,7 @@ class AgentRunner:
         if request.provider == "cursor" and not environment.get("CURSOR_API_KEY", "").strip():
             diagnostics += (
                 "\n\nCursor authentication: run `agent login`, or set CURSOR_API_KEY once in "
-                "the launch-root `.env` (or the Daedalus TUI package `.env`). "
-                "Target projects do not need their own copy."
+                "the Daedalus TUI package `.env`. Target projects do not need their own copy."
             )
         return AgentResult(
             provider=request.provider,
@@ -568,7 +571,7 @@ class AgentRunner:
             return stdout.strip()
         return (
             "No diagnostics were emitted. Check Cursor authentication "
-            "(launch-root/package CURSOR_API_KEY or `agent login`)."
+            "(Daedalus TUI package CURSOR_API_KEY or `agent login`)."
         )
 
     @staticmethod

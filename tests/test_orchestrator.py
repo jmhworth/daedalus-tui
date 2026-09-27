@@ -38,6 +38,10 @@ class OrchestratorTests(unittest.TestCase):
             orchestrator.run_agent(
                 Mock(), context, ("cursor", "cursor", ""), "Implement this", event_phase="agent"
             )
+            requests = [item.args[0] for item in runner.run.call_args_list]
+            self.assertEqual(len(requests), 2)
+            self.assertTrue(all(request.environment_files == () for request in requests))
+            self.assertTrue(all(request.credential_files == () for request in requests))
 
         self.assertEqual(events, [])
 

@@ -85,6 +85,15 @@ class EnvironmentTests(unittest.TestCase):
             self.assertEqual(environment["CURSOR_API_KEY"], "from-launch")
             self.assertEqual(environment["OTHER"], "kept")
 
+    def test_cursor_environment_can_skip_directory_env(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            (project / ".env").write_text("PROJECT_SECRET=private\n", encoding="utf-8")
+
+            environment = cursor_environment(project, include_directory_env=False)
+
+        self.assertNotIn("PROJECT_SECRET", environment)
+
     def test_agent_credential_fallbacks_use_launch_then_package(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -5,9 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 import os
 
-# Operator credentials for agent CLIs. These are not project secrets: they live
-# in the launch-root or TUI package `.env` and are filled into Cursor subprocesses
-# when a target project does not define them.
+# Operator credentials for agent CLIs. These are not project secrets: the
+# orchestrated agent path uses the TUI package `.env` as its file fallback.
 AGENT_CREDENTIAL_KEYS = frozenset({"CURSOR_API_KEY"})
 
 
@@ -16,15 +15,24 @@ def tui_package_env_path() -> Path:
     return Path(__file__).resolve().parent.parent / ".env"
 
 
-def cursor_environment(directory: Path, extra_files: tuple[Path, ...] = ()) -> dict[str, str]:
+def cursor_environment(
+    directory: Path,
+    extra_files: tuple[Path, ...] = (),
+    *,
+    include_directory_env: bool = True,
+) -> dict[str, str]:
     """Return the process environment plus local Cursor credentials.
 
     Explicit process variables always win over values in `.env` files. The
-    target directory's `.env` is checked before explicitly supplied files.
+    target directory's `.env` is checked before explicitly supplied files by
+    default; agent runs disable it to keep project files out of agent processes.
     Empty assignments are ignored so they cannot block later fallbacks.
     """
     environment = os.environ.copy()
-    paths = (directory / ".env", *extra_files)
+    paths = (
+        *((directory / ".env",) if include_directory_env else ()),
+        *extra_files,
+    )
     seen: set[Path] = set()
     for path in paths:
         path = path.resolve()
@@ -44,9 +52,10 @@ def with_agent_credential_fallbacks(
 ) -> dict[str, str]:
     """Fill missing agent auth keys from operator env files.
 
-    Project and process values win. Non-empty ``CURSOR_API_KEY`` values from the
-    launch-root ``.env`` and the TUI package ``.env`` are applied only when the
-    key is absent or blank, so target projects do not need a copied API key.
+    Existing environment values win. Non-empty ``CURSOR_API_KEY`` values from
+    explicitly supplied fallback files and the TUI package ``.env`` are applied
+    only when the key is absent or blank. Orchestrated runs supply no external
+    fallback files, so target projects do not need a copied API key.
     """
     merged = dict(environment)
     paths = (*fallback_files, tui_package_env_path())
