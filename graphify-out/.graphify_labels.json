@@ -84,8 +84,6 @@
   "82": "paste_from_system_clipboard",
   "83": ".cursor_shape",
   "84": ".__init__",
-  "85": "._focus_submitted_task",
-  "86": ".has_active_sync_recovery",
   "89": "PersonalSupabaseSetupWizardScreen",
   "90": "remove_personal_supabase",
   "91": "._finish_personal_supabase_progress",
