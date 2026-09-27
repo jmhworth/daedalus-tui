@@ -1499,7 +1499,8 @@ class DaedalusTuiApp(App[None]):
                         if should_push:
                             runtime_environment = cursor_environment(
                                 project_path,
-                                (project_path / ".env",),
+                                (TUI_ROOT / ".env",),
+                                include_directory_env=False,
                             )
                             project_ref = resolve_project_ref_from_environment(
                                 runtime_environment,

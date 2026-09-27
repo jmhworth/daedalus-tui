@@ -210,7 +210,7 @@ def resolve_personal_supabase_environment(
 
     url = values.get(url_key, "").strip()
     if not url:
-        return None, f"Project environment is missing required Supabase setting(s): {url_key}."
+        return None, f"Daedalus TUI .env is missing required Supabase setting(s): {url_key}."
 
     publishable_candidates = [publishable_key, *(str(k) for k in config.get("env_publishable_key_aliases", []))]
     secret_candidates = [secret_key, *(str(k) for k in config.get("env_secret_key_aliases", []))]
@@ -223,7 +223,7 @@ def resolve_personal_supabase_environment(
         missing.append(_key_or_aliases_label(secret_candidates))
     if missing:
         return None, (
-            "Project environment is missing required Supabase setting(s): "
+            "Daedalus TUI .env is missing required Supabase setting(s): "
             + ", ".join(missing)
             + "."
         )
@@ -231,12 +231,12 @@ def resolve_personal_supabase_environment(
     project_ref = resolve_project_ref_from_environment(values, config)
     if not project_ref:
         return None, (
-            "Project environment needs a Supabase project ref: set "
+            "Daedalus TUI .env needs a Supabase project ref: set "
             f"{project_ref_key}, or use a {url_key} of the form "
             "https://<project-ref>.supabase.co."
         )
     if not re.fullmatch(r"[A-Za-z0-9_-]+", project_ref):
-        return None, "Project environment has a malformed Supabase project ref."
+        return None, "Daedalus TUI .env has a malformed Supabase project ref."
 
     db_url = values.get(db_url_key, "").strip()
     db_url_ipv4 = values.get(db_url_ipv4_key, "").strip()
@@ -244,7 +244,7 @@ def resolve_personal_supabase_environment(
     access_token = values.get(access_token_key, "").strip()
     if require_database_access and not any((db_url, db_url_ipv4, db_url_ipv6, access_token)):
         return None, (
-            "Project environment must define one database access setting: "
+            "Daedalus TUI .env must define one database access setting: "
             f"{db_url_key}, {db_url_ipv4_key}, {db_url_ipv6_key}, or {access_token_key}. "
             "API keys alone cannot run migration pushes."
         )
@@ -509,18 +509,17 @@ def load_personal_supabase_status(project_root: Path) -> PersonalSupabaseStatus:
 
 
 def project_personal_supabase_env_path(project_root: Path) -> Path:
-    """Return the project-local ``.env`` path operators must edit."""
-    return project_root.expanduser().resolve() / ".env"
+    """Return the Daedalus TUI ``.env`` path used for Supabase settings."""
+    return TUI_ROOT / ".env"
 
 
 def load_project_personal_supabase_env_values(project_root: Path) -> dict[str, str]:
-    """Load values from the project ``.env`` only (no process overrides).
+    """Load Supabase values from the Daedalus TUI ``.env`` only.
 
-    Wizard Continue uses :func:`probe_project_personal_supabase_environment` so the
-    TUI never needs these values just to gate setup. Activate/bootstrap still load
-    the file when building CLI environments.
+    The ``project_root`` argument remains for compatibility with callers, but
+    target project environment files are never inspected by this workflow.
     """
-    return read_env_file(project_personal_supabase_env_path(project_root))
+    return read_env_file(TUI_ROOT / ".env")
 
 
 def probe_project_personal_supabase_environment(
@@ -530,10 +529,10 @@ def probe_project_personal_supabase_environment(
     run_process=subprocess.run,
     timeout_seconds: float = 30.0,
 ) -> tuple[bool, str | None]:
-    """Check required project Supabase keys via a child process exit code.
+    """Check required TUI Supabase keys via a child process exit code.
 
     The parent only observes the exit code and a key-name diagnostic on failure.
-    Secret values stay inside the probe process (cwd = project root).
+    Secret values stay inside the probe process.
     """
     project = project_root.expanduser().resolve()
     env = {
@@ -570,7 +569,7 @@ def validate_project_personal_supabase_environment(
     require_database_access: bool = True,
     settings: dict | None = None,
 ) -> tuple[dict[str, str] | None, str | None]:
-    """Read and resolve the project ``.env`` without writing any files.
+    """Read and resolve the TUI ``.env`` without writing any files.
 
     Returns ``(environment, None)`` on success. The environment merges file
     values with preferred/derived keys for CLI use. On failure returns
@@ -597,11 +596,11 @@ def bootstrap_personal_supabase(
     *,
     require_database_access: bool = True,
 ) -> PersonalSupabaseBootstrapResult:
-    """Validate registration and the project-local shared environment.
+    """Validate registration and the TUI-owned shared Supabase environment.
 
     This helper performs no remote operation and never writes ``.env`` files.
-    It only confirms the tracked Supabase scaffold and that project-local
-    credentials can be used by the orchestration-owned CLI push.
+    It only confirms the tracked Supabase scaffold and that TUI credentials can
+    be used by the orchestration-owned CLI push.
     """
     root = project_root.expanduser().resolve()
     settings = load_personal_supabase_settings()
@@ -1037,7 +1036,7 @@ def preflight_personal_supabase(
         require_database_access=True,
     )
     if resolve_error or resolved is None:
-        return PreflightResult(False, resolve_error or "Project environment could not be resolved.")
+        return PreflightResult(False, resolve_error or "Daedalus TUI .env could not be resolved.")
     project_ref = resolved[str(settings["env_project_ref_key"])]
     access_token = resolved.get(str(settings["env_access_token_key"]), "").strip()
     database_urls = [

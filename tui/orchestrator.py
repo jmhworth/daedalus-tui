@@ -642,13 +642,18 @@ class LocalOrchestrator:
         attempts = 0
         failure_log: list[str] = []
         limit = self.settings.task_verification_attempt_limit
-        extra_environment = (self.environment_path,) if self.environment_path is not None else ()
-        environment = cursor_environment(context.path, (self.repository / ".env", *extra_environment))
+        environment = cursor_environment(
+            context.path,
+            (TUI_ROOT / ".env",),
+            include_directory_env=False,
+        )
         project_ref = resolve_project_ref_from_environment(
             environment,
             load_personal_supabase_settings(),
         )
-        personal_registered = is_personal_supabase_registered(context.path)
+        # Registration belongs to the canonical repository. The task worktree
+        # can be temporary or based on a commit that predates its marker.
+        personal_registered = is_personal_supabase_registered(context.repository)
         while True:
             if not migrations_pending(context.path, context.base_commit):
                 return

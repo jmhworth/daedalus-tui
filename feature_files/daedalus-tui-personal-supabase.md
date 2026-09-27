@@ -7,14 +7,14 @@ humans and agents can develop against a dedicated schema. Phase 2 (Activate)
 is software-owned Daedalus ecosystem readiness: commit the scaffold onto the
 already-checked-out operating branch, live-preflight Supabase connectivity, and
 TUI-root-owned Supabase CLI migration application. File scaffolding alone is not
-ecosystem-ready. Operators set each project's credentials manually via a setup
-wizard; Daedalus never copies credentials between project `.env` files.
+ecosystem-ready. Operators set credentials once in the Daedalus TUI root
+`.env`; project `.env` files are not read or changed for this workflow.
 
 ## Key Points
 - **Shared database, per-project schema**: Schema identity is always the validated
   project slug. Apps share auth on the single Supabase project; agents must never
   default to `public`.
-- **Project-local credentials**: Prefer `SUPABASE_URL`,
+- **TUI-owned credentials**: Set `SUPABASE_URL`,
   `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` (Supabase's new API key
   names). Legacy `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` and
   `SUPABASE_PRIVATE_KEY` (secret alias) still resolve. `SUPABASE_PROJECT_REF` is
@@ -74,12 +74,9 @@ wizard; Daedalus never copies credentials between project `.env` files.
   the Activate action stays disabled until the exact project name is entered.
 - **Agent teaching**: Idempotently appends a Personal Supabase Schema section to
   `.agents/profiles/coding.md` and `architecture.md` (no Cursor skill file).
-- **Canonical environment**: Each project's ignored `.env` owns its connection
-  values; orchestration reads that file for personal-Supabase validation and CLI
-  overlays (broader agent env loading may still apply process overrides
-  elsewhere). The Register wizard presence gate probes only the active project's
-  file via child exit code. Project `.env.example` documents placeholders;
-  Daedalus never syncs credentials between project `.env` files.
+- **Canonical environment**: The Daedalus TUI root `.env` owns the connection
+  values. Registration, activation, launch, and orchestration read that file;
+  project `.env` files are not inspected or changed for this flow.
 - **Hosted API exposure**: The local TUI `supabase/config.toml` does not configure hosted
   PostgREST. Operators must add the project schema to Dashboard > Project Settings >
   Data API > Exposed schemas after the migration is applied. Generated agent guidance
@@ -140,6 +137,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-27: Routed personal-Supabase environment resolution through the TUI root `.env` and documented the CLI link step before migration pushes.
 - 2026-09-27: Replaced synthetic Supabase CLI project-ref state with an actual `supabase link --project-ref` before TUI-root migration pushes, and added focused link/push routing coverage.
 - 2026-09-26: Activate now commits the matching legacy project Supabase config and schema-creation migration while continuing to block unrelated Supabase changes.
 - 2026-09-26: Fixed personal migration filename validation for underscored schemas and aligned launch bootstrap coverage with TUI-root CLI execution.

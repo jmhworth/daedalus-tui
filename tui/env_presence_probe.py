@@ -1,9 +1,8 @@
-"""Child-process probe for project-local Supabase env key presence.
+"""Child-process probe for Daedalus TUI Supabase env key presence.
 
-Invoke as ``python -m tui.env_presence_probe`` with ``cwd`` set to the Daedalus
-project root. Exit ``0`` when required keys resolve from that directory's
-``.env`` file; otherwise exit ``1`` and print a key-name-only diagnostic on
-stderr (never secret values).
+Invoke as ``python -m tui.env_presence_probe``. Exit ``0`` when required keys
+resolve from the TUI package root's ``.env`` file; otherwise exit ``1`` and
+print a key-name-only diagnostic on stderr (never secret values).
 
 The probe deliberately ignores process ``SUPABASE_*`` overrides so Continue
 confirms the project file was saved, not that keys happen to exist in the
@@ -24,7 +23,7 @@ from .personal_supabase import load_personal_supabase_settings, resolve_personal
 def main() -> int:
     require_database_access = os.environ.get("DAEDALUS_ENV_PROBE_REQUIRE_DB", "1") != "0"
     settings = load_personal_supabase_settings()
-    values = read_env_file(Path.cwd() / ".env")
+    values = read_env_file(Path(__file__).resolve().parents[1] / ".env")
     _resolved, error = resolve_personal_supabase_environment(
         values,
         settings,

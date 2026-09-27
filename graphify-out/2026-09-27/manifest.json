@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "tui/app.py": {
-    "mtime": 1790478687.2814915,
-    "ast_hash": "042f864547b201879a9dc76651f585b7",
+    "mtime": 1790531550.6558366,
+    "ast_hash": "ae8b8cb7c66193921e39835502d5da62",
     "semantic_hash": ""
   },
   "tui/clipboard.py": {
@@ -105,8 +105,8 @@
     "semantic_hash": "e5c00634ce8bd1e0a3f5dc86854c8119"
   },
   "tui/orchestrator.py": {
-    "mtime": 1790478687.283491,
-    "ast_hash": "37281f623f9d6326381affe8aaead9ca",
+    "mtime": 1790531550.5961394,
+    "ast_hash": "1eb83cd927b1db58d9cf407924f5bae0",
     "semantic_hash": ""
   },
   "tui/projects.py": {
@@ -305,13 +305,13 @@
     "semantic_hash": ""
   },
   "tests/test_supabase_migrations.py": {
-    "mtime": 1790478000.0686767,
-    "ast_hash": "b359511a1c2c22ebb25eb9311788a7fe",
+    "mtime": 1790530335.3827507,
+    "ast_hash": "b82ae49c8e2b02ad56e6398c8fe35f9f",
     "semantic_hash": ""
   },
   "tui/supabase_migrations.py": {
-    "mtime": 1790478000.0750332,
-    "ast_hash": "fd32ecd597f6c4b8e7da021c58c337e3",
+    "mtime": 1790530279.8219135,
+    "ast_hash": "8ef1f9b19df4dd0885edf8065f7ade00",
     "semantic_hash": ""
   },
   "topic_files/project-imports-to-the-daedalus-format.md": {
@@ -440,18 +440,18 @@
     "semantic_hash": ""
   },
   "tests/test_personal_supabase.py": {
-    "mtime": 1790479187.84864,
-    "ast_hash": "32a289ced38cffa43707c36912f521cc",
+    "mtime": 1790530373.197354,
+    "ast_hash": "75f78473e55b20cf5aace6e592f5a624",
     "semantic_hash": ""
   },
   "tui/personal_supabase.py": {
-    "mtime": 1790479187.8492558,
-    "ast_hash": "01162f6c35997f5f99c615aafa7cd068",
+    "mtime": 1790531635.1742601,
+    "ast_hash": "db9cd8112cfacdf4b1b8a2a82e1ec9cc",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-personal-supabase.md": {
-    "mtime": 1790479187.8480346,
-    "ast_hash": "18d5834000bd174585e9dc346e0adad1",
+    "mtime": 1790531607.9986413,
+    "ast_hash": "b807795407ed3d07e0fa97fd53240636",
     "semantic_hash": ""
   },
   "tests/test_environment.py": {
@@ -465,8 +465,8 @@
     "semantic_hash": ""
   },
   "tui/env_presence_probe.py": {
-    "mtime": 1789608912.9044275,
-    "ast_hash": "d5d1b3007490edf574a5e6bf47b58520",
+    "mtime": 1790531550.54056,
+    "ast_hash": "525a659956fa0b12c356d2afec86a859",
     "semantic_hash": ""
   },
   "tests/test_codex_usage.py": {

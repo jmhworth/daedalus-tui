@@ -7,7 +7,7 @@ from tui.agent_runner import AgentResult
 from tui.git_worktree import GitWorktreeError, WorktreeContext
 from tui.graphify import GraphifyResult
 from tui.orchestrator import LocalOrchestrator, OrchestrationSettings
-from tui.supabase_migrations import PushResult
+from tui.supabase_migrations import PushResult, TUI_ROOT
 from tui.verification import VerificationResult
 
 
@@ -582,6 +582,50 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(push.call_args.args[0], context.path)
         self.assertTrue(any(phase == "migrations" for phase, _, _ in events))
         self.assertTrue(any(phase == "ready" for phase, _, _ in events))
+
+    def test_registered_project_push_uses_repository_registration_and_tui_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            worktree = repository / "worktree"
+            worktree.mkdir()
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", worktree)
+            orchestrator = LocalOrchestrator(
+                repository,
+                Mock(),
+                OrchestrationSettings(),
+                lambda *_: None,
+            )
+            manager = Mock()
+            with (
+                patch("tui.orchestrator.migrations_pending", return_value=True),
+                patch("tui.orchestrator.cursor_environment", return_value={
+                    "SUPABASE_PROJECT_REF": "shared-ref",
+                    "SUPABASE_ACCESS_TOKEN": "token",
+                }),
+                patch("tui.orchestrator.is_personal_supabase_registered", return_value=True) as registered,
+                patch("tui.orchestrator.preflight_personal_supabase", return_value=Mock(
+                    succeeded=True,
+                    database_url=None,
+                )),
+                patch("tui.orchestrator.synchronize_personal_migrations", return_value=Mock(
+                    succeeded=True,
+                    conflicts=(),
+                )),
+                patch("tui.orchestrator.temporary_supabase_cli_config"),
+                patch("tui.orchestrator.push_migrations", return_value=PushResult(True, "ok")) as push,
+            ):
+                orchestrator._push_migrations_with_repairs(
+                    manager,
+                    context,
+                    ("codex", "model", ""),
+                    "task prompt",
+                    None,
+                    None,
+                )
+
+        registered.assert_called_once_with(repository)
+        self.assertEqual(push.call_args.args[0], TUI_ROOT)
+        self.assertEqual(push.call_args.kwargs["project_ref"], "shared-ref")
 
     def test_migration_push_failure_repairs_then_succeeds(self):
         with tempfile.TemporaryDirectory() as directory:
