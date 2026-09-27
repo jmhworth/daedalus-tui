@@ -705,6 +705,7 @@ class LocalOrchestrator:
                         push_options = {
                             "executable": self.settings.supabase_executable,
                             "env": environment,
+                            "project_ref": project_ref,
                         }
                         if database_url:
                             push_options["database_url"] = database_url

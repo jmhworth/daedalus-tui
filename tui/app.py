@@ -1518,6 +1518,7 @@ class DaedalusTuiApp(App[None]):
                                 push_options = {
                                     "executable": self.orchestration_settings.supabase_executable,
                                     "env": runtime_environment,
+                                    "project_ref": project_ref,
                                 }
                                 if preflight.database_url:
                                     push_options["database_url"] = preflight.database_url

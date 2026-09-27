@@ -710,19 +710,18 @@ def temporary_supabase_cli_config(project_root: Path, project_ref: str) -> Itera
         else:
             prepared = replacement + "\n\n" + original
 
-    # `db push` resolves its target from the link state file created by
-    # `supabase link`; project_id in config.toml alone is not sufficient.
+    # `push_migrations` runs `supabase link --project-ref ...` before `db push`.
+    # Preserve the previous CLI link state because this TUI root can target
+    # several registered projects over time.
     linked_ref_path = root / "supabase" / ".temp" / "project-ref"
     linked_ref_existed = linked_ref_path.exists()
     original_linked_ref = linked_ref_path.read_bytes() if linked_ref_existed else None
     try:
         if not config_existed or prepared != original:
             config_path.write_text(prepared, encoding="utf-8")
-        linked_ref_path.parent.mkdir(parents=True, exist_ok=True)
-        linked_ref_path.write_text(project_ref.strip(), encoding="utf-8")
         yield
     finally:
-        if config_existed and prepared != original:
+        if config_existed:
             config_path.write_text(original, encoding="utf-8")
         if original_linked_ref is None:
             linked_ref_path.unlink(missing_ok=True)
@@ -1282,7 +1281,11 @@ def activate_personal_supabase(
                     f"Root SQL:\n{root_sql}\nProject SQL:\n{project_sql}"
                 )
             with temporary_supabase_cli_config(root, project_ref):
-                push_options = {"executable": executable, "env": environment}
+                push_options = {
+                    "executable": executable,
+                    "env": environment,
+                    "project_ref": project_ref,
+                }
                 if preflight.database_url:
                     push_options["database_url"] = preflight.database_url
                 pushed = push_migrations(TUI_ROOT, **push_options)

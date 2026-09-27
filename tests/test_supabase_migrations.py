@@ -83,6 +83,51 @@ class SupabaseMigrationsTests(unittest.TestCase):
 
     @patch("tui.supabase_migrations.shutil.which", return_value="/usr/local/bin/supabase")
     @patch("tui.supabase_migrations.subprocess.run")
+    def test_registered_push_links_project_before_db_push(self, run, _which):
+        run.side_effect = [
+            Mock(returncode=0, stdout="Finished supabase link.", stderr=""),
+            Mock(returncode=0, stdout="Migration push complete.", stderr=""),
+        ]
+        result = push_migrations(
+            Path("/tui-root"),
+            env={"SUPABASE_ACCESS_TOKEN": "tok"},
+            project_ref="shared-ref",
+        )
+        self.assertTrue(result.succeeded)
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(
+            run.call_args_list[0].args[0],
+            ["/usr/local/bin/supabase", "link", "--project-ref", "shared-ref"],
+        )
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            ["/usr/local/bin/supabase", "db", "push", "--yes"],
+        )
+
+    @patch("tui.supabase_migrations.shutil.which", return_value="/usr/local/bin/supabase")
+    @patch("tui.supabase_migrations.subprocess.run")
+    def test_registered_push_stops_when_link_fails(self, run, _which):
+        run.return_value = Mock(returncode=1, stdout="", stderr="link auth failed")
+        result = push_migrations(Path("/tui-root"), project_ref="shared-ref")
+        self.assertFalse(result.succeeded)
+        self.assertIn("link auth failed", result.output)
+        run.assert_called_once()
+
+    @patch("tui.supabase_migrations.shutil.which", return_value="/usr/local/bin/supabase")
+    @patch("tui.supabase_migrations.subprocess.run")
+    def test_explicit_database_url_does_not_require_link(self, run, _which):
+        run.return_value = Mock(returncode=0, stdout="Migration push complete.", stderr="")
+        result = push_migrations(
+            Path("/tui-root"),
+            database_url="postgresql://example",
+            project_ref="shared-ref",
+        )
+        self.assertTrue(result.succeeded)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0][-2:], ["--db-url", "postgresql://example"])
+
+    @patch("tui.supabase_migrations.shutil.which", return_value="/usr/local/bin/supabase")
+    @patch("tui.supabase_migrations.subprocess.run")
     def test_push_failure_captures_diagnostics(self, run, _which):
         run.return_value = Mock(returncode=1, stdout="", stderr="ERROR: relation already exists")
         result = push_migrations(Path("/worktree"))

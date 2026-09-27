@@ -112,12 +112,26 @@ def push_migrations(
     executable: str = "supabase",
     env: dict[str, str] | None = None,
     database_url: str | None = None,
+    project_ref: str | None = None,
 ) -> PushResult:
-    """Run non-interactive `supabase db push --yes` from the selected CLI root."""
+    """Link the selected project when needed, then run non-interactive `db push`."""
     resolved_executable = shutil.which(executable)
     if resolved_executable is None:
         return PushResult(False, f"{executable} is not available on PATH.")
     try:
+        if project_ref and not database_url:
+            link = subprocess.run(
+                [resolved_executable, "link", "--project-ref", project_ref],
+                cwd=directory,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if link.returncode != 0:
+                output = "\n".join(
+                    part.strip() for part in (link.stdout, link.stderr) if part.strip()
+                )
+                return PushResult(False, output or "Supabase project linking failed.")
         command = [resolved_executable, "db", "push", "--yes"]
         if database_url:
             command.extend(["--db-url", database_url])

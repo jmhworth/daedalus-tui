@@ -581,7 +581,14 @@ class PersonalSupabaseTests(unittest.TestCase):
                     return SimpleNamespace(returncode=0, stdout="", stderr="")
                 raise AssertionError(f"Unexpected command: {command}")
 
-            def fake_push(directory, *, executable="supabase", env=None, database_url=None):
+            def fake_push(
+                directory,
+                *,
+                executable="supabase",
+                env=None,
+                database_url=None,
+                project_ref=None,
+            ):
                 push_calls.append(directory)
                 return PushResult(True, "ok")
 
