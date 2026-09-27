@@ -924,10 +924,17 @@ def commit_personal_supabase_scaffold(
     # outside the software-owned commit boundary. It may be untracked in a
     # freshly initialized project, so do not mistake it for unrelated dirt.
     operator_managed = {".env"}
+    personal_supabase_compat_paths = _personal_supabase_compat_scaffold_paths(
+        root,
+        dirty,
+        schema_name,
+    )
     unrelated = sorted(
         path
         for path in dirty
-        if path not in operator_managed and not _path_allowed_for_scaffold(path, allowed)
+        if path not in operator_managed
+        and not _path_allowed_for_scaffold(path, allowed)
+        and path not in personal_supabase_compat_paths
     )
     if unrelated:
         preview = ", ".join(unrelated[:5])
@@ -938,7 +945,12 @@ def commit_personal_supabase_scaffold(
             "Commit or clean them, or keep only personal-Supabase scaffold changes.",
         )
 
-    scaffold_dirty = [path for path in dirty if _path_allowed_for_scaffold(path, allowed)]
+    scaffold_dirty = [
+        path
+        for path in dirty
+        if _path_allowed_for_scaffold(path, allowed)
+        or path in personal_supabase_compat_paths
+    ]
     message = commit_message or str(settings["activate_commit_message"])
     if not scaffold_dirty:
         return GitScaffoldCommitResult(
@@ -949,7 +961,8 @@ def commit_personal_supabase_scaffold(
 
     # Keep deleted tracked paths in the selection so ``git add -A`` records the
     # removal instead of silently omitting it.
-    existing = [path for path in allowed if (root / path).exists() or path in scaffold_dirty]
+    selected_paths = allowed | personal_supabase_compat_paths
+    existing = [path for path in selected_paths if (root / path).exists() or path in scaffold_dirty]
     return _commit_paths(root, existing, message)
 
 
@@ -1420,6 +1433,52 @@ def _path_allowed_for_scaffold(path: str, allowed: set[str]) -> bool:
         # Allow parent directory entries such as ``supabase/`` while scaffolding.
         return True
     return False
+
+
+def _personal_supabase_compat_scaffold_paths(
+    root: Path,
+    dirty: set[str],
+    schema: str,
+) -> set[str]:
+    """Recognize the paired legacy local Supabase config and schema migration.
+
+    Some projects already have a project-local Supabase scaffold from the older
+    setup flow. Activate may commit its generated schema migration and the API
+    schema allow-list together, while unrelated local Supabase files remain a
+    blocker.
+    """
+    normalized = {
+        path.replace("\\", "/").removeprefix("./").rstrip("/")
+        for path in dirty
+    }
+    migration_paths = {
+        path
+        for path in normalized
+        if path.startswith("supabase/migrations/")
+        and "/" not in path[len("supabase/migrations/") :]
+        and path.endswith("_create_personal_schema.sql")
+    }
+    matching_migrations: set[str] = set()
+    for relative in migration_paths:
+        try:
+            sql = (root / relative).read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
+        if _migration_creates_schema(sql, schema):
+            matching_migrations.add(relative)
+
+    config_relative = "supabase/config.toml"
+    if not matching_migrations or config_relative not in normalized:
+        return set()
+    try:
+        config = tomllib.loads((root / config_relative).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError):
+        return set()
+    api = config.get("api")
+    schemas = api.get("schemas") if isinstance(api, dict) else None
+    if isinstance(schemas, list) and schema in schemas:
+        return matching_migrations | {config_relative}
+    return set()
 
 
 def _git_output(command: list[str], directory: Path) -> str | None:

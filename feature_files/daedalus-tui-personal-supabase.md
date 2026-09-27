@@ -95,6 +95,10 @@ wizard; Daedalus never copies credentials between project `.env` files.
   TUI root `supabase/migrations/`, skip identical files, and preserve unrelated
   root migrations. A same-name/different-content conflict trusts the root copy
   and sends both SQL bodies to a repair agent.
+- **Legacy scaffold commit compatibility**: Activate also commits a dirty
+  project-local `supabase/config.toml` with the registered schema in
+  `[api].schemas` and a matching `*_create_personal_schema.sql` migration.
+  Other dirty project-local Supabase files continue to block activation.
 - **Root-owned CLI**: Registered-project CLI operations run with cwd at the TUI
   repository root and use the project's `.env` for connection details.
 - **CLI launch path**: Migration pushes invoke the absolute Supabase CLI path
@@ -135,6 +139,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Activate now commits the matching legacy project Supabase config and schema-creation migration while continuing to block unrelated Supabase changes.
 - 2026-09-26: Fixed personal migration filename validation for underscored schemas and aligned launch bootstrap coverage with TUI-root CLI execution.
 - 2026-09-26: Removed a stray undefined-mock assertion from the migration conflict synchronization test.
 - 2026-09-26: Fixed migration-directory Git ownership checks, made parameter lookup independent of a patched CLI root, and aligned generated guidance and regression fixtures with the current setup flow.

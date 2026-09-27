@@ -381,6 +381,65 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertFalse(result.succeeded)
             self.assertIn("Unrelated dirty", result.message)
 
+    def test_activate_commits_personal_schema_migration_and_matching_supabase_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp), "demo-app")
+            self._init_git_repo(project, "main")
+            register_personal_supabase(project, schema="demo-app")
+            migrations = project / "supabase" / "migrations"
+            migrations.mkdir(parents=True)
+            (project / "supabase" / "config.toml").write_text(
+                '[api]\nschemas = ["public", "demo-app"]\n',
+                encoding="utf-8",
+            )
+            migration = migrations / "20260101000000_create_personal_schema.sql"
+            migration.write_text(
+                'CREATE SCHEMA IF NOT EXISTS "demo-app";\n',
+                encoding="utf-8",
+            )
+
+            result = commit_personal_supabase_scaffold(project, "main", schema="demo-app")
+
+            self.assertTrue(result.succeeded)
+            self.assertTrue(result.committed)
+            names = subprocess.run(
+                ["git", "show", "--name-only", "--pretty=", "HEAD"],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.splitlines()
+            self.assertIn("supabase/config.toml", names)
+            self.assertIn(
+                "supabase/migrations/20260101000000_create_personal_schema.sql",
+                names,
+            )
+
+    def test_unrelated_supabase_migration_still_blocks_activate_commit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp), "demo-app")
+            self._init_git_repo(project, "main")
+            register_personal_supabase(project, schema="demo-app")
+            migrations = project / "supabase" / "migrations"
+            migrations.mkdir(parents=True)
+            (migrations / "20260101000000_create_personal_schema.sql").write_text(
+                'CREATE SCHEMA IF NOT EXISTS "demo-app";\n',
+                encoding="utf-8",
+            )
+            (migrations / "20260101000001_add_users.sql").write_text(
+                'CREATE TABLE "demo-app".users (id integer);\n',
+                encoding="utf-8",
+            )
+            (project / "supabase" / "config.toml").write_text(
+                '[api]\nschemas = ["public", "demo-app"]\n',
+                encoding="utf-8",
+            )
+
+            result = commit_personal_supabase_scaffold(project, "main", schema="demo-app")
+
+            self.assertFalse(result.succeeded)
+            self.assertIn("supabase/migrations/20260101000001_add_users.sql", result.message)
+
     def test_clean_operating_branch_commits_only_scaffold_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
             project = self._seed_project(Path(tmp), "demo-app")
