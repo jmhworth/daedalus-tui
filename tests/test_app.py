@@ -4,6 +4,7 @@ import threading
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from textual import events
@@ -313,7 +314,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseConfirmationScreen)
                 self.assertFalse((project / "supabase").exists())
-                self.assertTrue((project / "daedalus-migrations").is_dir())
+                self.assertFalse((project / "daedalus-migrations").exists())
                 confirmation_input = app.screen.query_one(
                     "#personal-supabase-confirmation-input",
                     Input,

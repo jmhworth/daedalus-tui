@@ -135,6 +135,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Fixed migration-directory Git ownership checks, made parameter lookup independent of a patched CLI root, and aligned generated guidance and regression fixtures with the current setup flow.
 - 2026-09-26: Moved registered-project SQL to timestamped `daedalus-migrations/` files and routed synchronization and Supabase CLI work through the TUI root.
 - 2026-09-26: Changed Activate to assume a blank remote schema and push local migrations without clearing remote objects or migration history.
 - 2026-09-26: Corrected the remote-reset regression assertion to match the explicitly registered `demo-app` schema.

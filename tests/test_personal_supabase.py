@@ -135,9 +135,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(first.status, "success")
             self.assertEqual(second.status, "success")
             self.assertTrue(second.already_registered)
-            self.assertEqual(
-                list((project / "daedalus-migrations").iterdir()),
-            )
+            self.assertEqual(len(list((project / "daedalus-migrations").iterdir())), 1)
 
     def test_remove_personal_supabase_removes_owned_artifacts_preserves_shared_files(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -12,14 +12,12 @@ from threading import Lock
 
 
 TUI_ROOT = Path(__file__).resolve().parents[1]
+PARAMETER_PATH = TUI_ROOT / "parameter_files" / "daedalus-tui-personal-supabase.toml"
 ROOT_MIGRATION_LOCK = Lock()
 
 
 def _migration_directory_name() -> str:
-    import tomllib
-
-    parameter_path = TUI_ROOT / "parameter_files" / "daedalus-tui-personal-supabase.toml"
-    with parameter_path.open("rb") as source:
+    with PARAMETER_PATH.open("rb") as source:
         return str(tomllib.load(source)["migration_directory"])
 
 

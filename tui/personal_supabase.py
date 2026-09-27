@@ -1381,7 +1381,8 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         f"- Put migration SQL only in `{values['migration_directory']}/`, named "
         "`<YYYYMMDDHHMM>_<schema>_<description>.sql`. Daedalus copies these files to "
         "the TUI migration directory and applies them after verification. Do not create "
-        "project-local `supabase/` files or run `supabase db push`; Activate owns the initial apply.\n"
+        "project-local `supabase/` files. Agents must not run `supabase db push`; "
+        "Activate owns the initial apply.\n"
         "- File scaffolding alone is not ecosystem-ready; the operator must Activate via Daedalus "
         "(from the Ctrl+K Command Menu) so the software layer commits the scaffold and pushes migrations.\n"
         "- Supabase CLI configuration and migration execution are owned by the Daedalus TUI root. "
@@ -1410,6 +1411,10 @@ def _path_allowed_for_scaffold(path: str, allowed: set[str]) -> bool:
         normalized = normalized[2:]
     normalized = normalized.rstrip("/")
     if normalized in allowed:
+        return True
+    if any(normalized.startswith(candidate + "/") for candidate in allowed):
+        # Allow files beneath an owned scaffold directory such as
+        # ``daedalus-migrations/``.
         return True
     if any(candidate.startswith(normalized + "/") for candidate in allowed):
         # Allow parent directory entries such as ``supabase/`` while scaffolding.
