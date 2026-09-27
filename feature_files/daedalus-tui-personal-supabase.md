@@ -86,10 +86,13 @@ wizard; Daedalus never copies credentials between project `.env` files.
   does not link the CLI. Activate supplies that file only while pushing and
   restores any prior value afterward, so operators do not need to run
   `supabase link` in every project.
-- **Network-family-aware migration URL**: When project `.env` provides separate
-  IPv4 and IPv6 Postgres URLs, preflight probes them and activation passes the
-  reachable URL with `supabase db push --db-url`. This avoids letting the CLI
-  silently select an unreachable IPv6 direct endpoint on IPv4-only networks.
+- **Network-family-aware migration URL**: Activate, launch bootstrap, and
+  post-task orchestration pushes preflight project database URLs in IPv4,
+  IPv6, then default order. Each push passes the first reachable URL with
+  `supabase db push --db-url`, avoiding repeated CLI attempts against an
+  unreachable IPv6 direct endpoint on IPv4-only networks. If no configured URL
+  is reachable, preflight reports the Session pooler URL setting needed for
+  IPv4-only networks before migration repair retries begin.
 
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
@@ -102,6 +105,8 @@ wizard; Daedalus never copies credentials between project `.env` files.
 - `tui/app.py`: Command Menu, confirmation modal, setup wizard, activation progress
   modal, and scaffold+Activate / retry worker.
 - `tui/supabase_migrations.py`: Orchestration-owned non-interactive `db push`.
+- `tui/orchestrator.py`, `tui/app.py`: Preflight registered project URLs and
+  explicitly pass the reachable database URL for task and launch pushes.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation and
   wizard copy, activate commit message, and preflight timeout.
 - `tests/test_personal_supabase.py`, `tests/test_app.py`, `tests/test_environment.py`: Coverage.
@@ -110,6 +115,7 @@ wizard; Daedalus never copies credentials between project `.env` files.
 HACKING
 
 ## State Log
+- 2026-09-26: Routed personal-Supabase task and launch pushes through endpoint preflight, passing a reachable configured database URL explicitly and surfacing IPv4 Session pooler guidance before any migration repair retries.
 - 2026-09-26: Added optional IPv4/IPv6 Postgres URLs and use the first reachable endpoint explicitly for migration pushes, keeping the PostgREST API URL independent.
 - 2026-09-26: Fixed Activate pushes failing with “Cannot find project ref” by temporarily supplying the derived ref in the Supabase CLI link-state file and restoring it after the push.
 - 2026-09-26: Fixed Activate migration pushes to launch the PATH-resolved Supabase CLI path when the project credential overlay omits PATH.

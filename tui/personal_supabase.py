@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlparse
+import errno
 import os
 import re
 import shutil
@@ -1031,6 +1032,7 @@ def preflight_personal_supabase(
     project_root: Path,
     *,
     executable: str = "supabase",
+    environment: dict[str, str] | None = None,
     timeout_seconds: float | None = None,
     run_process=subprocess.run,
     find_executable=shutil.which,
@@ -1042,7 +1044,11 @@ def preflight_personal_supabase(
         if timeout_seconds is not None
         else settings["preflight_timeout_seconds"]
     )
-    values = load_project_personal_supabase_env_values(project_root)
+    values = (
+        dict(environment)
+        if environment is not None
+        else load_project_personal_supabase_env_values(project_root)
+    )
     resolved, resolve_error = resolve_personal_supabase_environment(
         values,
         settings,
@@ -1540,7 +1546,14 @@ def _probe_database_url(
             f"{direct_hint} Supabase CLI login does not affect DNS resolution.",
         )
     except OSError as error:
-        return PreflightResult(False, f"Could not reach database host {host}:{port} ({error}).")
+        message = f"Could not reach database host {host}:{port} ({error})."
+        if error.errno in {errno.ENETUNREACH, errno.EHOSTUNREACH}:
+            ipv4_key = str(load_personal_supabase_settings()["env_db_url_ipv4_key"])
+            message += (
+                f" If this network does not support IPv6, set {ipv4_key} to this "
+                "project's Supabase Session pooler connection URL."
+            )
+        return PreflightResult(False, message)
     return PreflightResult(True, f"Database host {host}:{port} is reachable.")
 
 

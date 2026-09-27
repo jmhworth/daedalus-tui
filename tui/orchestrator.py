@@ -25,6 +25,7 @@ from .project_config import load_project_worktree_settings
 from .personal_supabase import (
     is_personal_supabase_registered,
     load_personal_supabase_settings,
+    preflight_personal_supabase,
     resolve_project_ref_from_environment,
     temporary_supabase_cli_config,
 )
@@ -655,14 +656,31 @@ class LocalOrchestrator:
         while True:
             if not migrations_pending(context.path, context.base_commit):
                 return
+            database_url: str | None = None
+            if personal_registered:
+                preflight = preflight_personal_supabase(
+                    context.path,
+                    executable=self.settings.supabase_executable,
+                    environment=environment,
+                )
+                if not preflight.succeeded:
+                    raise RuntimeError(
+                        preflight.message or "Personal Supabase connectivity preflight failed."
+                    )
+                database_url = preflight.database_url
             self.emit("migrations", "Pushing pending Supabase migrations.")
             self._raise_if_stopped(control)
             if personal_registered:
                 with temporary_supabase_cli_config(context.path, project_ref):
+                    push_options = {
+                        "executable": self.settings.supabase_executable,
+                        "env": environment,
+                    }
+                    if database_url:
+                        push_options["database_url"] = database_url
                     result = push_migrations(
                         context.path,
-                        executable=self.settings.supabase_executable,
-                        env=environment,
+                        **push_options,
                     )
             else:
                 result = push_migrations(

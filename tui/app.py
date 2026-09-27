@@ -61,6 +61,7 @@ from .personal_supabase import (
     activate_personal_supabase,
     bootstrap_personal_supabase,
     is_personal_supabase_activated,
+    preflight_personal_supabase,
     load_personal_supabase_settings,
     load_personal_supabase_status,
     register_personal_supabase,
@@ -1504,16 +1505,28 @@ class DaedalusTuiApp(App[None]):
                                 runtime_environment,
                                 load_personal_supabase_settings(),
                             )
-                            with temporary_supabase_cli_config(project_path, project_ref):
-                                pushed = push_migrations(
-                                    project_path,
-                                    executable=self.orchestration_settings.supabase_executable,
-                                    env=runtime_environment,
-                                )
-                            if not pushed.succeeded:
+                            preflight = preflight_personal_supabase(
+                                project_path,
+                                executable=self.orchestration_settings.supabase_executable,
+                                environment=runtime_environment,
+                            )
+                            if not preflight.succeeded:
                                 push_message = _redact_supabase_diagnostic(
-                                    pushed.output, runtime_environment
-                                ) or "Supabase migration push failed."
+                                    preflight.message, runtime_environment
+                                ) or "Supabase connectivity preflight failed."
+                            else:
+                                push_options = {
+                                    "executable": self.orchestration_settings.supabase_executable,
+                                    "env": runtime_environment,
+                                }
+                                if preflight.database_url:
+                                    push_options["database_url"] = preflight.database_url
+                                with temporary_supabase_cli_config(project_path, project_ref):
+                                    pushed = push_migrations(project_path, **push_options)
+                                if not pushed.succeeded:
+                                    push_message = _redact_supabase_diagnostic(
+                                        pushed.output, runtime_environment
+                                    ) or "Supabase migration push failed."
                         results.append((project_path, prepared, push_message))
                 except Exception as error:  # Keep one project from blocking other projects.
                     log_exception(
