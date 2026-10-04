@@ -616,7 +616,7 @@ class GitWorktreeManager:
         )
 
     def capture_primary(self) -> str:
-        self._validate_primary()
+        self.validate_primary(auto_commit_dirty=True)
         return self.git_output(["rev-parse", self.primary_branch])
 
     def prepare_primary_checkout(self) -> tuple[Path, Path | None]:

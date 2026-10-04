@@ -95,6 +95,17 @@ class GitWorktreeTests(unittest.TestCase):
             self.assertEqual(context.base_commit, "abc123")
             self.assertEqual(run_git.call_args.args[0][:4], ["worktree", "add", "-b", "agent/task-task-1"])
 
+    def test_capture_primary_auto_commits_dirty_target_before_capturing_tip(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        with patch.object(manager, "validate_primary", return_value=True) as validate_primary, patch.object(
+            manager, "git_output", return_value="committed-tip"
+        ):
+            captured = manager.capture_primary()
+
+        self.assertEqual(captured, "committed-tip")
+        validate_primary.assert_called_once_with(auto_commit_dirty=True)
+        manager.git_output.assert_called_once_with(["rev-parse", "main"])
+
     def test_primary_validation_allows_other_checked_out_branch(self):
         manager = GitWorktreeManager(Path("/repo"), primary_branch="develop")
         with patch("tui.git_worktree.subprocess.run") as run, patch.object(
