@@ -49,6 +49,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-10-03: Repaired regression coverage for dirty target auto-commit at integration capture without weakening the TUI-root Supabase environment contract.
 - 2026-10-03: Integration now auto-commits dirty checked-out target-branch files before capturing the integration base, keeping those changes in the task's promotion ancestry.
 - 2026-09-19: Updated coordinator test doubles to accept sync-recovery orchestrator kwargs so normal submit paths stay compatible.
 - 2026-09-19: Added operator Sync conflict recovery that plans in a preserved isolated sync worktree, auto-implements when questions clear, finalizes under the integration gate, and pushes without stock implement_plan worktree discard.

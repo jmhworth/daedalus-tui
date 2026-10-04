@@ -99,12 +99,12 @@ class GitWorktreeTests(unittest.TestCase):
         manager = GitWorktreeManager(Path("/repo"))
         with patch.object(manager, "validate_primary", return_value=True) as validate_primary, patch.object(
             manager, "git_output", return_value="committed-tip"
-        ):
+        ) as git_output:
             captured = manager.capture_primary()
 
         self.assertEqual(captured, "committed-tip")
         validate_primary.assert_called_once_with(auto_commit_dirty=True)
-        manager.git_output.assert_called_once_with(["rev-parse", "main"])
+        git_output.assert_called_once_with(["rev-parse", "main"])
 
     def test_primary_validation_allows_other_checked_out_branch(self):
         manager = GitWorktreeManager(Path("/repo"), primary_branch="develop")

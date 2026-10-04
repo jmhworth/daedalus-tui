@@ -427,8 +427,11 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(str((TUI_ROOT / ".env").resolve()), str(instructions.render()))
                 with patch(
                     "tui.app.probe_project_personal_supabase_environment",
-                    return_value=(False, "Daedalus TUI .env is missing SUPABASE_URL."),
-                ):
+                    side_effect=[
+                        (False, "Daedalus TUI .env is missing SUPABASE_URL."),
+                        (True, None),
+                    ],
+                ) as probe_environment:
                     continue_button.press()
                     await pilot.pause()
                 self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
@@ -440,17 +443,15 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("SUPABASE_URL", str(status.render()))
                 self.assertIn(str((TUI_ROOT / ".env").resolve()), str(status.render()))
 
-                (project / ".env").write_text(
-                    "SUPABASE_URL=https://shared-ref.supabase.co\n"
-                    "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
-                    "SUPABASE_SECRET_KEY=secret-key\n"
-                    "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
-                    encoding="utf-8",
-                )
                 continue_button.press()
                 await pilot.pause()
                 self.assertEqual(outcomes, [True])
                 self.assertNotIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
+                self.assertEqual(probe_environment.call_count, 2)
+                self.assertEqual(
+                    probe_environment.call_args.kwargs,
+                    {"require_database_access": True},
+                )
 
     async def test_command_menu_remove_supabase_requires_confirmation(self):
         with tempfile.TemporaryDirectory() as directory:
