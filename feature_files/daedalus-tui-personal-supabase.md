@@ -137,6 +137,7 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 HACKING
 
 ## State Log
+- 2026-10-03: Kept both setup-wizard retry probes within the mocked environment-check scope so the test verifies a missing-then-present environment response.
 - 2026-09-27: Routed personal-Supabase environment resolution through the TUI root `.env` and documented the CLI link step before migration pushes.
 - 2026-09-27: Routed registered task pushes through the canonical project registration and TUI-root `.env`; link the Supabase CLI project even when pushing with an explicit database URL.
 - 2026-09-26: Activate now commits the matching legacy project Supabase config and schema-creation migration while continuing to block unrelated Supabase changes.

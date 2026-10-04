@@ -434,17 +434,17 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 ) as probe_environment:
                     continue_button.press()
                     await pilot.pause()
-                self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
-                self.assertEqual(outcomes, [])
-                self.assertIn(
-                    "Environment variables still not detected",
-                    str(status.render()),
-                )
-                self.assertIn("SUPABASE_URL", str(status.render()))
-                self.assertIn(str((TUI_ROOT / ".env").resolve()), str(status.render()))
+                    self.assertIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
+                    self.assertEqual(outcomes, [])
+                    self.assertIn(
+                        "Environment variables still not detected",
+                        str(status.render()),
+                    )
+                    self.assertIn("SUPABASE_URL", str(status.render()))
+                    self.assertIn(str((TUI_ROOT / ".env").resolve()), str(status.render()))
 
-                continue_button.press()
-                await pilot.pause()
+                    continue_button.press()
+                    await pilot.pause()
                 self.assertEqual(outcomes, [True])
                 self.assertNotIsInstance(app.screen, PersonalSupabaseSetupWizardScreen)
                 self.assertEqual(probe_environment.call_count, 2)
