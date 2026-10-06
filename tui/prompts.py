@@ -62,7 +62,12 @@ def build_task_prompt(
             "Do not modify files or create generated artifacts."
         )
     elif mode == "coding":
-        instructions = "Make the requested file changes and leave them in the worktree."
+        instructions = (
+            "Make the requested file changes and leave them in the worktree. "
+            "If the request does not require any file changes (for example a question or "
+            "explanation that was sent in coding mode), clearly state that no changes are "
+            "needed and leave the worktree unmodified; that is a successful outcome."
+        )
     else:
         raise ValueError(f"Unsupported task mode: {mode}")
     embedded_profile = _embedded_profile(profile_text)

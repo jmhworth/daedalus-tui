@@ -25,6 +25,8 @@ class PromptTests(unittest.TestCase):
     def test_task_prompt_assigns_git_ownership_to_orchestrator(self):
         prompt = build_task_prompt("Build the feature")
         self.assertIn("leave them in the worktree", prompt)
+        self.assertIn("no changes are needed", prompt)
+        self.assertIn("leave the worktree unmodified", prompt)
         self.assertIn("orchestration layer owns all file staging, commits, merges, graph refreshes", prompt)
         self.assertIn("Do not run git add, git commit, git merge, git push, or switch branches", prompt)
         self.assertIn("Do not run graphify", prompt)

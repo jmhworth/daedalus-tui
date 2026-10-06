@@ -256,7 +256,21 @@ class LocalOrchestrator:
                 manager.discard_graphify_changes(context.path)
                 manager.commit_changes(context.path, f"Daedalus task {task_id}")
                 if manager.head(context.path) == context.base_commit:
-                    raise RuntimeError("Agent finished without creating a commit.")
+                    # Coding mode may receive ask-style prompts; no file changes is
+                    # a successful no-op rather than a failed implementation.
+                    manager.remove_successful(context)
+                    self.emit(
+                        "completed",
+                        "Completed coding task with no file changes.",
+                    )
+                    return OrchestrationResult(
+                        True,
+                        task_id,
+                        context.branch_name,
+                        context.path,
+                        context=context,
+                        tokens_consumed=self._completed_tokens(),
+                    )
                 self.verify_with_repairs(
                     manager, context, selection, prompt, control, topic_slug=topic_slug
                 )

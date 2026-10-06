@@ -426,6 +426,45 @@ class OrchestratorTests(unittest.TestCase):
         manager.remove_cancelled.assert_called_once_with(context)
         self.assertTrue(any(phase == "cancelled" for phase, _, _ in events))
 
+    def test_coding_with_no_file_changes_completes_successfully(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "No changes needed.")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "base"
+            manager.commit_changes.return_value = False
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda phase, message, channel: events.append((phase, message, channel)),
+            )
+
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager):
+                result = orchestrator.run(
+                    "Why does this warning appear?",
+                    "codex",
+                    "luna",
+                    "high",
+                    task_id="task",
+                )
+
+        self.assertTrue(result.succeeded)
+        self.assertFalse(result.awaiting_plan)
+        manager.commit_changes.assert_called_once_with(context.path, "Daedalus task task")
+        manager.remove_successful.assert_called_once_with(context)
+        manager.promote.assert_not_called()
+        self.assertTrue(
+            any(
+                phase == "completed" and "no file changes" in message
+                for phase, message, _ in events
+            )
+        )
+
     def test_tagged_topic_is_embedded_from_worktree(self):
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
