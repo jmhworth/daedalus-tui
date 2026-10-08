@@ -68,6 +68,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-10-08: Updated the configuration regression expectation to preserve the 14-row compact task inbox in the scrollable vertical workspace.
 - 2026-10-08: Increased the compact task inbox height to show several task rows while the vertical workspace remains scrollable.
 - 2026-09-26: Restored GPT-6 Luna and Sol in the Codex picker and defaulted to GPT-6 Luna after confirming both slugs are live in the local Codex models cache.
 - 2026-09-26: Dropped unsupported GPT-6 Luna/Sol picker entries, defaulted Codex to GPT-5.6 Luna, and surfaced Codex JSONL API errors instead of benign stdin/cache stderr.
