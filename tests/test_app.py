@@ -1776,7 +1776,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("i")
             self.assertEqual(prompt.vim_mode, VimMode.INSERT)
             prompt.insert("first line")
-            await pilot.press("enter")
+            await pilot.press("shift+enter")
             prompt.insert("second line")
             self.assertEqual(prompt.text, "first line\nsecond line")
 

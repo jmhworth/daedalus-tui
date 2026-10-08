@@ -127,6 +127,11 @@ class DaedalusVimTextArea(VimTextArea):
             event.stop()
             event.prevent_default()
             return
+        if event.key == "shift+enter" and self.vim_mode == VimMode.INSERT:
+            self.insert("\n")
+            event.stop()
+            event.prevent_default()
+            return
         if event.key == "ctrl+k":
             # VimTextArea handles several Ctrl keys itself, so route the
             # application's shortcut before its mode-specific processing.

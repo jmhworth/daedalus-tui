@@ -228,6 +228,7 @@ SHORTCUT_SECTIONS = (
         "Prompt (Vim mode)",
         (
             ("Enter", "Send prompt"),
+            ("Shift+Enter", "Insert a new line"),
             ("Esc", "Enter Normal mode"),
             ("i / a / o", "Enter Insert mode"),
             ("h / j / k / l", "Move the cursor"),
