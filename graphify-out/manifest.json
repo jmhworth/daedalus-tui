@@ -15,13 +15,13 @@
     "semantic_hash": ""
   },
   "tests/test_app.py": {
-    "mtime": 1791076758.5062747,
-    "ast_hash": "8e36a28b40bca3054102d9a936981a6e",
+    "mtime": 1791475622.2327108,
+    "ast_hash": "443adbd7447e2d27fad7868f969c9dec",
     "semantic_hash": ""
   },
   "tests/test_config.py": {
-    "mtime": 1790446359.7161279,
-    "ast_hash": "8fc1a2ee64b3bebc6129d2a5f22484a6",
+    "mtime": 1791475952.9717555,
+    "ast_hash": "2eaa7176e31e20b557fc8b2a28771422",
     "semantic_hash": ""
   },
   "tests/test_git_worktree.py": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "tui/app.py": {
-    "mtime": 1790531550.6558366,
-    "ast_hash": "ae8b8cb7c66193921e39835502d5da62",
+    "mtime": 1791475622.2337885,
+    "ast_hash": "07d07d97191ce91c799d0aa7e0ac38fc",
     "semantic_hash": ""
   },
   "tui/clipboard.py": {
@@ -85,8 +85,8 @@
     "semantic_hash": "cf5f808e3a03a0cd04a9f08912c9cacd"
   },
   "tui/config.py": {
-    "mtime": 1790446359.7167904,
-    "ast_hash": "1fb23befd6fd2c604568e341c19381df",
+    "mtime": 1791475952.9746833,
+    "ast_hash": "546a75597d6822934b4a0d4483bff5c6",
     "semantic_hash": ""
   },
   "tui/environment.py": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "tui/vim_text_area.py": {
-    "mtime": 1789569190.9059784,
-    "ast_hash": "51d2a6f0f49d76b29cc88e06893806ea",
+    "mtime": 1791475622.235563,
+    "ast_hash": "49da8636a675791d9fd01b51116078fb",
     "semantic_hash": ""
   },
   "README.md": {
@@ -145,8 +145,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
-    "mtime": 1790446359.7146204,
-    "ast_hash": "d8c3ce407b4d931ae9bd9f785a0f1e30",
+    "mtime": 1791475952.955809,
+    "ast_hash": "739cb5a7dcc54f11ab98684a3393fc67",
     "semantic_hash": ""
   },
   "requirements.txt": {
