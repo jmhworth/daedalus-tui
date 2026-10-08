@@ -246,7 +246,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.query_one("#cancel-button", Button), Button)
             self.assertIsInstance(app.query_one("#retry-button", Button), Button)
             self.assertIsInstance(app.query_one("#continue-plan-button", Button), Button)
-            self.assertIsInstance(app.query_one("#start-coding-button", Button), Button)
             self.assertEqual(app.query("#new-task-button, #new-project-button").nodes, [])
             self.assertEqual(
                 app.query(
@@ -1973,7 +1972,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(app.query_one("#pause-button", Button).disabled)
             self.assertFalse(app.query_one("#cancel-button", Button).disabled)
 
-    async def test_questioning_plan_is_selectable_and_can_continue_or_start_coding(self):
+    async def test_questioning_plan_is_selectable_and_can_continue(self):
         app, coordinator = self.make_app()
         async with app.run_test() as pilot:
             app.query_one("#mode-select", Select).value = "plan"
@@ -1988,7 +1987,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(str(app.query_one("#phase", Static).render()), "Phase: Questioning")
             self.assertFalse(app.query_one("#continue-plan-button", Button).disabled)
-            self.assertFalse(app.query_one("#start-coding-button", Button).disabled)
             self.assertTrue(app.query_one("#pause-button", Button).disabled)
             self.assertFalse(app.query_one("#cancel-button", Button).disabled)
 
@@ -1997,15 +1995,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 coordinator.plan_actions[-1],
                 ("continue", record.task_id, "Please clarify the data flow."),
-            )
-
-            record.status = "questioning"
-            coordinator.emit(record, "questioning", "Plan ready again.", "status")
-            app.query_one("#resume-notes", TextArea).insert("Use the smallest compatible change.")
-            app._start_coding()
-            self.assertEqual(
-                coordinator.plan_actions[-1],
-                ("coding", record.task_id, "Use the smallest compatible change."),
             )
 
     async def test_plan_review_renders_literal_markup_like_agent_text(self):

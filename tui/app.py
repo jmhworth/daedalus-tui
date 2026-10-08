@@ -227,6 +227,7 @@ SHORTCUT_SECTIONS = (
     (
         "Prompt (Vim mode)",
         (
+            ("Enter", "Send prompt"),
             ("Esc", "Enter Normal mode"),
             ("i / a / o", "Enter Insert mode"),
             ("h / j / k / l", "Move the cursor"),
@@ -235,7 +236,6 @@ SHORTCUT_SECTIONS = (
             ("d / u", "Delete / undo"),
             ("y / p", "Yank / paste"),
             ("V", "Select whole lines"),
-            ("Enter", "Insert a newline"),
         ),
     ),
 )
@@ -1457,7 +1457,6 @@ class DaedalusTuiApp(App[None]):
                         with Horizontal(id="actions"):
                             yield Button("Send", id="send-button", variant="primary")
                             yield Button("Continue Plan", id="continue-plan-button", disabled=True)
-                            yield Button("Start Coding", id="start-coding-button", disabled=True, variant="primary")
                             yield Button("Pause", id="pause-button", disabled=True)
                             yield Button("Resume", id="resume-button", disabled=True)
                             yield Button("Cancel", id="cancel-button", disabled=True, variant="error")
@@ -1876,9 +1875,6 @@ class DaedalusTuiApp(App[None]):
     def action_continue_plan(self) -> None:
         self._continue_plan()
 
-    def action_start_coding(self) -> None:
-        self._start_coding()
-
     def action_cancel_task(self) -> None:
         self._cancel_task()
 
@@ -2171,8 +2167,6 @@ class DaedalusTuiApp(App[None]):
             self.action_view_topic()
         elif event.button.id == "continue-plan-button":
             self._continue_plan()
-        elif event.button.id == "start-coding-button":
-            self._start_coding()
         elif event.button.id == "pause-button":
             self._pause_task()
         elif event.button.id == "resume-button":
@@ -3283,7 +3277,6 @@ class DaedalusTuiApp(App[None]):
             self.query_one("#cancel-button", Button).disabled = True
             self.query_one("#retry-button", Button).disabled = True
             self.query_one("#continue-plan-button", Button).disabled = True
-            self.query_one("#start-coding-button", Button).disabled = True
             self.query_one("#resume-notes-panel", Vertical).styles.display = "none"
             self.query_one("#plan-review", Vertical).styles.display = "none"
             return
@@ -3332,7 +3325,6 @@ class DaedalusTuiApp(App[None]):
         self.query_one("#cancel-button", Button).disabled = not active and record.status != "questioning"
         self.query_one("#retry-button", Button).disabled = record.status != "failed"
         self.query_one("#continue-plan-button", Button).disabled = record.status != "questioning"
-        self.query_one("#start-coding-button", Button).disabled = record.status != "questioning"
         self.query_one("#resume-notes-panel", Vertical).styles.display = (
             "block" if record.status in {"paused", "questioning"} else "none"
         )
@@ -3855,15 +3847,6 @@ class DaedalusTuiApp(App[None]):
             self._mark_task_current_session(record)
             notes_widget.clear()
             self._set_status("Continuing plan")
-
-    def _start_coding(self) -> None:
-        record = self.coordinator.get(self._selected_task_id or "")
-        notes_widget = self.query_one("#resume-notes", TextArea)
-        notes = notes_widget.text.strip()
-        if record is not None and self.coordinator.start_coding(record.task_id, notes):
-            self._mark_task_current_session(record)
-            notes_widget.clear()
-            self._set_status("Starting coding")
 
     def _cancel_task(self) -> None:
         record = self.coordinator.get(self._selected_task_id or "")
