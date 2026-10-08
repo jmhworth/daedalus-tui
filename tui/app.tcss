@@ -292,7 +292,7 @@ Screen {
     margin-right: 2;
 }
 
-#continue-plan-button, #start-coding-button {
+#continue-plan-button {
     width: 16;
     margin-right: 1;
 }

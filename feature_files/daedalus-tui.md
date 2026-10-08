@@ -36,6 +36,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Full-size output toggle**: Agent transcript and task diagnostics share one full-height output panel; a toggle shows either log at the same readable size while preserving selection and copying.
 - **Readable streamed output**: Assistant messages are separated by a blank line, transcript lines reflow at word boundaries with hyphenation only for overlong words, and the output pane keeps a small width buffer so long responses remain visible.
 - **Incremental Vim input**: The prompt uses a modal VimTextArea with a practical command subset; additional Vim commands can be added as they become useful instead of implementing the entire Vim language up front.
+- **Prompt submission**: Pressing Enter in the prompt submits the task, Shift+Enter inserts a newline while composing, and Ctrl+Enter remains available as a global shortcut.
 - **Project selection**: Launching from a root directory discovers only immediate child directories with `feature_files` folders; nested descendants are excluded, and the launch root is used only as a fallback when no eligible child exists. The task toolbar selects the project for new submissions, editable prompt drafts survive project switches, and focusing an inbox row synchronizes the active project without mixing transcripts or worktrees. Each project's remembered operating branch is restored independently when focus returns.
 - **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
@@ -70,6 +71,8 @@ HACKING
 ## State Log
 - 2026-10-08: Updated the configuration regression expectation to preserve the 14-row compact task inbox in the scrollable vertical workspace.
 - 2026-10-08: Increased the compact task inbox height to show several task rows while the vertical workspace remains scrollable.
+- 2026-10-08: Preserved multiline prompt composition with Shift+Enter after Enter became the submit key.
+- 2026-10-08: Removed the ambiguous Start Coding composer action and made Enter submit prompts from the Vim editor.
 - 2026-09-26: Restored GPT-6 Luna and Sol in the Codex picker and defaulted to GPT-6 Luna after confirming both slugs are live in the local Codex models cache.
 - 2026-09-26: Dropped unsupported GPT-6 Luna/Sol picker entries, defaulted Codex to GPT-5.6 Luna, and surfaced Codex JSONL API errors instead of benign stdin/cache stderr.
 - 2026-09-23: Added GPT-6 Luna and Sol to the Codex model picker and made GPT-6 Luna with high reasoning the default.

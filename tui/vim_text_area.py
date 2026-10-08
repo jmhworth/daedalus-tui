@@ -120,14 +120,18 @@ class DaedalusVimTextArea(VimTextArea):
             end += 1
         self.cursor_location = characters[end][1]
 
-    def _handle_insert_mode(self, event: events.Key) -> None:
-        """Keep Enter as a newline; Ctrl+Enter remains the app submit key."""
-        if event.key == "enter":
-            return
-        super()._handle_insert_mode(event)
-
     def on_key(self, event: events.Key) -> None:
         """Route visual-line mode and mirror new yanks to the host clipboard."""
+        if event.key == "enter":
+            self.app.action_submit_prompt()
+            event.stop()
+            event.prevent_default()
+            return
+        if event.key == "shift+enter" and self.vim_mode == VimMode.INSERT:
+            self.insert("\n")
+            event.stop()
+            event.prevent_default()
+            return
         if event.key == "ctrl+k":
             # VimTextArea handles several Ctrl keys itself, so route the
             # application's shortcut before its mode-specific processing.
