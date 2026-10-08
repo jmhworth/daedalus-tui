@@ -36,7 +36,7 @@ class LayoutSettings:
 
     compact_width: int = 100
     short_height: int = 32
-    compact_task_sidebar_height: int = 8
+    compact_task_sidebar_height: int = 14
     compact_prompt_height: int = 8
     wide_control_min_width: int = 13
     compact_output_height: int = 16
@@ -124,7 +124,7 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
     layout = LayoutSettings(
         compact_width=int(layout_values.get("compact_width", 100)),
         short_height=int(layout_values.get("short_height", 32)),
-        compact_task_sidebar_height=int(layout_values.get("compact_task_sidebar_height", 8)),
+        compact_task_sidebar_height=int(layout_values.get("compact_task_sidebar_height", 14)),
         compact_prompt_height=int(layout_values.get("compact_prompt_height", 8)),
         wide_control_min_width=int(layout_values.get("wide_control_min_width", 14)),
         compact_output_height=int(layout_values.get("compact_output_height", 16)),

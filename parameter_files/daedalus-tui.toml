@@ -48,9 +48,10 @@ compact_width = 100
 # cannot provide enough cells for its label and dropdown affordance.
 wide_control_min_width = 13
 short_height = 32
-compact_task_sidebar_height = 8
+compact_task_sidebar_height = 14
 # Compact mode lays out all settings in a three-column grid and scrolls the
-# complete workspace; these are the initial transcript and prompt heights.
+# complete workspace. The taller inbox leaves room for several task rows;
+# these are the initial transcript and prompt heights.
 compact_prompt_height = 8
 compact_output_height = 16
 

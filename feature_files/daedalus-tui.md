@@ -44,7 +44,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
 - **Command Menu**: `Ctrl+K` opens a discoverable action menu for New Task, Create Topic, Activate/remove personal Supabase, and Sync to GitHub (pull then push by default; merge conflicts can launch plan-mode recovery). New Task also remains available through `Ctrl+T`; the menu links to the full keyboard-shortcut reference, while New Project remains available through `Ctrl+Shift+N` and coding statistics remains on `Ctrl+U`.
-- **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a three-column settings grid above the output and composer, giving the transcript and prompt larger starting heights while retaining independent scrolling inside each widget.
+- **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a taller task inbox and a three-column settings grid above the output and composer, giving several task rows room while retaining independent scrolling inside each widget.
 
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
@@ -68,6 +68,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-10-08: Increased the compact task inbox height to show several task rows while the vertical workspace remains scrollable.
 - 2026-09-26: Restored GPT-6 Luna and Sol in the Codex picker and defaulted to GPT-6 Luna after confirming both slugs are live in the local Codex models cache.
 - 2026-09-26: Dropped unsupported GPT-6 Luna/Sol picker entries, defaulted Codex to GPT-5.6 Luna, and surfaced Codex JSONL API errors instead of benign stdin/cache stderr.
 - 2026-09-23: Added GPT-6 Luna and Sol to the Codex model picker and made GPT-6 Luna with high reasoning the default.

@@ -324,7 +324,7 @@ Screen {
 #screen.compact-width #task-sidebar {
     width: 1fr;
     min-width: 0;
-    height: 8;
+    height: 14;
     padding: 1;
 }
 
