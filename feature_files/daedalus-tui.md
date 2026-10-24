@@ -44,9 +44,10 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Stable task inbox layout**: The task inbox uses fixed, parameterized marker/project/task/status widths and visible ellipses so background update markers cannot resize or horizontally scroll the sidebar.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
+- **Prompt placement**: The prompt editor sits directly below the settings toggles, above agent output; submission and task action buttons stay at the bottom of the workspace.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
 - **Command Menu**: `Ctrl+K` opens a discoverable action menu for New Task, Create Topic, Activate/remove personal Supabase, and Sync to GitHub (pull then push by default; merge conflicts can launch plan-mode recovery). New Task also remains available through `Ctrl+T`; the menu links to the full keyboard-shortcut reference, while New Project remains available through `Ctrl+Shift+N` and coding statistics remains on `Ctrl+U`.
-- **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a taller task inbox and a three-column settings grid above the output and composer, giving several task rows room while retaining independent scrolling inside each widget.
+- **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a taller task inbox and a three-column settings grid above the composer and output, giving several task rows room while retaining independent scrolling inside each widget.
 
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
@@ -72,6 +73,7 @@ HACKING
 
 ## State Log
 - 2026-10-24: Added animated active-task feedback, colored terminal outcomes above the transcript, and file glyphs for bracketed paths and filenames.
+- 2026-10-24: Moved the prompt editor below the settings controls and kept submission/task actions after the output panel at the bottom of the workspace.
 - 2026-10-08: Updated the configuration regression expectation to preserve the 14-row compact task inbox in the scrollable vertical workspace.
 - 2026-10-08: Increased the compact task inbox height to show several task rows while the vertical workspace remains scrollable.
 - 2026-10-08: Preserved multiline prompt composition with Shift+Enter after Enter became the submit key.
