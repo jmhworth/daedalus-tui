@@ -7856,8 +7856,8 @@
       "source_location": "L1468",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_personal_supabase_bootstrap",
-      "community": 46,
-      "community_name": "._handle_visual_line_mode",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._start_personal_supabase_bootstrap()"
     },
     {
@@ -7977,8 +7977,8 @@
       "source_location": "L1731",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_apply_measured_responsive_layout",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._apply_measured_responsive_layout()"
     },
     {
@@ -7988,8 +7988,8 @@
       "source_location": "L1742",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_wide_controls_overflow",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._wide_controls_overflow()"
     },
     {
@@ -8131,8 +8131,8 @@
       "source_location": "L1864",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_new_task",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 46,
+      "community_name": "._handle_visual_line_mode",
       "norm_label": ".action_new_task()"
     },
     {
@@ -8318,8 +8318,8 @@
       "source_location": "L2010",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_open_personal_supabase_setup_wizard",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 69,
+      "community_name": "log_exception",
       "norm_label": "._open_personal_supabase_setup_wizard()"
     },
     {
@@ -8329,8 +8329,8 @@
       "source_location": "L2026",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_wizard_finished",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 69,
+      "community_name": "log_exception",
       "norm_label": "._on_personal_supabase_wizard_finished()"
     },
     {
@@ -8340,8 +8340,8 @@
       "source_location": "L2049",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_personal_supabase_activate",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 91,
+      "community_name": "._finish_personal_supabase_progress",
       "norm_label": "._start_personal_supabase_activate()"
     },
     {
@@ -8351,8 +8351,8 @@
       "source_location": "L2098",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_activation_progress",
-      "community": 91,
-      "community_name": "._finish_personal_supabase_progress",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._on_personal_supabase_activation_progress()"
     },
     {
@@ -8483,8 +8483,8 @@
       "source_location": "L2436",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_current_submission_settings",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "._current_submission_settings()"
     },
     {
@@ -8527,8 +8527,8 @@
       "source_location": "L2520",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_topic_created",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "._on_topic_created()"
     },
     {
@@ -8593,8 +8593,8 @@
       "source_location": "L2630",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_update_sync_recovery_status",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "._update_sync_recovery_status()"
     },
     {
@@ -8703,8 +8703,8 @@
       "source_location": "L2805",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_push_selected_branch",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 69,
+      "community_name": "log_exception",
       "norm_label": "._push_selected_branch()"
     },
     {
@@ -8714,8 +8714,8 @@
       "source_location": "L2852",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_push_finished",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "._on_push_finished()"
     },
     {
@@ -8725,8 +8725,8 @@
       "source_location": "L2877",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_sync_conflict_recovery",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "._start_sync_conflict_recovery()"
     },
     {
@@ -8747,8 +8747,8 @@
       "source_location": "L2930",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_selected_topic",
-      "community": 69,
-      "community_name": "log_exception",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._selected_topic()"
     },
     {
@@ -8813,8 +8813,8 @@
       "source_location": "L3007",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_project_initialized",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 46,
+      "community_name": "._handle_visual_line_mode",
       "norm_label": "._on_project_initialized()"
     },
     {
@@ -9000,8 +9000,8 @@
       "source_location": "L3250",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_render_selected_task_safely",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 46,
+      "community_name": "._handle_visual_line_mode",
       "norm_label": "._render_selected_task_safely()"
     },
     {
@@ -9187,8 +9187,8 @@
       "source_location": "L3697",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_new_task",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 46,
+      "community_name": "._handle_visual_line_mode",
       "norm_label": "._start_new_task()"
     },
     {
@@ -9363,8 +9363,8 @@
       "source_location": "L3873",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_set_error",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "._set_error()"
     },
     {
@@ -9660,8 +9660,8 @@
       "source_location": "L1469",
       "_origin": "ast",
       "id": "tui_app_rationale_1469",
-      "community": 46,
-      "community_name": "._handle_visual_line_mode",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "synchronize registered projects; push migrations only when activated."
     },
     {
@@ -9726,8 +9726,8 @@
       "source_location": "L1732",
       "_origin": "ast",
       "id": "tui_app_rationale_1732",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "switch to compact mode when wide controls extend past their bars."
     },
     {
@@ -9737,8 +9737,8 @@
       "source_location": "L1743",
       "_origin": "ast",
       "id": "tui_app_rationale_1743",
-      "community": 80,
-      "community_name": ".edit_paste_after",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "return whether wide-layout controls are clipped or too narrow."
     },
     {
@@ -9847,8 +9847,8 @@
       "source_location": "L2015",
       "_origin": "ast",
       "id": "tui_app_rationale_2015",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 69,
+      "community_name": "log_exception",
       "norm_label": "scaffold files, then guide manual project env setup before activate."
     },
     {
@@ -9858,8 +9858,8 @@
       "source_location": "L2055",
       "_origin": "ast",
       "id": "tui_app_rationale_2055",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 91,
+      "community_name": "._finish_personal_supabase_progress",
       "norm_label": "run scaffold+activate in a background worker so the tui stays responsive."
     },
     {
@@ -9869,8 +9869,8 @@
       "source_location": "L2099",
       "_origin": "ast",
       "id": "tui_app_rationale_2099",
-      "community": 91,
-      "community_name": "._finish_personal_supabase_progress",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "forward worker phases to the modal and the main status line."
     },
     {
@@ -9968,8 +9968,8 @@
       "source_location": "L2437",
       "_origin": "ast",
       "id": "tui_app_rationale_2437",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "return provider metadata from the shared controls for a new task."
     },
     {
@@ -9979,8 +9979,8 @@
       "source_location": "L2521",
       "_origin": "ast",
       "id": "tui_app_rationale_2521",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "queue a coding task that writes and expands the requested topic file."
     },
     {
@@ -10012,8 +10012,8 @@
       "source_location": "L2631",
       "_origin": "ast",
       "id": "tui_app_rationale_2631",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "surface sync conflict recovery progress in the status bar."
     },
     {
@@ -10089,8 +10089,8 @@
       "source_location": "L2806",
       "_origin": "ast",
       "id": "tui_app_rationale_2806",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 69,
+      "community_name": "log_exception",
       "norm_label": "sync the branch select value for the active project with origin."
     },
     {
@@ -10100,8 +10100,8 @@
       "source_location": "L2878",
       "_origin": "ast",
       "id": "tui_app_rationale_2878",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "launch plan-mode recovery against the preserved sync conflict worktree."
     },
     {
@@ -10122,8 +10122,8 @@
       "source_location": "L2931",
       "_origin": "ast",
       "id": "tui_app_rationale_2931",
-      "community": 69,
-      "community_name": "log_exception",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "return the selected topic slug, or none for the blank option."
     },
     {
@@ -10232,8 +10232,8 @@
       "source_location": "L3251",
       "_origin": "ast",
       "id": "tui_app_rationale_3251",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 46,
+      "community_name": "._handle_visual_line_mode",
       "norm_label": "keep one bad dynamic widget update from closing the entire tui."
     },
     {
@@ -10276,8 +10276,8 @@
       "source_location": "L3698",
       "_origin": "ast",
       "id": "tui_app_rationale_3698",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 46,
+      "community_name": "._handle_visual_line_mode",
       "norm_label": "clear the selected task and unlock a fresh prompt editor."
     },
     {
@@ -12146,8 +12146,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "tui_git_worktree_syncmergeconflicterror",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "syncmergeconflicterror"
     },
     {
@@ -12641,8 +12641,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "tui_git_worktree_rationale_18",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 80,
+      "community_name": ".edit_paste_after",
       "norm_label": "raised when an operator sync pull/merge leaves unmerged paths.      the conflict"
     },
     {
@@ -20129,7 +20129,7 @@
       "label": "Relevant Files",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui.md",
-      "source_location": "L50",
+      "source_location": "L51",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_relevant_files",
       "community": 12,
@@ -20140,7 +20140,7 @@
       "label": "Dev Mode",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui.md",
-      "source_location": "L68",
+      "source_location": "L69",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_dev_mode",
       "community": 12,
@@ -20151,7 +20151,7 @@
       "label": "State Log",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui.md",
-      "source_location": "L71",
+      "source_location": "L72",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_state_log",
       "community": 12,
@@ -53856,7 +53856,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "tui/app.py",
-      "source_location": "L1435",
+      "source_location": "L1446",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_app_daedalustuiapp_compose",
@@ -53867,7 +53867,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/app.py",
-      "source_location": "L1424",
+      "source_location": "L1435",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_app_daedalustuiapp_compose",
@@ -53904,7 +53904,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tui/app.py",
-      "source_location": "L1437",
+      "source_location": "L1448",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_app_daedalustuiapp_compose",
@@ -53916,7 +53916,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tui/app.py",
-      "source_location": "L1448",
+      "source_location": "L1425",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_app_daedalustuiapp_compose",
@@ -80431,7 +80431,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui.md",
-      "source_location": "L68",
+      "source_location": "L69",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_daedalus_textual_tui",
@@ -80453,7 +80453,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui.md",
-      "source_location": "L50",
+      "source_location": "L51",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_daedalus_textual_tui",
@@ -80464,7 +80464,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui.md",
-      "source_location": "L71",
+      "source_location": "L72",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_daedalus_textual_tui",
@@ -80902,5 +80902,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "cff2044e04632c2d24f9860f30237806571a56f0"
+  "built_at_commit": "cc2c01cd1e6b5c170e377b4d30f7e80fb7bb48e0"
 }

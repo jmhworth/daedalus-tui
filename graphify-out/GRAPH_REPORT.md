@@ -1,16 +1,16 @@
-# Graph Report - daedalus-tui  (2026-10-08)
+# Graph Report - daedalus-tui  (2026-10-24)
 
 ## Corpus Check
-- 96 files · ~95,574 words
+- 96 files · ~95,625 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1877 nodes · 5205 edges · 93 communities (79 shown, 14 thin omitted)
+- 1877 nodes · 5205 edges · 93 communities (80 shown, 13 thin omitted)
 - Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 595 edges (avg confidence: 0.54)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `cff2044e`
+- Built from commit: `cc2c01cd`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -135,7 +135,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (93 total, 14 thin omitted)
+## Communities (93 total, 13 thin omitted)
 
 ### Community 0 - "PlanQuestion"
 Cohesion: 0.22
@@ -306,8 +306,8 @@ Cohesion: 0.20
 Nodes (9): Constraints and Design Principles, Desired End State, Intended Import Workflow, Open Questions, Project Imports to the Daedalus Format, Scope and Durable Context, State Log, Topic Goal (+1 more)
 
 ### Community 46 - "._handle_visual_line_mode"
-Cohesion: 0.08
-Nodes (14): RowSelected, Synchronize registered projects; push migrations only when activated., Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive., Promote only events that need the user's attention in the inbox., Return only direct-child projects, or the empty-root fallback., Refresh the account usage line without blocking the TUI event loop., Render actionable history and tasks created during this session. (+6 more)
+Cohesion: 0.07
+Nodes (15): RowSelected, Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive., Promote only events that need the user's attention in the inbox., Return only direct-child projects, or the empty-root fallback., Refresh the account usage line without blocking the TUI event loop., Render actionable history and tasks created during this session., Keep failures, active work, and all tasks submitted in this launch. (+7 more)
 
 ### Community 47 - "DaedalusTuiApp"
 Cohesion: 0.16
@@ -375,7 +375,7 @@ Nodes (8): is_personal_supabase_activated(), is_personal_supabase_registered(), 
 
 ### Community 69 - "log_exception"
 Cohesion: 0.07
-Nodes (19): Path, Resize, Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com, Measure wide controls after their current layout pass completes., Apply provider-specific model and reasoning choices to all controls., Avoid posting Select.Changed events when the options are unchanged., Return labels and values for one compact settings category. (+11 more)
+Nodes (20): Path, Resize, Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com, Measure wide controls after their current layout pass completes., Scaffold files, then guide manual project env setup before Activate., Apply provider-specific model and reasoning choices to all controls., Avoid posting Select.Changed events when the options are unchanged. (+12 more)
 
 ### Community 70 - "GitWorktreeError"
 Cohesion: 0.31
@@ -413,13 +413,17 @@ Nodes (5): GraphifyTests, Path, Best-effort graph refresh owned by the local orc
 Cohesion: 0.23
 Nodes (5): AsyncFunctionDef, ClassDef, FunctionDef, Module, _ScopeFrame
 
+### Community 80 - ".edit_paste_after"
+Cohesion: 0.21
+Nodes (6): Return provider metadata from the shared controls for a new task., Queue a coding task that writes and expands the requested topic file., Surface Sync conflict recovery progress in the status bar., Launch plan-mode recovery against the preserved Sync conflict worktree., Raised when an operator Sync pull/merge leaves unmerged paths.      The conflict, SyncMergeConflictError
+
 ### Community 81 - "select_roots"
 Cohesion: 0.08
 Nodes (25): EnvironmentTests, _format_codex_usage(), _format_codex_window(), Textual interface for concurrent local agent tasks., Remove known credential values before diagnostics reach the UI or log., Return Textual's event name for a user-facing shortcut label., _redact_supabase_diagnostic(), _shortcut_binding_key() (+17 more)
 
 ### Community 84 - "RegistrationResult"
 Cohesion: 0.05
-Nodes (26): DaedalusTuiApp, Key, Add Vim-like navigation without changing TextArea insert behavior., Run the wide-layout measurement after the next screen refresh., Run a command after the command menu has been removed., Confirm, then scaffold (if needed) and Activate personal Supabase., Confirm, then remove local personal-Supabase artifacts for the project., Scaffold files, then guide manual project env setup before Activate. (+18 more)
+Nodes (20): DaedalusTuiApp, Key, Synchronize registered projects; push migrations only when activated., Add Vim-like navigation without changing TextArea insert behavior., Run the wide-layout measurement after the next screen refresh., Switch to compact mode when wide controls extend past their bars., Return whether wide-layout controls are clipped or too narrow., Run a command after the command menu has been removed. (+12 more)
 
 ### Community 85 - "._focus_submitted_task"
 Cohesion: 0.16
@@ -439,7 +443,7 @@ Nodes (26): main(), Child-process probe for Daedalus TUI Supabase env key presen
 
 ### Community 91 - "._finish_personal_supabase_progress"
 Cohesion: 0.12
-Nodes (10): PersonalSupabaseActivationProgressScreen, Forward worker phases to the modal and the main status line., Finish a queued modal update only if its screen is still mounted., Show the durable activation phases while the worker runs., Whether the activation worker still owns this progress surface., Apply worker results that arrived while this modal was mounting., Mark the current activation phase and retain a readable status line., Update mounted progress widgets for one worker phase. (+2 more)
+Nodes (10): PersonalSupabaseActivationProgressScreen, Run scaffold+Activate in a background worker so the TUI stays responsive., Finish a queued modal update only if its screen is still mounted., Show the durable activation phases while the worker runs., Whether the activation worker still owns this progress surface., Apply worker results that arrived while this modal was mounting., Mark the current activation phase and retain a readable status line., Update mounted progress widgets for one worker phase. (+2 more)
 
 ### Community 92 - "paste_from_system_clipboard"
 Cohesion: 0.29
@@ -452,14 +456,14 @@ Nodes (23): AbstractEventLoop, BaseException, Exception, Pause active agents bef
 ## Knowledge Gaps
 - **117 isolated node(s):** `daedalus-tui`, `Execution Boundaries (CRITICAL)`, `Evidence Extraction`, `Architecture Boundaries`, `Parameter Files` (+112 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `DaedalusTuiApp` connect `RegistrationResult` to `AgentRunner`, `log_exception`, `GitWorktreeError`, `._rebuild_plan_questions`, `bootstrap_personal_supabase`, `._handle_visual_line_mode`, `.edit_paste_after`, `select_roots`, `._persist_task`, `.on_mount`, `._set_status`, `._finish_personal_supabase_progress`, `paste_from_system_clipboard`, `CodingStatisticsScreen`, `calculate_token_usage`, `DescriptorEmbedder`?**
   _High betweenness centrality (0.132) - this node is a cross-community bridge._
-- **Why does `TuiAppTests` connect `bootstrap_personal_supabase` to `DaedalusVimTextArea`, `AgentRunner`, `GitWorktreeError`, `._rebuild_plan_questions`, `CandidateFeatureGroup`, `RegistrationResult`, `DescriptorEmbedder`, `._finish_personal_supabase_progress`, `CodingStatisticsScreen`?**
+- **Why does `TuiAppTests` connect `bootstrap_personal_supabase` to `DaedalusVimTextArea`, `AgentRunner`, `GitWorktreeError`, `._rebuild_plan_questions`, `CandidateFeatureGroup`, `.edit_paste_after`, `RegistrationResult`, `DescriptorEmbedder`, `._finish_personal_supabase_progress`, `CodingStatisticsScreen`?**
   _High betweenness centrality (0.054) - this node is a cross-community bridge._
 - **Why does `AgentRunner` connect `._set_status` to `AgentRunner`, `.on_mount`, `push_migrations`, `._persist_task`, `select_roots`, `CodingStatisticsScreen`, `RegistrationResult`, `.provider_split`, `._finish_personal_supabase_progress`, `CodingStatisticsScreen`?**
   _High betweenness centrality (0.049) - this node is a cross-community bridge._
