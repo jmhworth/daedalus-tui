@@ -1372,6 +1372,23 @@ class DaedalusTuiApp(App[None]):
                             allow_blank=False,
                             id="project-select",
                         )
+                    yield Static(self._directory_text(), id="directory")
+                    yield Static("Codex plan usage: Loading…", id="codex-usage")
+                    yield Static("Phase: Idle", id="phase")
+                    yield Static("Task branch: —    Worktree: —", id="task-context")
+                    with Horizontal(id="agent-state-row"):
+                        yield LoadingIndicator(id="agent-spinner")
+                        yield Static("", id="agent-outcome", markup=False)
+                    with Vertical(id="output-panel"):
+                        with Horizontal(id="output-toolbar"):
+                            yield Static("Agent output", id="output-view-label")
+                            yield Button("Show errors", id="output-toggle-button")
+                        # Keep diagnostics on the same selectable Log surface
+                        # as the transcript so mouse selection, y, and Ctrl+C
+                        # all use Textual's screen-selection clipboard path.
+                        yield Log(id="task-error", auto_scroll=False)
+                        # Log supports Textual click-drag selection; RichLog does not.
+                        yield TranscriptLog(id="output", auto_scroll=True)
                     with Horizontal(id="settings"):
                         yield Select(
                             [(option.label, option.value) for option in self.settings.providers],
@@ -1433,23 +1450,6 @@ class DaedalusTuiApp(App[None]):
                                 id="resume-notes",
                                 placeholder="Tell the agent what it missed or what to update next...",
                             )
-                    yield Static(self._directory_text(), id="directory")
-                    yield Static("Codex plan usage: Loading…", id="codex-usage")
-                    yield Static("Phase: Idle", id="phase")
-                    yield Static("Task branch: —    Worktree: —", id="task-context")
-                    with Horizontal(id="agent-state-row"):
-                        yield LoadingIndicator(id="agent-spinner")
-                        yield Static("", id="agent-outcome", markup=False)
-                    with Vertical(id="output-panel"):
-                        with Horizontal(id="output-toolbar"):
-                            yield Static("Agent output", id="output-view-label")
-                            yield Button("Show errors", id="output-toggle-button")
-                        # Keep diagnostics on the same selectable Log surface
-                        # as the transcript so mouse selection, y, and Ctrl+C
-                        # all use Textual's screen-selection clipboard path.
-                        yield Log(id="task-error", auto_scroll=False)
-                        # Log supports Textual click-drag selection; RichLog does not.
-                        yield TranscriptLog(id="output", auto_scroll=True)
                     with Vertical(id="plan-review"):
                         # Agent plan text is literal; brackets and scientific
                         # notation must not be parsed as Textual/Rich markup.
