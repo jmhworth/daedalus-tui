@@ -1421,6 +1421,17 @@ class DaedalusTuiApp(App[None]):
                             allow_blank=False,
                             id="compact-settings-value",
                         )
+                    with Vertical(id="composer"):
+                        yield DaedalusVimTextArea(
+                            id="prompt-input",
+                            placeholder="Describe the change for the local agent...",
+                        )
+                        with Vertical(id="resume-notes-panel"):
+                            yield Static("Optional notes for resuming this task", id="resume-notes-label")
+                            yield TextArea(
+                                id="resume-notes",
+                                placeholder="Tell the agent what it missed or what to update next...",
+                            )
                     yield Static(self._directory_text(), id="directory")
                     yield Static("Codex plan usage: Loading…", id="codex-usage")
                     yield Static("Phase: Idle", id="phase")
@@ -1444,25 +1455,14 @@ class DaedalusTuiApp(App[None]):
                         with Horizontal(id="plan-actions"):
                             yield Button("Submit Answers", id="answer-plan-button", disabled=True)
                             yield Button("Implement", id="implement-button", disabled=True, variant="primary")
-                    with Vertical(id="composer"):
-                        yield DaedalusVimTextArea(
-                            id="prompt-input",
-                            placeholder="Describe the change for the local agent...",
-                        )
-                        with Vertical(id="resume-notes-panel"):
-                            yield Static("Optional notes for resuming this task", id="resume-notes-label")
-                            yield TextArea(
-                                id="resume-notes",
-                                placeholder="Tell the agent what it missed or what to update next...",
-                            )
-                        with Horizontal(id="actions"):
-                            yield Button("Send", id="send-button", variant="primary")
-                            yield Button("Continue Plan", id="continue-plan-button", disabled=True)
-                            yield Button("Pause", id="pause-button", disabled=True)
-                            yield Button("Resume", id="resume-button", disabled=True)
-                            yield Button("Cancel", id="cancel-button", disabled=True, variant="error")
-                            yield Button("Retry", id="retry-button", disabled=True)
-                            yield Static("Idle", id="status")
+                    with Horizontal(id="actions"):
+                        yield Button("Send", id="send-button", variant="primary")
+                        yield Button("Continue Plan", id="continue-plan-button", disabled=True)
+                        yield Button("Pause", id="pause-button", disabled=True)
+                        yield Button("Resume", id="resume-button", disabled=True)
+                        yield Button("Cancel", id="cancel-button", disabled=True, variant="error")
+                        yield Button("Retry", id="retry-button", disabled=True)
+                        yield Static("Idle", id="status")
         yield Footer()
 
     def _start_personal_supabase_bootstrap(self) -> None:
