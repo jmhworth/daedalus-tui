@@ -11,6 +11,10 @@ from textual import events
 from textual.strip import Strip
 from textual.widgets import Log
 
+_BRACKETED_FILE_MARKER = re.compile(
+    r"\[([^\]\n]*[/\\][^\]\n]+|[^\]\n]+\.[A-Za-z0-9]{1,12})\]"
+)
+
 
 class TranscriptLog(Log):
     """A selectable log that can emphasize a task's final assistant message.
@@ -133,7 +137,7 @@ class TranscriptLog(Log):
         self, line: str, width: int, *, allow_right_edge_buffer: bool = True
     ) -> list[str]:
         """Wrap one logical line at word boundaries when the width permits."""
-        processed_line = self._process_line(line)
+        processed_line = self._annotate_file_markers(self._process_line(line))
         if not processed_line or width <= 0 or cell_len(processed_line) <= width:
             return [processed_line]
         if not processed_line.strip():
@@ -167,6 +171,13 @@ class TranscriptLog(Log):
         if current or not wrapped:
             wrapped.append(current.rstrip())
         return wrapped
+
+    @staticmethod
+    def _annotate_file_markers(line: str) -> str:
+        """Add a file glyph to bracketed paths and filenames in agent text."""
+        return _BRACKETED_FILE_MARKER.sub(
+            lambda match: f"[📄 {match.group(1)}]", line
+        )
 
     @staticmethod
     def _hyphenate_word(word: str, width: int) -> list[str]:

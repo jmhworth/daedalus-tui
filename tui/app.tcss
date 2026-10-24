@@ -114,6 +114,11 @@ Screen {
     height: 2;
 }
 
+#agent-state-row {
+    height: 1;
+    align: left middle;
+}
+
 #output-panel {
     height: 1fr;
     min-height: 1;
@@ -128,6 +133,33 @@ Screen {
     width: 1fr;
     color: $text-accent;
     text-style: bold;
+}
+
+#agent-spinner {
+    width: 3;
+    height: 1;
+    display: none;
+    color: $text-accent;
+}
+
+#agent-outcome {
+    width: auto;
+    height: 1;
+    margin-left: 1;
+    color: $text-muted;
+    text-style: bold;
+}
+
+#agent-outcome.outcome-success {
+    color: $success;
+}
+
+#agent-outcome.outcome-failure {
+    color: $error;
+}
+
+#agent-outcome.outcome-input {
+    color: $warning;
 }
 
 #output-toggle-button {

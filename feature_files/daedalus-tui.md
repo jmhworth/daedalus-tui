@@ -33,6 +33,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Plan completion crash guard**: Deferred `PlanAnswerSelect` initialization catches illegal leftover option ids and half-removed overlays so a follow-up plan round cannot fatal-exit the TUI; fatal Textual exceptions also print a stderr pointer to the launch-root debug log.
 - **Plan recommended defaults**: Plan and follow-up prompts require every multiple-choice question to mark exactly one option with ` (Recommended)` so a safe default is always visible when the user does not care which answer to pick.
 - **Filtered logs and copying**: The output pane uses Textual's selectable `Log` widget for completed assistant messages; Vim yank commands copy selected transcript or diagnostic text to the system clipboard.
+- **Agent activity and outcomes**: The output toolbar animates a spinner while a task is active, highlights completion/failure/input-needed states, and prefixes bracketed file paths and filenames in transcript messages with a file glyph.
 - **Full-size output toggle**: Agent transcript and task diagnostics share one full-height output panel; a toggle shows either log at the same readable size while preserving selection and copying.
 - **Readable streamed output**: Assistant messages are separated by a blank line, transcript lines reflow at word boundaries with hyphenation only for overlong words, and the output pane keeps a small width buffer so long responses remain visible.
 - **Incremental Vim input**: The prompt uses a modal VimTextArea with a practical command subset; additional Vim commands can be added as they become useful instead of implementing the entire Vim language up front.
@@ -50,6 +51,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
 - `tui/app.tcss`: Shared full-height output-panel layout and readable transcript/diagnostic styling.
+- `tui/transcript.py`: Selectable transcript wrapping and bracketed file-marker annotation.
 - `tui/config.py`: Read-only provider and responsive-layout configuration models and loaders.
 - `tui/git_worktree.py`: Local Git helpers including operating-branch pull-then-push sync for the Command Menu action.
 - `tui/prompts.py`: Task, repair, and resolver prompt wrappers, including plan-mode recommended-option instructions.
@@ -69,6 +71,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-10-24: Added animated active-task feedback, colored terminal outcomes above the transcript, and file glyphs for bracketed paths and filenames.
 - 2026-10-08: Updated the configuration regression expectation to preserve the 14-row compact task inbox in the scrollable vertical workspace.
 - 2026-10-08: Increased the compact task inbox height to show several task rows while the vertical workspace remains scrollable.
 - 2026-10-08: Preserved multiline prompt composition with Shift+Enter after Enter became the submit key.

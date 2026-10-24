@@ -24,6 +24,7 @@ from textual.widgets import (
     Header,
     Input,
     Log,
+    LoadingIndicator,
     ProgressBar,
     Select,
     Static,
@@ -1425,6 +1426,9 @@ class DaedalusTuiApp(App[None]):
                     yield Static("Codex plan usage: Loading…", id="codex-usage")
                     yield Static("Phase: Idle", id="phase")
                     yield Static("Task branch: —    Worktree: —", id="task-context")
+                    with Horizontal(id="agent-state-row"):
+                        yield LoadingIndicator(id="agent-spinner")
+                        yield Static("", id="agent-outcome", markup=False)
                     with Vertical(id="output-panel"):
                         with Horizontal(id="output-toolbar"):
                             yield Static("Agent output", id="output-view-label")
@@ -3272,6 +3276,7 @@ class DaedalusTuiApp(App[None]):
             self._set_output_view(self._showing_error_output)
             self.query_one("#task-context", Static).update("Task branch: —    Worktree: —")
             self.query_one("#phase", Static).update("Phase: Idle")
+            self._update_agent_outcome(None)
             self._set_error("")
             self.query_one("#pause-button", Button).disabled = True
             self.query_one("#resume-button", Button).disabled = True
@@ -3310,6 +3315,7 @@ class DaedalusTuiApp(App[None]):
             f"Task branch: {branch}    Worktree: {worktree}"
         )
         self.query_one("#phase", Static).update(f"Phase: {record.phase}")
+        self._update_agent_outcome(record)
         self._set_error(record.error or "")
         self._set_status(record.status.capitalize())
         active = record.status in {
@@ -3332,6 +3338,42 @@ class DaedalusTuiApp(App[None]):
         self.query_one("#resume-notes-label", Static).update(
             "Plan follow-up or question" if record.status == "questioning" else "Optional notes for resuming this task"
         )
+
+    def _update_agent_outcome(self, record: TaskRecord | None) -> None:
+        """Show animated activity or a concise terminal task outcome."""
+        spinner = self.query_one("#agent-spinner", LoadingIndicator)
+        outcome = self.query_one("#agent-outcome", Static)
+        outcome.remove_class("outcome-success", "outcome-failure", "outcome-input")
+        if record is None:
+            spinner.styles.display = "none"
+            outcome.update("")
+        elif record.status in {"queued", "planning", "running", "verifying", "ready", "integrating", "resolving"}:
+            spinner.styles.display = "block"
+            activity = {
+                "queued": "Queued…",
+                "planning": "Planning…",
+                "running": "Thinking…",
+                "verifying": "Verifying…",
+                "ready": "Ready to integrate…",
+                "integrating": "Integrating…",
+                "resolving": "Resolving…",
+            }[record.status]
+            outcome.update(activity)
+        elif record.status == "completed":
+            spinner.styles.display = "none"
+            outcome.add_class("outcome-success")
+            outcome.update("✓ Completed!")
+        elif record.status == "failed":
+            spinner.styles.display = "none"
+            outcome.add_class("outcome-failure")
+            outcome.update("✕ Failed")
+        elif record.status in {"questioning", "awaiting_answers"}:
+            spinner.styles.display = "none"
+            outcome.add_class("outcome-input")
+            outcome.update("✎ Input needed")
+        else:
+            spinner.styles.display = "none"
+            outcome.update(record.status.capitalize())
 
     def _render_plan_review(self, record: TaskRecord, generation: int) -> None:
         plan_display = self.query_one("#plan-display", Static)
