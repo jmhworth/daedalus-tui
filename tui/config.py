@@ -87,8 +87,10 @@ class CommandMenuSettings:
     personal_supabase_label: str = "Activate personal Supabase"
     remove_personal_supabase_label: str = "Remove personal Supabase"
     push_branch_label: str = "Sync to GitHub"
+    auto_sync_label: str = "Auto-sync after completed tasks"
     keyboard_shortcuts_label: str = "Keyboard Shortcuts"
     pull_before_push: bool = True
+    auto_sync_after_completed_tasks: bool = False
     sync_conflict_recovery_enabled: bool = True
     sync_conflict_attempt_limit: int = 3
 
@@ -257,8 +259,10 @@ def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMen
             labels.get("remove_personal_supabase", "Remove personal Supabase")
         ),
         push_branch_label=str(labels.get("push_branch", "Sync to GitHub")),
+        auto_sync_label=str(labels.get("auto_sync", "Auto-sync after completed tasks")),
         keyboard_shortcuts_label=str(labels.get("keyboard_shortcuts", "Keyboard Shortcuts")),
         pull_before_push=bool(values.get("pull_before_push", True)),
+        auto_sync_after_completed_tasks=bool(values.get("auto_sync_after_completed_tasks", False)),
         sync_conflict_recovery_enabled=bool(values.get("sync_conflict_recovery_enabled", True)),
         sync_conflict_attempt_limit=attempt_limit,
     )

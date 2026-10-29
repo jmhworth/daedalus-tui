@@ -425,6 +425,10 @@ class CommandMenuScreen(ModalScreen[str | None]):
                 id="command-push-branch-button",
             )
             yield Button(
+                self._auto_sync_label(),
+                id="command-auto-sync-button",
+            )
+            yield Button(
                 self.settings.keyboard_shortcuts_label,
                 id="command-show-shortcuts-button",
             )
@@ -432,6 +436,10 @@ class CommandMenuScreen(ModalScreen[str | None]):
     def on_mount(self) -> None:
         self.app._refresh_push_button()
         self.query_one("#command-new-task-button", Button).focus()
+
+    def _auto_sync_label(self) -> str:
+        state = "On" if self.app.auto_sync_after_completed_tasks else "Off"
+        return f"{self.settings.auto_sync_label}: {state}"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {
@@ -441,10 +449,15 @@ class CommandMenuScreen(ModalScreen[str | None]):
             "command-register-supabase-button": "register_personal_supabase",
             "command-remove-supabase-button": "remove_personal_supabase",
             "command-push-branch-button": "push_branch",
+            "command-auto-sync-button": "toggle_auto_sync",
             "command-show-shortcuts-button": "show_shortcuts",
         }
         action = actions.get(event.button.id)
         if action is not None:
+            if action == "toggle_auto_sync":
+                self.app._toggle_auto_sync_after_tasks()
+                event.button.label = self._auto_sync_label()
+                return
             self.dismiss(action)
 
     def action_close_command_menu(self) -> None:
@@ -1284,6 +1297,10 @@ class DaedalusTuiApp(App[None]):
         self.memory = TaskMemoryStore(self.launch_root / DEFAULT_MEMORY_FILE)
         self.settings = settings or load_tui_settings()
         self.command_menu_settings = load_command_menu_settings()
+        self.auto_sync_after_completed_tasks = (
+            self.command_menu_settings.auto_sync_after_completed_tasks
+        )
+        self._auto_synced_task_ids: set[tuple[Path, str]] = set()
         self.statistics_settings = statistics_settings or load_coding_statistics_settings()
         self.codex_usage_settings = codex_usage_settings or load_codex_usage_settings()
         self._codex_usage_reader = codex_usage_reader or fetch_codex_usage
@@ -1911,6 +1928,11 @@ class DaedalusTuiApp(App[None]):
         handler = handlers.get(action)
         if handler is not None:
             self.call_after_refresh(handler)
+
+    def _toggle_auto_sync_after_tasks(self) -> None:
+        self.auto_sync_after_completed_tasks = not self.auto_sync_after_completed_tasks
+        state = "on" if self.auto_sync_after_completed_tasks else "off"
+        self._set_status(f"Auto-sync after completed tasks {state}")
 
     def action_show_statistics(self) -> None:
         self.push_screen(CodingStatisticsScreen(self._usage_entries(), self.statistics_settings))
@@ -2602,6 +2624,24 @@ class DaedalusTuiApp(App[None]):
             project_path = self._project_for_record(record)
             if project_path is None:
                 return
+            if (
+                phase.lower() == "completed"
+                and record.status == "completed"
+                and record.mode == "coding"
+                and not record.sync_recovery
+                and self.auto_sync_after_completed_tasks
+            ):
+                sync_key = (project_path.resolve(), record.task_id)
+                if sync_key not in self._auto_synced_task_ids:
+                    self._auto_synced_task_ids.add(sync_key)
+                    if project_path.resolve() == self._active_project_path.resolve():
+                        self._push_selected_branch()
+                    else:
+                        LOGGER.info(
+                            "Skipped auto-sync for completed task in inactive project task=%s project=%s",
+                            record.task_id,
+                            project_path,
+                        )
             row_key = self._task_row_key(project_path, record.task_id)
             is_selected = (
                 project_path == self._active_project_path

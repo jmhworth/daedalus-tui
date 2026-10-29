@@ -11,6 +11,8 @@ pull_before_push = true
 sync_conflict_recovery_enabled = true
 # Bounded coding attempts when conflict resolutions still leave unmerged paths.
 sync_conflict_attempt_limit = 3
+# Auto-sync is an in-session preference, initially off each time the TUI starts.
+auto_sync_after_completed_tasks = false
 
 [labels]
 new_task = "New Task"
@@ -19,4 +21,5 @@ create_topic = "Create Topic"
 personal_supabase = "Activate personal Supabase"
 remove_personal_supabase = "Remove personal Supabase"
 push_branch = "Sync to GitHub"
+auto_sync = "Auto-sync after completed tasks"
 keyboard_shortcuts = "Keyboard Shortcuts"
