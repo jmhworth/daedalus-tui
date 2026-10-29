@@ -90,14 +90,7 @@
   "88": "preflight_personal_supabase",
   "89": "PersonalSupabaseSetupWizardScreen",
   "90": "remove_personal_supabase",
-  "92": "paste_from_system_clipboard",
-  "93": ".on_mount",
   "94": "SyncMergeConflictError",
-  "95": "_TimeoutTracker",
-  "96": ".__init__",
   "97": "._on_personal_supabase_activation_progress",
-  "98": "profile_guidance_section",
-  "100": ".cursor_shape",
-  "101": ".edit_paste_before",
-  "104": ".nav_word_end"
+  "100": ".cursor_shape"
 }
