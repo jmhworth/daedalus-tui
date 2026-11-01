@@ -95,10 +95,10 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
   and sends both SQL bodies to a repair agent.
 - **Legacy scaffold commit compatibility**: Activate also commits a dirty
   project-local `supabase/config.toml` with the registered schema in
-  `[api].schemas` and a matching `*_create_personal_schema.sql` migration.
-  Schema creation recognition accepts quoted names and valid unquoted SQL
-  identifiers. Other dirty project-local Supabase files continue to block
-  activation.
+  `[api].schemas` and a matching `*_create_personal_schema.sql` migration,
+  including tracked deletions validated against their `HEAD` contents. Schema
+  creation recognition accepts quoted names and valid unquoted SQL identifiers.
+  Other dirty project-local Supabase files continue to block activation.
 - **Root-owned CLI**: Registered-project CLI operations run with cwd at the TUI
   repository root and use the project's `.env` for connection details.
 - **CLI launch path**: Migration pushes invoke the absolute Supabase CLI path
@@ -183,3 +183,4 @@ HACKING
 - 2026-09-16: Rebound personal-Supabase activation and retry from F4 to the Control-based Ctrl+Shift+S shortcut.
 - 2026-09-16: Moved personal-Supabase activation into the Ctrl+K Command Menu and removed its standalone keyboard shortcut.
 - 2026-09-16: Added exact-name-confirmed local Supabase cleanup for debugging and hardened scaffold commits to preserve deletions, isolate selected paths, and detect files changing during the commit.
+- 2026-10-31: Recognize deleted legacy Supabase scaffold files from their committed contents so Activate can commit their removal alongside the replacement migration scaffold.

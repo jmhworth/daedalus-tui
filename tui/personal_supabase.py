@@ -1482,9 +1482,8 @@ def _personal_supabase_compat_scaffold_paths(
     }
     matching_migrations: set[str] = set()
     for relative in migration_paths:
-        try:
-            sql = (root / relative).read_text(encoding="utf-8")
-        except (OSError, UnicodeError):
+        sql = _read_working_or_head_file(root, relative)
+        if sql is None:
             continue
         if _migration_creates_schema(sql, schema):
             matching_migrations.add(relative)
@@ -1492,15 +1491,28 @@ def _personal_supabase_compat_scaffold_paths(
     config_relative = "supabase/config.toml"
     if not matching_migrations or config_relative not in normalized:
         return set()
+    config_text = _read_working_or_head_file(root, config_relative)
+    if config_text is None:
+        return set()
     try:
-        config = tomllib.loads((root / config_relative).read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, tomllib.TOMLDecodeError):
+        config = tomllib.loads(config_text)
+    except tomllib.TOMLDecodeError:
         return set()
     api = config.get("api")
     schemas = api.get("schemas") if isinstance(api, dict) else None
     if isinstance(schemas, list) and schema in schemas:
         return matching_migrations | {config_relative}
     return set()
+
+
+def _read_working_or_head_file(root: Path, relative: str) -> str | None:
+    """Read a dirty project file, falling back to HEAD for a tracked deletion."""
+    try:
+        return (root / relative).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return _git_output(["show", f"HEAD:{relative}"], root)
+    except (OSError, UnicodeError):
+        return None
 
 
 def _git_output(command: list[str], directory: Path) -> str | None:

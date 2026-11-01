@@ -445,13 +445,13 @@
     "semantic_hash": ""
   },
   "tui/personal_supabase.py": {
-    "mtime": 1793500304.396233,
-    "ast_hash": "2dcb0a53dc2bcd5cf06f44c52552dc1c",
+    "mtime": 1793500942.9079921,
+    "ast_hash": "807b4c55c651286bc95c143e8d8a1de9",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-personal-supabase.md": {
-    "mtime": 1793500304.394297,
-    "ast_hash": "f4c5044358d69111fa3dcdf94d80285b",
+    "mtime": 1793500950.4832497,
+    "ast_hash": "19d9cf34267c13042453446e99f5c075",
     "semantic_hash": ""
   },
   "tests/test_environment.py": {
