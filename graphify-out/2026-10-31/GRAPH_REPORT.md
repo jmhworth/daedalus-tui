@@ -1,7 +1,7 @@
 # Graph Report - daedalus-tui  (2026-10-31)
 
 ## Corpus Check
-- 96 files · ~96,093 words
+- 96 files · ~96,119 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `547c3ef6`
+- Built from commit: `89463c6b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -225,8 +225,8 @@ Cohesion: 0.29
 Nodes (6): Daedalus TUI Coding Statistics, Dev Mode, Key Points, Relevant Files, State Log, Summary
 
 ### Community 25 - "._set_status"
-Cohesion: 0.09
-Nodes (13): RowSelected, Path, Focus a task from the cross-project update inbox., Memory override for the project, else the parameter-file default., Update the project's coordinator so later submits use ``branch``., Return only direct-child projects, or the empty-root fallback., Render actionable history and tasks created during this session., Keep failures, active work, and all tasks submitted in this launch. (+5 more)
+Cohesion: 0.11
+Nodes (11): RowSelected, Path, Focus a task from the cross-project update inbox., Memory override for the project, else the parameter-file default., Update the project's coordinator so later submits use ``branch``., Return only direct-child projects, or the empty-root fallback., Render actionable history and tasks created during this session., Keep failures, active work, and all tasks submitted in this launch. (+3 more)
 
 ### Community 26 - ".provider_split"
 Cohesion: 0.18
@@ -289,8 +289,8 @@ Cohesion: 0.09
 Nodes (25): Popen, Protocol, VerificationTests, AgentControl, Provider-specific subprocess execution with normalized agent messages., Cooperative stop signals shared by a task and its active subprocess., Best-effort graph refresh owned by the local orchestration layer., __getattr__() (+17 more)
 
 ### Community 43 - "._rebuild_plan_questions"
-Cohesion: 0.07
-Nodes (21): Mount, FakeCoordinator, FakeRunner, settings(), PersonalSupabaseActivationProgressScreen, PlanAnswerSelect, Finish a queued modal update only if its screen is still mounted., Initialize dynamic plan selectors after their nested children mount. (+13 more)
+Cohesion: 0.09
+Nodes (14): Mount, FakeCoordinator, FakeRunner, settings(), PlanAnswerSelect, Initialize dynamic plan selectors after their nested children mount., Finish Select setup without allowing a stale value to exit the TUI.          Pla, TuiSettings (+6 more)
 
 ### Community 44 - "CandidateFeatureGroup"
 Cohesion: 0.11
@@ -437,12 +437,12 @@ Cohesion: 0.18
 Nodes (12): _first_filled_env_value(), _key_or_aliases_label(), load_project_personal_supabase_env_values(), project_ref_from_supabase_url(), Derive the project ref from a standard ``https://<ref>.supabase.co`` URL., Return an explicit or URL-derived project ref (empty when neither is usable)., Normalize project env into preferred keys, accepting aliases.      Returns ``(ov, Load Supabase values from the Daedalus TUI ``.env`` only.      The ``project_roo (+4 more)
 
 ### Community 94 - "SyncMergeConflictError"
-Cohesion: 0.09
-Nodes (14): Key, Remove known credential values before diagnostics reach the UI or log., Add Vim-like navigation without changing TextArea insert behavior., Confirm, then scaffold (if needed) and Activate personal Supabase., Scaffold files, then guide manual project env setup before Activate., Run scaffold+Activate in a background worker so the TUI stays responsive., Return provider metadata from the shared controls for a new task., Queue a coding task that writes and expands the requested topic file. (+6 more)
+Cohesion: 0.07
+Nodes (16): Key, Remove known credential values before diagnostics reach the UI or log., Add Vim-like navigation without changing TextArea insert behavior., Confirm, then scaffold (if needed) and Activate personal Supabase., Scaffold files, then guide manual project env setup before Activate., Run scaffold+Activate in a background worker so the TUI stays responsive., Return provider metadata from the shared controls for a new task., Queue a coding task that writes and expands the requested topic file. (+8 more)
 
 ### Community 97 - "._on_personal_supabase_activation_progress"
-Cohesion: 0.40
-Nodes (3): Forward worker phases to the modal and the main status line., Mark the current activation phase and retain a readable status line., Update mounted progress widgets for one worker phase.
+Cohesion: 0.12
+Nodes (10): PersonalSupabaseActivationProgressScreen, Forward worker phases to the modal and the main status line., Finish a queued modal update only if its screen is still mounted., Show the durable activation phases while the worker runs., Whether the activation worker still owns this progress surface., Apply worker results that arrived while this modal was mounting., Mark the current activation phase and retain a readable status line., Update mounted progress widgets for one worker phase. (+2 more)
 
 ### Community 100 - ".cursor_shape"
 Cohesion: 0.10
@@ -458,9 +458,9 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `DaedalusTuiApp` connect `RegistrationResult` to `DaedalusVimTextArea`, `AgentRunner`, `._set_status`, `CodingStatisticsScreen`, `calculate_token_usage`, `.on_button_pressed`, `debug_log.py`, `._rebuild_plan_questions`, `._handle_visual_line_mode`, `._persist_task`, `._rebuild_plan_questions`, `TranscriptLog`, `task_coordinator.py`, `log_exception`, `GitWorktreeError`, `bootstrap_personal_supabase`, `TranscriptLog`, `._shutdown_coordinators`, `SyncMergeConflictError`, `._on_personal_supabase_activation_progress`, `.cursor_shape`?**
   _High betweenness centrality (0.143) - this node is a cross-community bridge._
-- **Why does `TuiAppTests` connect `.cursor_shape` to `DaedalusVimTextArea`, `AgentRunner`, `GitWorktreeError`, `._rebuild_plan_questions`, `bootstrap_personal_supabase`, `CandidateFeatureGroup`, `._handle_visual_line_mode`, `.edit_paste_after`, `._rebuild_plan_questions`, `TranscriptLog`, `RegistrationResult`, `SyncMergeConflictError`?**
+- **Why does `TuiAppTests` connect `.cursor_shape` to `DaedalusVimTextArea`, `AgentRunner`, `._on_personal_supabase_activation_progress`, `GitWorktreeError`, `._rebuild_plan_questions`, `bootstrap_personal_supabase`, `CandidateFeatureGroup`, `._handle_visual_line_mode`, `.edit_paste_after`, `._rebuild_plan_questions`, `TranscriptLog`, `RegistrationResult`, `SyncMergeConflictError`?**
   _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Why does `TaskCoordinator` connect `._persist_task` to `DaedalusVimTextArea`, `AgentRunner`, `._shutdown_coordinators`, `._set_status`, `.on_mount`, `CodingStatisticsScreen`, `calculate_token_usage`, `.on_button_pressed`, `debug_log.py`, `._rebuild_plan_questions`, `._rebuild_plan_questions`, `TranscriptLog`, `DescriptorEmbedder`, `CodingStatisticsScreen`, `task_coordinator.py`, `GitWorktreeError`, `._on_personal_supabase_activation_progress`, `TranscriptLog`, `RegistrationResult`, `preflight_personal_supabase`, `PersonalSupabaseSetupWizardScreen`?**
+- **Why does `TaskCoordinator` connect `._persist_task` to `DaedalusVimTextArea`, `AgentRunner`, `._shutdown_coordinators`, `._set_status`, `.on_mount`, `CodingStatisticsScreen`, `calculate_token_usage`, `.on_button_pressed`, `debug_log.py`, `._rebuild_plan_questions`, `._rebuild_plan_questions`, `TranscriptLog`, `DescriptorEmbedder`, `CodingStatisticsScreen`, `task_coordinator.py`, `GitWorktreeError`, `._on_personal_supabase_activation_progress`, `TranscriptLog`, `RegistrationResult`, `preflight_personal_supabase`, `PersonalSupabaseSetupWizardScreen`, `._on_personal_supabase_activation_progress`?**
   _High betweenness centrality (0.051) - this node is a cross-community bridge._
 - **Are the 22 inferred relationships involving `DaedalusTuiApp` (e.g. with `FakeCoordinator` and `FakeRunner`) actually correct?**
   _`DaedalusTuiApp` has 22 INFERRED edges - model-reasoned connections that need verification._
