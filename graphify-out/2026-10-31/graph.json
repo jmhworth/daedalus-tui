@@ -7328,8 +7328,8 @@
       "source_location": "L712",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "personalsupabaseactivationprogressscreen"
     },
     {
@@ -7339,8 +7339,8 @@
       "source_location": "L729",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_init",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": ".__init__()"
     },
     {
@@ -7350,8 +7350,8 @@
       "source_location": "L741",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_running",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": ".running()"
     },
     {
@@ -7372,8 +7372,8 @@
       "source_location": "L781",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_on_mount",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": ".on_mount()"
     },
     {
@@ -7394,8 +7394,8 @@
       "source_location": "L825",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_finish",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": ".finish()"
     },
     {
@@ -7405,8 +7405,8 @@
       "source_location": "L833",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_apply_finish",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "._apply_finish()"
     },
     {
@@ -7427,8 +7427,8 @@
       "source_location": "L858",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_action_close_activation_progress",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": ".action_close_activation_progress()"
     },
     {
@@ -8142,8 +8142,8 @@
       "source_location": "L1885",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_new_task",
-      "community": 94,
-      "community_name": "SyncMergeConflictError",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": ".action_new_task()"
     },
     {
@@ -8395,8 +8395,8 @@
       "source_location": "L2167",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_finish_personal_supabase_progress",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "._finish_personal_supabase_progress()"
     },
     {
@@ -8835,8 +8835,8 @@
       "source_location": "L3051",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_project_initialized",
-      "community": 94,
-      "community_name": "SyncMergeConflictError",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._on_project_initialized()"
     },
     {
@@ -9022,8 +9022,8 @@
       "source_location": "L3294",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_render_selected_task_safely",
-      "community": 94,
-      "community_name": "SyncMergeConflictError",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._render_selected_task_safely()"
     },
     {
@@ -9220,8 +9220,8 @@
       "source_location": "L3779",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_new_task",
-      "community": 94,
-      "community_name": "SyncMergeConflictError",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "._start_new_task()"
     },
     {
@@ -9572,8 +9572,8 @@
       "source_location": "L713",
       "_origin": "ast",
       "id": "tui_app_rationale_713",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "show the durable activation phases while the worker runs."
     },
     {
@@ -9583,8 +9583,8 @@
       "source_location": "L742",
       "_origin": "ast",
       "id": "tui_app_rationale_742",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "whether the activation worker still owns this progress surface."
     },
     {
@@ -9594,8 +9594,8 @@
       "source_location": "L782",
       "_origin": "ast",
       "id": "tui_app_rationale_782",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "apply worker results that arrived while this modal was mounting."
     },
     {
@@ -9627,8 +9627,8 @@
       "source_location": "L826",
       "_origin": "ast",
       "id": "tui_app_rationale_826",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "freeze the progress display and allow the operator to close it."
     },
     {
@@ -9638,8 +9638,8 @@
       "source_location": "L834",
       "_origin": "ast",
       "id": "tui_app_rationale_834",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "render a completion state after all modal widgets are mounted."
     },
     {
@@ -9913,8 +9913,8 @@
       "source_location": "L2172",
       "_origin": "ast",
       "id": "tui_app_rationale_2172",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 43,
+      "community_name": "._rebuild_plan_questions",
       "norm_label": "finish a queued modal update only if its screen is still mounted."
     },
     {
@@ -10265,8 +10265,8 @@
       "source_location": "L3295",
       "_origin": "ast",
       "id": "tui_app_rationale_3295",
-      "community": 94,
-      "community_name": "SyncMergeConflictError",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "keep one bad dynamic widget update from closing the entire tui."
     },
     {
@@ -10320,8 +10320,8 @@
       "source_location": "L3780",
       "_origin": "ast",
       "id": "tui_app_rationale_3780",
-      "community": 94,
-      "community_name": "SyncMergeConflictError",
+      "community": 25,
+      "community_name": "._set_status",
       "norm_label": "clear the selected task and unlock a fresh prompt editor."
     },
     {
@@ -14233,7 +14233,7 @@
       "label": "_ensure_supabase_scaffold()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1661",
+      "source_location": "L1664",
       "_origin": "ast",
       "id": "tui_personal_supabase_ensure_supabase_scaffold",
       "community": 41,
@@ -14244,7 +14244,7 @@
       "label": "_ensure_env_example()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1697",
+      "source_location": "L1700",
       "_origin": "ast",
       "id": "tui_personal_supabase_ensure_env_example",
       "community": 41,
@@ -14255,7 +14255,7 @@
       "label": "_env_example_block()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1742",
+      "source_location": "L1745",
       "_origin": "ast",
       "id": "tui_personal_supabase_env_example_block",
       "community": 41,
@@ -14266,7 +14266,7 @@
       "label": "_shared_env_example_block()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1753",
+      "source_location": "L1756",
       "_origin": "ast",
       "id": "tui_personal_supabase_shared_env_example_block",
       "community": 41,
@@ -14277,7 +14277,7 @@
       "label": "_allow_list_comment()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1784",
+      "source_location": "L1787",
       "_origin": "ast",
       "id": "tui_personal_supabase_allow_list_comment",
       "community": 41,
@@ -14288,7 +14288,7 @@
       "label": "_ensure_profile_guidance()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1791",
+      "source_location": "L1794",
       "_origin": "ast",
       "id": "tui_personal_supabase_ensure_profile_guidance",
       "community": 41,
@@ -14299,7 +14299,7 @@
       "label": "_write_registration_marker()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1822",
+      "source_location": "L1825",
       "_origin": "ast",
       "id": "tui_personal_supabase_write_registration_marker",
       "community": 41,
@@ -14310,7 +14310,7 @@
       "label": "_toml_escape()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1857",
+      "source_location": "L1860",
       "_origin": "ast",
       "id": "tui_personal_supabase_toml_escape",
       "community": 41,
@@ -14863,8 +14863,8 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "tui_plan_build_plan_clarification_prompt",
-      "community": 88,
-      "community_name": "preflight_personal_supabase",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "build_plan_clarification_prompt()"
     },
     {
@@ -15050,8 +15050,8 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "tui_plan_rationale_117",
-      "community": 88,
-      "community_name": "preflight_personal_supabase",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "build a read-only ask prompt for one plan question, without other questions."
     },
     {
@@ -16106,8 +16106,8 @@
       "source_location": "L546",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_get",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".get()"
     },
     {
@@ -16205,8 +16205,8 @@
       "source_location": "L795",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_run_clarification",
-      "community": 88,
-      "community_name": "preflight_personal_supabase",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "._run_clarification()"
     },
     {
@@ -16238,8 +16238,8 @@
       "source_location": "L913",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_run",
-      "community": 21,
-      "community_name": "._shutdown_coordinators",
+      "community": 88,
+      "community_name": "preflight_personal_supabase",
       "norm_label": "._run()"
     },
     {
@@ -16249,8 +16249,8 @@
       "source_location": "L1063",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_update_plan_state",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 88,
+      "community_name": "preflight_personal_supabase",
       "norm_label": "._update_plan_state()"
     },
     {
@@ -16260,8 +16260,8 @@
       "source_location": "L1100",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_parse_plan_messages",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 88,
+      "community_name": "preflight_personal_supabase",
       "norm_label": "._parse_plan_messages()"
     },
     {
@@ -16315,8 +16315,8 @@
       "source_location": "L1356",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_restore_plan_state",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 57,
+      "community_name": "DescriptorEmbedder",
       "norm_label": "._restore_plan_state()"
     },
     {
@@ -16491,8 +16491,8 @@
       "source_location": "L796",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_796",
-      "community": 88,
-      "community_name": "preflight_personal_supabase",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "run an ask-mode clarification that does not mutate plan conversation state."
     },
     {
@@ -16513,8 +16513,8 @@
       "source_location": "L1101",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_1101",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 88,
+      "community_name": "preflight_personal_supabase",
       "norm_label": "parse plan json from one turn without letting join separators break it."
     },
     {
@@ -16557,8 +16557,8 @@
       "source_location": "L1357",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_1357",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 57,
+      "community_name": "DescriptorEmbedder",
       "norm_label": "recover review questions from the last persisted plan response."
     },
     {
@@ -19964,7 +19964,7 @@
       "label": "Relevant Files",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L118",
+      "source_location": "L120",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_relevant_files",
       "community": 66,
@@ -19975,7 +19975,7 @@
       "label": "Dev Mode",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L136",
+      "source_location": "L138",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_dev_mode",
       "community": 66,
@@ -19986,7 +19986,7 @@
       "label": "State Log",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L139",
+      "source_location": "L141",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_state_log",
       "community": 66,
@@ -68110,7 +68110,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1784",
+      "source_location": "L1787",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -68165,7 +68165,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1697",
+      "source_location": "L1700",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -68176,7 +68176,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1791",
+      "source_location": "L1794",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -68187,7 +68187,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1661",
+      "source_location": "L1664",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -68198,7 +68198,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1742",
+      "source_location": "L1745",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -68638,7 +68638,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1753",
+      "source_location": "L1756",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -68682,7 +68682,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1857",
+      "source_location": "L1860",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -68737,7 +68737,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1822",
+      "source_location": "L1825",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69514,7 +69514,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1697",
+      "source_location": "L1700",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_env_example",
@@ -69526,7 +69526,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1791",
+      "source_location": "L1794",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_profile_guidance",
@@ -69538,7 +69538,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1661",
+      "source_location": "L1664",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_supabase_scaffold",
@@ -69802,7 +69802,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1822",
+      "source_location": "L1825",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_write_registration_marker",
@@ -70585,7 +70585,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1792",
+      "source_location": "L1795",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_profile_guidance",
@@ -70678,7 +70678,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1665",
+      "source_location": "L1668",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_supabase_scaffold",
@@ -70690,7 +70690,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1735",
+      "source_location": "L1738",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_env_example",
@@ -70702,7 +70702,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1699",
+      "source_location": "L1702",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_env_example",
@@ -70714,7 +70714,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1733",
+      "source_location": "L1736",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_env_example",
@@ -70726,7 +70726,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1749",
+      "source_location": "L1752",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_env_example_block",
@@ -70738,7 +70738,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1744",
+      "source_location": "L1747",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_env_example_block",
@@ -70750,7 +70750,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1838",
+      "source_location": "L1841",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_write_registration_marker",
@@ -80461,7 +80461,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L136",
+      "source_location": "L138",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -80483,7 +80483,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L118",
+      "source_location": "L120",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -80494,7 +80494,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L139",
+      "source_location": "L141",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -81130,5 +81130,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "41b37e99928264e6bda88e8f6a70175a247d2279"
+  "built_at_commit": "547c3ef6ed04130e805c53386eb78098a61ace78"
 }
