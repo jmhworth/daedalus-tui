@@ -1651,8 +1651,11 @@ def _supabase_layout_conflict(root: Path, schema: str, settings: dict) -> str | 
 
 
 def _migration_creates_schema(text: str, schema: str) -> bool:
+    schema_identifiers = [rf'"{re.escape(schema)}"']
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_$]*", schema):
+        schema_identifiers.append(rf"{re.escape(schema)}(?![A-Za-z0-9_$])")
     pattern = re.compile(
-        rf'CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+"{re.escape(schema)}"\s*;',
+        rf"CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+(?:{'|'.join(schema_identifiers)})\s*;",
         re.IGNORECASE,
     )
     return bool(pattern.search(text))

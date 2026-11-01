@@ -96,7 +96,9 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 - **Legacy scaffold commit compatibility**: Activate also commits a dirty
   project-local `supabase/config.toml` with the registered schema in
   `[api].schemas` and a matching `*_create_personal_schema.sql` migration.
-  Other dirty project-local Supabase files continue to block activation.
+  Schema creation recognition accepts quoted names and valid unquoted SQL
+  identifiers. Other dirty project-local Supabase files continue to block
+  activation.
 - **Root-owned CLI**: Registered-project CLI operations run with cwd at the TUI
   repository root and use the project's `.env` for connection details.
 - **CLI launch path**: Migration pushes invoke the absolute Supabase CLI path
@@ -137,6 +139,7 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 HACKING
 
 ## State Log
+- 2026-10-31: Allowed the paired legacy Supabase config and schema migration to auto-commit when its SQL uses an unquoted valid schema identifier.
 - 2026-10-03: Kept both setup-wizard retry probes within the mocked environment-check scope so the test verifies a missing-then-present environment response.
 - 2026-09-27: Routed personal-Supabase environment resolution through the TUI root `.env` and documented the CLI link step before migration pushes.
 - 2026-09-27: Routed registered task pushes through the canonical project registration and TUI-root `.env`; link the Supabase CLI project even when pushing with an explicit database URL.
