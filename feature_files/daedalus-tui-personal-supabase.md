@@ -53,12 +53,12 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 - **Retry**: Scaffolded or Activate-blocked projects reuse the Command Menu (`Ctrl+K`) with the
   same name confirmation and setup wizard; skip re-scaffold when registered, validate
   completeness, and re-run Phase 2. Incomplete scaffolds fail closed.
-- **Local cleanup**: The Command Menu also offers an exact-name-confirmed debug
-  cleanup that removes the project's `daedalus-migrations/` directory and generated integration
-  content while preserving unrelated `.daedalus` and profile content. The
-  operator-managed `.env` is left untouched; operators can delete personal
-  Supabase variables from it manually if they are no longer needed. Cleanup never
-  changes the remote database.
+- **Local cleanup**: The Command Menu also offers an exact-name-confirmed cleanup
+  that removes the project's `daedalus-migrations/` directory, generated `.env.example`
+  entries, generated profile guidance, and only the `[personal_supabase]` table
+  from `.daedalus`. Empty generated agent directories are removed; directories
+  with unrelated files remain. The operator-managed `.env` is left untouched,
+  and cleanup never changes the remote database.
 - **Status model**: Distinguish unregistered, scaffolded (`registered`, not
   `activated`), activated, and blocked reasons (`last_activate_status` /
   redacted error class—no credentials). Launch validates all registered projects;
@@ -139,6 +139,7 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 HACKING
 
 ## State Log
+- 2026-10-31: Personal Supabase removal now prunes empty generated agent directories and accurately describes the migration, profile, env-example, and marker cleanup.
 - 2026-10-31: Let Activate recognize plain or `IF NOT EXISTS` schema-creation migrations with or without a trailing semicolon when auto-committing a matching legacy Supabase config.
 - 2026-10-31: Allowed the paired legacy Supabase config and schema migration to auto-commit when its SQL uses an unquoted valid schema identifier.
 - 2026-10-03: Kept both setup-wizard retry probes within the mocked environment-check scope so the test verifies a missing-then-present environment response.

@@ -343,6 +343,14 @@ def remove_personal_supabase(project_root: Path) -> PersonalSupabaseRemovalResul
         profile = root / relative
         record(profile, lambda profile=profile: _remove_personal_supabase_profile(profile, settings))
 
+    # Profile files may have been created solely for this integration. Remove
+    # their empty parent directories, while preserving any unrelated agent
+    # instructions or skills stored alongside them.
+    for relative in (Path(".agents") / "profiles", Path(".agents")):
+        directory = root / relative
+        if directory.is_dir() and not directory.is_symlink():
+            record(directory, lambda directory=directory: _remove_empty_directory(directory))
+
     if failures:
         message = "Personal Supabase cleanup was incomplete: " + "; ".join(failures)
         return PersonalSupabaseRemovalResult(False, message, root, tuple(removed))
@@ -381,6 +389,17 @@ def _remove_path(path: Path) -> bool:
         shutil.rmtree(path)
     else:
         return False
+    return True
+
+
+def _remove_empty_directory(path: Path) -> bool:
+    """Remove a directory only when no unrelated files remain inside it."""
+    try:
+        path.rmdir()
+    except OSError as error:
+        if error.errno in (errno.ENOTEMPTY, errno.EEXIST):
+            return False
+        raise
     return True
 
 

@@ -651,7 +651,7 @@ class PersonalSupabaseRemovalConfirmationScreen(ModalScreen[bool]):
         with Vertical(id="personal-supabase-removal-dialog"):
             yield Static("Remove personal Supabase", id="personal-supabase-removal-title")
             yield Static(
-                "This removes the local supabase folder, registration marker, and generated profile guidance. The project .env is left untouched; remove its personal Supabase variables yourself if they are no longer needed. It does not change the remote database.",
+                "This removes daedalus-migrations/, generated Supabase entries from .env.example and agent profiles, and the personal_supabase entry in .daedalus. Empty generated agent directories are removed; directories with other files are kept. The project .env and remote database are left untouched.",
                 id="personal-supabase-removal-warning",
                 markup=False,
             )
