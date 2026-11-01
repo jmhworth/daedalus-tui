@@ -1655,7 +1655,8 @@ def _migration_creates_schema(text: str, schema: str) -> bool:
     if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_$]*", schema):
         schema_identifiers.append(rf"{re.escape(schema)}(?![A-Za-z0-9_$])")
     pattern = re.compile(
-        rf"CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+(?:{'|'.join(schema_identifiers)})\s*;",
+        rf"CREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+        rf"(?:{'|'.join(schema_identifiers)})\s*;?",
         re.IGNORECASE,
     )
     return bool(pattern.search(text))

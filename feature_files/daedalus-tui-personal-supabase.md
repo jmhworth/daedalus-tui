@@ -139,6 +139,7 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 HACKING
 
 ## State Log
+- 2026-10-31: Let Activate recognize plain or `IF NOT EXISTS` schema-creation migrations with or without a trailing semicolon when auto-committing a matching legacy Supabase config.
 - 2026-10-31: Allowed the paired legacy Supabase config and schema migration to auto-commit when its SQL uses an unquoted valid schema identifier.
 - 2026-10-03: Kept both setup-wizard retry probes within the mocked environment-check scope so the test verifies a missing-then-present environment response.
 - 2026-09-27: Routed personal-Supabase environment resolution through the TUI root `.env` and documented the CLI link step before migration pushes.
