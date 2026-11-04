@@ -463,7 +463,7 @@ def _remove_personal_supabase_env_example(path: Path) -> bool:
     )
     if start is not None:
         end_match = re.search(
-            r"(?m)^# (?:After migrations apply, allow-list schema|Activate automatically adds schema) .*$",
+            r"(?m)^# (?:After migrations apply, allow-list schema|Activate automatically adds schema|Use Expose schema after activation) .*$",
             updated[start:],
         )
         if end_match is not None:
@@ -473,7 +473,7 @@ def _remove_personal_supabase_env_example(path: Path) -> bool:
     # Older or hand-edited examples may have the schema assignments without
     # the generated block marker; remove those assignments too.
     updated = re.sub(
-        r"(?m)^# (?:After migrations apply, allow-list schema|Activate automatically adds schema) .*$\n?",
+        r"(?m)^# (?:After migrations apply, allow-list schema|Activate automatically adds schema|Use Expose schema after activation) .*$\n?",
         "",
         updated,
     )

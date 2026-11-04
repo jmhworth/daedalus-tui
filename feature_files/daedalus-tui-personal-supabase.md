@@ -164,6 +164,7 @@ for Activate and is never copied to the project.
 HACKING
 
 ## State Log
+2026-11-04: Personal Supabase cleanup now recognizes the generated manual-exposure guidance comment and removes an otherwise-empty `.env.example`.
 2026-11-04: Fixed local cleanup to recognize the current generated hosted-schema guidance comment so empty `.env.example` scaffolds are removed.
 2026-11-04: Activation now completes without hosted API exposure; the completed screen offers a separate, retryable Expose schema action for legacy and new projects.
 - 2026-11-04: Added the hosted Data API exposed-schema step and PGRST106 override diagnostics to personal Supabase setup instructions.
