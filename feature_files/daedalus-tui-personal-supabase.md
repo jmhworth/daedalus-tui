@@ -11,8 +11,9 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 `.env`. Activate copies the API URL, publishable/secret keys, project ref, and
 registered schema into a managed block at the end of the target project's
 ignored `.env` for application data access. The Management API access token
-and migration database URLs remain in the TUI root `.env`; the token is required
-for Activate and is never copied to the project.
+and migration database URLs remain in the TUI root `.env`; the token is needed
+for hosted schema exposure (or as a migration access method) and is never copied
+to the project.
 
 ## Key Points
 - **Shared database, per-project schema**: Schema identity is always the validated
@@ -97,8 +98,10 @@ for Activate and is never copied to the project.
 - **Hosted API exposure**: The local TUI `supabase/config.toml` does not configure hosted
   PostgREST. Once activation completes, the operator can press Expose schema on the
   completed activation screen. This separate Management API action merges the project
-  schema into `db_schema` while preserving existing exposed schemas, and remains
-  available when reopening an already-activated project's flow for backward compatibility.
+  schema into `db_schema` while preserving existing exposed schemas. It reads the
+  Management API token from the Daedalus TUI package's `.env` (never the registered
+  project's `.env`). It remains available when reopening an already-activated
+  project's flow for backward compatibility.
   Failed exposures open a popup with the redacted detail returned from validation or the
   Management API, while keeping the issue in the TUI error log. Generated agent guidance
   explains `.schema(...)` usage and how to diagnose `PGRST106`, including a stale
@@ -167,6 +170,7 @@ for Activate and is never copied to the project.
 HACKING
 
 ## State Log
+2026-11-04: Made hosted schema exposure errors identify the exact Daedalus TUI `.env` path required for `SUPABASE_ACCESS_TOKEN`, and routed canonical env loading through that path helper.
 2026-11-04: Personal Supabase exposure failures now show a popup with the redacted underlying explanation, keep the issue in the on-screen error log, and recommend retrying exposure instead of Activate after network failures.
 2026-11-04: Personal Supabase cleanup now recognizes the generated manual-exposure guidance comment and removes an otherwise-empty `.env.example`.
 2026-11-04: Fixed local cleanup to recognize the current generated hosted-schema guidance comment so empty `.env.example` scaffolds are removed.

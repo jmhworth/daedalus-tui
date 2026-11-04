@@ -601,7 +601,7 @@ def tui_personal_supabase_env_path() -> Path:
 
 def load_project_personal_supabase_env_values(project_root: Path) -> dict[str, str]:
     """Load canonical Supabase values from the Daedalus TUI ``.env``."""
-    return read_env_file(TUI_ROOT / ".env")
+    return read_env_file(tui_personal_supabase_env_path())
 
 
 def write_project_personal_supabase_environment(
@@ -1555,7 +1555,10 @@ def expose_registered_personal_supabase_schema(project_root: Path) -> Activation
         return ActivationResult(
             "failed",
             status.schema,
-            f"Expose schema requires {settings['env_access_token_key']} in the Daedalus TUI root .env.",
+            (
+                f"Expose schema requires {settings['env_access_token_key']} in "
+                f"{tui_personal_supabase_env_path()}."
+            ),
             root,
             activated=True,
         )
