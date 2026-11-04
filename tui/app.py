@@ -726,7 +726,8 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
         "Committing scaffold changes": 2,
         "Validating environment": 3,
         "Checking Supabase connection": 4,
-        "Pushing migrations": 5,
+        "Synchronize and apply migrations from the Daedalus TUI root": 5,
+        "Exposing schema through the Supabase Data API": 6,
     }
 
     def __init__(self, project_name: str, schema: str) -> None:

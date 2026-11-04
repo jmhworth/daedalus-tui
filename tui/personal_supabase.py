@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 import errno
+import json
 import os
 import re
 import shutil
@@ -244,6 +247,11 @@ def resolve_personal_supabase_environment(
     db_url_ipv4 = values.get(db_url_ipv4_key, "").strip()
     db_url_ipv6 = values.get(db_url_ipv6_key, "").strip()
     access_token = values.get(access_token_key, "").strip()
+    if require_database_access and not access_token:
+        return None, (
+            f"Daedalus TUI .env is missing required Supabase setting(s): {access_token_key}. "
+            "Activate needs this token to configure the hosted Data API."
+        )
     if require_database_access and not any((db_url, db_url_ipv4, db_url_ipv6, access_token)):
         return None, (
             "Daedalus TUI .env must define one database access setting: "
@@ -266,6 +274,45 @@ def resolve_personal_supabase_environment(
     if access_token:
         overlay[access_token_key] = access_token
     return overlay, None
+
+
+def expose_personal_supabase_schema(
+    project_ref: str,
+    schema: str,
+    access_token: str,
+    *,
+    timeout: float = 15,
+) -> None:
+    """Merge the project schema into the hosted PostgREST exposed schema list."""
+    endpoint = f"https://api.supabase.com/v1/projects/{project_ref}/postgrest"
+    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+
+    def request(method: str, body: bytes | None = None):
+        req = Request(endpoint, data=body, headers=headers, method=method)
+        try:
+            with urlopen(req, timeout=timeout) as response:
+                return response.read()
+        except HTTPError as error:
+            raise ValueError(
+                f"Supabase Management API {method} failed with HTTP {error.code}; "
+                "check the project ref, access token, and project permissions."
+            ) from None
+        except (URLError, TimeoutError, OSError):
+            raise ValueError(
+                f"Supabase Management API {method} could not reach the PostgREST settings endpoint; "
+                "check network access and retry Activate."
+            ) from None
+
+    try:
+        response = json.loads(request("GET"))
+    except ValueError:
+        raise ValueError("Supabase Management API returned an invalid PostgREST settings response.") from None
+    exposed = response.get("db_schema") if isinstance(response, dict) else None
+    if not isinstance(exposed, str):
+        raise ValueError("Supabase Management API response is missing the db_schema setting.")
+    schemas = {item.strip() for item in exposed.split(",") if item.strip()}
+    schemas.add(schema)
+    request("PATCH", json.dumps({"db_schema": ",".join(sorted(schemas))}).encode("utf-8"))
 
 
 def _first_filled_env_value(values: dict[str, str], keys: list[str]) -> tuple[str, str]:
@@ -1396,7 +1443,7 @@ def activate_personal_supabase(
                     push_options["database_url"] = preflight.database_url
                 pushed = push_migrations(TUI_ROOT, **push_options)
     except ValueError as error:
-        message = str(error)
+        message = redact_environment_values(str(error), environment) or "Supabase migration setup failed."
         _write_registration_marker(
             root,
             schema_name,
@@ -1419,6 +1466,37 @@ def activate_personal_supabase(
             redact_environment_values(pushed.output, environment)
             or "Supabase migration push failed."
         )
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+            last_activate_error=_short_error(message),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            message,
+            root,
+            scaffolded=scaffolded,
+            committed=git_result.committed,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+        )
+
+    report_progress("Exposing schema through the Supabase Data API")
+    try:
+        with ROOT_MIGRATION_LOCK:
+            expose_personal_supabase_schema(
+                project_ref,
+                schema_name,
+                environment.get(str(settings["env_access_token_key"]), ""),
+                timeout=float(settings.get("management_api_timeout_seconds", 15)),
+            )
+    except ValueError as error:
+        detail = redact_environment_values(str(error), environment) or (
+            "check project settings and retry Activate"
+        )
+        message = f"Failed to expose the schema through the Supabase Data API: {detail}"
         _write_registration_marker(
             root,
             schema_name,
@@ -1493,6 +1571,9 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "`SUPABASE_URL`, publishable/secret API keys (legacy anon/service_role aliases "
         "still work), and one database access setting (`SUPABASE_DB_URL`, "
         "`SUPABASE_DB_URL_IPV4`, `SUPABASE_DB_URL_IPV6`, or `SUPABASE_ACCESS_TOKEN`). "
+        "Activate also always requires `SUPABASE_ACCESS_TOKEN` in the TUI root `.env` "
+        "for the Management API, even when a database URL is configured; the token "
+        "is never copied into this project's `.env`. "
         "When multiple database URLs are set, Activate probes the IPv4 URL, then IPv6, "
         "then the default URL and passes the reachable URL to migration push. "
         "`SUPABASE_URL` remains the independent PostgREST/API endpoint. Project ref is optional when the URL is "
@@ -1515,9 +1596,11 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "- File scaffolding alone is not ecosystem-ready; the operator must Activate via Daedalus "
         "(from the Ctrl+K Command Menu) so the software layer commits the scaffold and pushes migrations.\n"
         "- Supabase CLI configuration and migration execution are owned by the Daedalus TUI root. "
-        "This does not change the hosted project's PostgREST "
-        "configuration. After Activate applies the schema, add it to Supabase Dashboard "
-        "Project Settings > Data API > Exposed schemas, preserving the existing entries.\n"
+        "After applying migrations, Activate merges this schema into hosted PostgREST's "
+        "exposed schemas using the Management API while preserving existing entries. "
+        "The initial migration grants schema usage and table access to `service_role` "
+        "and default table privileges for `postgres`; it does not grant broad access "
+        "to `anon` or `authenticated`.\n"
         f"- If a hosted request fails with `PGRST106` / `Invalid schema: {schema}`, PostgREST "
         "does not currently expose the requested schema. Check the hosted Exposed schemas "
         "list first. If the schema is already listed but the error remains, check whether "
@@ -1809,15 +1892,13 @@ def _ensure_supabase_scaffold(root: Path, schema: str, settings: dict) -> None:
         migration_path.write_text(
             (
                 f"-- Personal shared Supabase schema for this Daedalus project.\n"
-                f"-- Operators must allow-list \"{schema}\" in Supabase Data API settings.\n"
+                f"-- Activate adds \"{schema}\" to hosted PostgREST exposed schemas.\n"
                 f'CREATE SCHEMA IF NOT EXISTS "{schema}";\n'
                 "\n"
-                f'GRANT USAGE ON SCHEMA "{schema}" TO anon, authenticated, service_role;\n'
-                f'GRANT ALL ON SCHEMA "{schema}" TO postgres, service_role;\n'
-                f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
-                "GRANT ALL ON TABLES TO postgres, service_role;\n"
-                f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
-                "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;\n"
+                f'GRANT USAGE ON SCHEMA "{schema}" TO service_role;\n'
+                f'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "{schema}" TO service_role;\n'
+                f'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA "{schema}" '
+                "GRANT ALL PRIVILEGES ON TABLES TO service_role;\n"
             ),
             encoding="utf-8",
         )
@@ -1912,8 +1993,7 @@ def _shared_env_example_block(settings: dict, keys: list[str] | None = None) -> 
 
 def _allow_list_comment(schema: str) -> str:
     return (
-        f"# After migrations apply, allow-list schema \"{schema}\" in Supabase Dashboard → "
-        "Project Settings → Data API (PostgREST exposed schemas)."
+        f"# Activate automatically adds schema \"{schema}\" to hosted PostgREST exposed schemas."
     )
 
 

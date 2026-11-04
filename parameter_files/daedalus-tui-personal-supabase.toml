@@ -23,13 +23,13 @@ canonical_env_keys = [
   "SUPABASE_DB_URL",
   "SUPABASE_DB_URL_IPV4",
   "SUPABASE_DB_URL_IPV6",
-  "SUPABASE_ACCESS_TOKEN",
 ]
 # Conceptually required after alias resolution (project ref may be derived from URL).
 required_env_keys = [
   "SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SECRET_KEY",
+  "SUPABASE_ACCESS_TOKEN",
 ]
 migration_directory = "daedalus-migrations"
 migration_filename_pattern = "<YYYYMMDDHHMM>_<schema>_<description>.sql"
@@ -41,7 +41,7 @@ confirmation_name_prompt = "Type this project name exactly to confirm:"
 confirmation_button_label = "Activate"
 wizard_title = "Personal Supabase setup"
 wizard_scaffold_done = "Scaffold files are in place for schema {schema}."
-wizard_env_instructions = "Next, edit the Daedalus TUI .env file and set:\n\n  {env_path}\n\n  SUPABASE_URL=...\n  SUPABASE_PUBLISHABLE_KEY=...\n  SUPABASE_SECRET_KEY=...\n  SUPABASE_DB_URL=...   # required database connection\n  SUPABASE_DB_URL_IPV4=...   # optional IPv4 Session pooler connection\n  SUPABASE_DB_URL_IPV6=...   # optional IPv6 direct connection\n  SUPABASE_ACCESS_TOKEN=... # required when no database URL is configured\n\nOn Activate, Daedalus copies the API URL, publishable/secret keys, project ref, and registered schema into a managed block at the end of this project's ignored .env so its app can read and write data. Database URLs and access tokens stay in the TUI root .env for migration operations. Re-Activate after changing credentials to refresh the project block.\n\nThis project's application data belongs in the registered schema {schema}, never public. Activate assumes that remote schema is blank and applies SQL from daedalus-migrations/ through the Daedalus TUI root. It does not clear remote objects or migration history. Set up a blank schema before activating. When multiple URLs are set, Activate probes IPv4, then IPv6, then the default URL and uses the reachable URL. Copy URLs from Supabase Dashboard > Connect. Project ref is optional when SUPABASE_URL is https://<ref>.supabase.co.\nMigration files use <YYYYMMDDHHMM>_<schema>_<description>.sql. Agents put SQL only in daedalus-migrations/ and never run Supabase CLI commands.\nAfter Activate completes, expose the schema to the hosted Data API: open Supabase Dashboard > Project Settings > Data API > Exposed schemas, add {schema}, preserve the schemas already listed, and save. The local Supabase CLI config and db push apply database migrations but do not change this hosted PostgREST setting. If requests still return PGRST106 after saving, confirm {schema} is listed; if it is, use the SQL Editor to inspect authenticator.rolconfig with SELECT rolname, rolconfig FROM pg_roles WHERE rolname = 'authenticator'; if a stale pgrst.db_schemas override is present, run ALTER ROLE authenticator RESET pgrst.db_schemas; to restore Dashboard control.\nContinue re-checks the TUI .env file in a separate process and only looks at the exit code.\n\nWhen the values are saved, continue."
+wizard_env_instructions = "Next, edit the Daedalus TUI .env file and set:\n\n  {env_path}\n\n  SUPABASE_URL=...\n  SUPABASE_PUBLISHABLE_KEY=...\n  SUPABASE_SECRET_KEY=...\n  SUPABASE_ACCESS_TOKEN=... # required Management API token for Activate\n  SUPABASE_DB_URL=...   # database connection, or use one of the family-specific URLs\n  SUPABASE_DB_URL_IPV4=...   # optional IPv4 Session pooler connection\n  SUPABASE_DB_URL_IPV6=...   # optional IPv6 direct connection\n\nOn Activate, Daedalus copies the API URL, publishable/secret keys, project ref, and registered schema into a managed block at the end of this project's ignored .env so its app can read and write data. Keep the access token and database URLs in the TUI root .env; they are never copied into the project. Re-Activate after changing credentials to refresh the project block.\n\nThis project's application data belongs in the registered schema {schema}, never public. Activate assumes that remote schema is blank and applies SQL from daedalus-migrations/ through the Daedalus TUI root. It grants schema and table access to service_role only, then uses the Supabase Management API to merge {schema} into the hosted PostgREST exposed schemas while preserving existing entries. If that API update fails, Activate remains retryable and does not mark the project activated. It does not clear remote objects or migration history. Set up a blank schema before activating. When multiple URLs are set, Activate probes IPv4, then IPv6, then the default URL and uses the reachable URL. Copy URLs from Supabase Dashboard > Connect. Project ref is optional when SUPABASE_URL is https://<ref>.supabase.co.\nMigration files use <YYYYMMDDHHMM>_<schema>_<description>.sql. Agents put SQL only in daedalus-migrations/ and never run Supabase CLI commands.\nContinue re-checks the TUI .env file in a separate process and only looks at the exit code.\n\nWhen the values are saved, continue."
 wizard_env_missing = "Environment variables still not detected."
 wizard_continue_label = "Continue"
 wizard_cancel_label = "Cancel"
@@ -58,5 +58,7 @@ activation_progress_stages = [
   "Validate environment",
   "Check Supabase connection",
   "Synchronize and apply migrations from the Daedalus TUI root",
+  "Expose schema through the Supabase Data API",
 ]
+management_api_timeout_seconds = 15
 activation_progress_close_label = "Close"

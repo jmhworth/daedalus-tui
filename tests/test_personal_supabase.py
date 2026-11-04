@@ -3,6 +3,8 @@ import subprocess
 import tempfile
 import tomllib
 import unittest
+import json
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -86,8 +88,12 @@ class PersonalSupabaseTests(unittest.TestCase):
             lines.append("SUPABASE_ACCESS_TOKEN=access-token")
         else:
             lines.append("SUPABASE_DB_URL=postgres://user:password@example.test:5432/db")
+            lines.append("SUPABASE_ACCESS_TOKEN=access-token")
         contents = "\n".join(lines) + "\n"
-        (project / ".env").write_text(contents, encoding="utf-8")
+        project_contents = "\n".join(
+            line for line in lines if not line.startswith("SUPABASE_ACCESS_TOKEN=")
+        ) + "\n"
+        (project / ".env").write_text(project_contents, encoding="utf-8")
         (self.tui_root / ".env").write_text(contents, encoding="utf-8")
 
     def test_schema_matches_validated_project_slug(self):
@@ -117,7 +123,11 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertIn("SUPABASE_PUBLISHABLE_KEY=", env_text)
             self.assertIn("SUPABASE_SECRET_KEY=", env_text)
             self.assertIn("SUPABASE_SCHEMA=example-project", env_text)
-            self.assertIn("allow-list", env_text.lower())
+            self.assertIn("exposed schemas", env_text.lower())
+            self.assertIn('GRANT USAGE ON SCHEMA "example-project" TO service_role;', migration_text)
+            self.assertIn("ALTER DEFAULT PRIVILEGES FOR ROLE postgres", migration_text)
+            self.assertNotIn("TO anon", migration_text)
+            self.assertNotIn("TO authenticated", migration_text)
             self.assertNotRegex(env_text, r"(?i)(eyJ|sk-|service_role\.[A-Za-z0-9])")
 
             for relative in (
@@ -273,7 +283,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self._seed_project(launch, "demo-app")
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
-            # API credentials alone are not enough when database access is required.
+            # API credentials alone are not enough; Activate needs the Management API token.
             (project / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
@@ -290,7 +300,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             result = bootstrap_personal_supabase(project)
 
             self.assertEqual(result.status, "failed")
-            self.assertIn("database access", result.message)
+            self.assertIn("SUPABASE_ACCESS_TOKEN", result.message)
             self.assertTrue((project / ".env").exists())
 
     def test_disabled_push_bootstrap_validates_without_database_access(self):
@@ -351,7 +361,8 @@ class PersonalSupabaseTests(unittest.TestCase):
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
                 "SUPABASE_PRIVATE_KEY=private-key\n"
-                "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n",
+                "SUPABASE_DB_URL=postgres://user:password@example.test:5432/db\n"
+                "SUPABASE_ACCESS_TOKEN=access-token\n",
                 encoding="utf-8",
             )
             private = bootstrap_personal_supabase(project)
@@ -371,6 +382,7 @@ class PersonalSupabaseTests(unittest.TestCase):
                 "SUPABASE_PUBLISHABLE_KEY": "pub",
                 "SUPABASE_SECRET_KEY": "sec",
                 "SUPABASE_DB_URL": "postgres://db",
+                "SUPABASE_ACCESS_TOKEN": "management-token",
             }
         )
         self.assertIsNone(error)
@@ -382,6 +394,41 @@ class PersonalSupabaseTests(unittest.TestCase):
             ),
             "abc123",
         )
+
+    def test_management_api_exposure_preserves_existing_schemas_and_is_idempotent(self):
+        from tui.personal_supabase import expose_personal_supabase_schema
+
+        calls = []
+
+        def fake_urlopen(request, timeout):
+            calls.append(request)
+            if request.method == "GET":
+                return BytesIO(json.dumps({"db_schema": "public, analytics, demo-app"}).encode())
+            return BytesIO(b"{}")
+
+        with patch("tui.personal_supabase.urlopen", side_effect=fake_urlopen):
+            expose_personal_supabase_schema("shared-ref", "demo-app", "secret-token")
+            expose_personal_supabase_schema("shared-ref", "demo-app", "secret-token")
+
+        self.assertEqual([call.method for call in calls], ["GET", "PATCH", "GET", "PATCH"])
+        for call in (calls[1], calls[3]):
+            self.assertEqual(
+                json.loads(call.data),
+                {"db_schema": "analytics,demo-app,public"},
+            )
+            self.assertEqual(call.get_header("Authorization"), "Bearer secret-token")
+
+    def test_activate_environment_requires_management_token_even_with_database_url(self):
+        overlay, error = resolve_personal_supabase_environment(
+            {
+                "SUPABASE_URL": "https://abc123.supabase.co",
+                "SUPABASE_PUBLISHABLE_KEY": "pub",
+                "SUPABASE_SECRET_KEY": "sec",
+                "SUPABASE_DB_URL": "postgres://db",
+            }
+        )
+        self.assertIsNone(overlay)
+        self.assertIn("SUPABASE_ACCESS_TOKEN", error or "")
 
     def test_wrong_branch_blocks_activate_without_checkout(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -608,6 +655,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self._write_project_env(project)
             push_calls = []
             psql_calls = []
+            activation_order = []
             progress = []
 
             def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
@@ -625,12 +673,18 @@ class PersonalSupabaseTests(unittest.TestCase):
                 project_ref=None,
             ):
                 push_calls.append(directory)
+                activation_order.append("push")
                 return PushResult(True, "ok")
 
             with patch("tui.personal_supabase.push_migrations", side_effect=fake_push), patch(
                 "tui.personal_supabase.synchronize_personal_migrations",
-                return_value=SimpleNamespace(succeeded=True, conflicts=()),
-            ):
+                side_effect=lambda *args, **kwargs: (
+                    activation_order.append("sync") or SimpleNamespace(succeeded=True, conflicts=())
+                ),
+            ), patch(
+                "tui.personal_supabase.expose_personal_supabase_schema",
+                side_effect=lambda *args, **kwargs: activation_order.append("expose"),
+            ) as expose:
                 result = activate_personal_supabase(
                     project,
                     "main",
@@ -644,6 +698,9 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertTrue(result.activated)
             self.assertTrue(result.scaffolded)
             self.assertEqual(len(push_calls), 1)
+            self.assertEqual(expose.call_args.args, ("shared-ref", "demo-app", "access-token"))
+            self.assertEqual(activation_order, ["sync", "push", "expose"])
+            self.assertNotIn("SUPABASE_ACCESS_TOKEN", (project / ".env").read_text(encoding="utf-8"))
             self.assertEqual(len(psql_calls), 1)
             self.assertEqual(psql_calls[0][-1], "SELECT 1;")
             self.assertEqual(
@@ -656,6 +713,7 @@ class PersonalSupabaseTests(unittest.TestCase):
                     "Validating environment",
                     "Checking Supabase connection",
                     "Synchronize and apply migrations from the Daedalus TUI root",
+                    "Exposing schema through the Supabase Data API",
                     "Complete",
                 ],
             )
@@ -712,7 +770,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             ), patch(
                 "tui.personal_supabase.synchronize_personal_migrations",
                 return_value=SimpleNamespace(succeeded=True, conflicts=()),
-            ):
+            ), patch("tui.personal_supabase.expose_personal_supabase_schema"):
                 result = activate_personal_supabase(
                     project,
                     "main",
@@ -725,6 +783,38 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertFalse(result.scaffolded)
             self.assertEqual(migration.read_text(encoding="utf-8"), before)
             self.assertTrue(is_personal_supabase_activated(project, "demo-app"))
+
+    def test_management_api_failure_keeps_activate_retryable_and_redacts_token(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._seed_project(Path(tmp) / "launch", "demo-app")
+            self._init_git_repo(project, "main")
+            register_personal_supabase(project, schema="demo-app")
+            self._write_project_env(project)
+
+            def fake_run(command, capture_output, text, env=None, timeout=None, cwd=None):
+                return SimpleNamespace(returncode=0, stdout="shared-ref\n", stderr="")
+
+            with patch(
+                "tui.personal_supabase.push_migrations",
+                return_value=PushResult(True, "ok"),
+            ), patch(
+                "tui.personal_supabase.synchronize_personal_migrations",
+                return_value=SimpleNamespace(succeeded=True, conflicts=()),
+            ), patch(
+                "tui.personal_supabase.expose_personal_supabase_schema",
+                side_effect=ValueError("Management API returned token access-token"),
+            ):
+                result = activate_personal_supabase(
+                    project,
+                    "main",
+                    schema="demo-app",
+                    run_process=fake_run,
+                    find_executable=lambda name: f"/bin/{name}",
+                )
+
+            self.assertEqual(result.status, "blocked")
+            self.assertNotIn("access-token", result.message)
+            self.assertFalse(load_personal_supabase_status(project).activated)
 
     def test_failed_preflight_leaves_commit_and_records_blocked_status(self):
         with tempfile.TemporaryDirectory() as tmp:
