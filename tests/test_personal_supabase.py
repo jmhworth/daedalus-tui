@@ -283,7 +283,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self._seed_project(launch, "demo-app")
             project = launch / "demo-app"
             register_personal_supabase(project, schema="demo-app")
-            # API credentials alone are not enough; Activate needs the Management API token.
+            # API credentials alone are not enough to apply migrations.
             (project / ".env").write_text(
                 "SUPABASE_URL=https://shared-ref.supabase.co\n"
                 "SUPABASE_PUBLISHABLE_KEY=publishable-key\n"
@@ -300,7 +300,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             result = bootstrap_personal_supabase(project)
 
             self.assertEqual(result.status, "failed")
-            self.assertIn("SUPABASE_ACCESS_TOKEN", result.message)
+            self.assertIn("database access setting", result.message)
             self.assertTrue((project / ".env").exists())
 
     def test_disabled_push_bootstrap_validates_without_database_access(self):
@@ -418,7 +418,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             )
             self.assertEqual(call.get_header("Authorization"), "Bearer secret-token")
 
-    def test_activate_environment_requires_management_token_even_with_database_url(self):
+    def test_activate_environment_accepts_database_url_without_management_token(self):
         overlay, error = resolve_personal_supabase_environment(
             {
                 "SUPABASE_URL": "https://abc123.supabase.co",
@@ -427,8 +427,8 @@ class PersonalSupabaseTests(unittest.TestCase):
                 "SUPABASE_DB_URL": "postgres://db",
             }
         )
-        self.assertIsNone(overlay)
-        self.assertIn("SUPABASE_ACCESS_TOKEN", error or "")
+        self.assertIsNone(error)
+        self.assertEqual(overlay["SUPABASE_DB_URL"], "postgres://db")
 
     def test_wrong_branch_blocks_activate_without_checkout(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -683,7 +683,6 @@ class PersonalSupabaseTests(unittest.TestCase):
                 ),
             ), patch(
                 "tui.personal_supabase.expose_personal_supabase_schema",
-                side_effect=lambda *args, **kwargs: activation_order.append("expose"),
             ) as expose:
                 result = activate_personal_supabase(
                     project,
@@ -698,8 +697,8 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertTrue(result.activated)
             self.assertTrue(result.scaffolded)
             self.assertEqual(len(push_calls), 1)
-            self.assertEqual(expose.call_args.args, ("shared-ref", "demo-app", "access-token"))
-            self.assertEqual(activation_order, ["sync", "push", "expose"])
+            expose.assert_not_called()
+            self.assertEqual(activation_order, ["sync", "push"])
             self.assertNotIn("SUPABASE_ACCESS_TOKEN", (project / ".env").read_text(encoding="utf-8"))
             self.assertEqual(len(psql_calls), 1)
             self.assertEqual(psql_calls[0][-1], "SELECT 1;")
@@ -713,7 +712,6 @@ class PersonalSupabaseTests(unittest.TestCase):
                     "Validating environment",
                     "Checking Supabase connection",
                     "Synchronize and apply migrations from the Daedalus TUI root",
-                    "Exposing schema through the Supabase Data API",
                     "Complete",
                 ],
             )
@@ -784,7 +782,7 @@ class PersonalSupabaseTests(unittest.TestCase):
             self.assertEqual(migration.read_text(encoding="utf-8"), before)
             self.assertTrue(is_personal_supabase_activated(project, "demo-app"))
 
-    def test_management_api_failure_keeps_activate_retryable_and_redacts_token(self):
+    def test_management_api_is_not_called_during_activation(self):
         with tempfile.TemporaryDirectory() as tmp:
             project = self._seed_project(Path(tmp) / "launch", "demo-app")
             self._init_git_repo(project, "main")
@@ -812,9 +810,29 @@ class PersonalSupabaseTests(unittest.TestCase):
                     find_executable=lambda name: f"/bin/{name}",
                 )
 
-            self.assertEqual(result.status, "blocked")
-            self.assertNotIn("access-token", result.message)
-            self.assertFalse(load_personal_supabase_status(project).activated)
+            self.assertEqual(result.status, "success")
+            self.assertTrue(load_personal_supabase_status(project).activated)
+
+    def test_expose_activated_schema_is_a_separate_retryable_action(self):
+        from tui.personal_supabase import expose_registered_personal_supabase_schema
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            environment = {
+                "SUPABASE_URL": "https://shared-ref.supabase.co",
+                "SUPABASE_ACCESS_TOKEN": "access-token",
+            }
+            with patch(
+                "tui.personal_supabase.load_personal_supabase_status",
+                return_value=SimpleNamespace(registered=True, activated=True, schema="demo-app"),
+            ), patch(
+                "tui.personal_supabase.validate_project_personal_supabase_environment",
+                return_value=(environment, None),
+            ), patch("tui.personal_supabase.expose_personal_supabase_schema") as expose:
+                result = expose_registered_personal_supabase_schema(project)
+
+            self.assertEqual(result.status, "success")
+            expose.assert_called_once_with("shared-ref", "demo-app", "access-token", timeout=15.0)
 
     def test_failed_preflight_leaves_commit_and_records_blocked_status(self):
         with tempfile.TemporaryDirectory() as tmp:

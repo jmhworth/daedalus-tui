@@ -60,6 +60,7 @@ from .personal_supabase import (
     ActivationResult,
     PersonalSupabaseBootstrapResult,
     activate_personal_supabase,
+    expose_registered_personal_supabase_schema,
     bootstrap_personal_supabase,
     is_personal_supabase_activated,
     preflight_personal_supabase,
@@ -712,7 +713,7 @@ class PersonalSupabaseRemovalConfirmationScreen(ModalScreen[bool]):
         self.dismiss(True)
 
 
-class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
+class PersonalSupabaseActivationProgressScreen(ModalScreen[str | None]):
     """Show the durable activation phases while the worker runs."""
 
     BINDINGS = [
@@ -727,7 +728,6 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
         "Validating environment": 3,
         "Checking Supabase connection": 4,
         "Synchronize and apply migrations from the Daedalus TUI root": 5,
-        "Exposing schema through the Supabase Data API": 6,
     }
 
     def __init__(self, project_name: str, schema: str) -> None:
@@ -779,6 +779,11 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
                 yield Button(
                     str(self.settings["activation_progress_close_label"]),
                     id="close-personal-supabase-progress-button",
+                    disabled=True,
+                )
+                yield Button(
+                    "Expose schema",
+                    id="expose-personal-supabase-schema-button",
                     disabled=True,
                 )
 
@@ -845,6 +850,7 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
                 progress=len(self.stages)
             )
             status = detail or "Personal Supabase is activated."
+            self.query_one("#expose-personal-supabase-schema-button", Button).disabled = False
         else:
             if 0 <= self._current_stage_index < len(self.stages):
                 self.query_one(
@@ -856,7 +862,9 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[None]):
         self.query_one("#close-personal-supabase-progress-button", Button).disabled = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "close-personal-supabase-progress-button" and not self._activation_running:
+        if event.button.id == "expose-personal-supabase-schema-button" and not self._activation_running:
+            self.dismiss("expose")
+        elif event.button.id == "close-personal-supabase-progress-button" and not self._activation_running:
             self.dismiss(None)
 
     def action_close_activation_progress(self) -> None:
@@ -1964,7 +1972,7 @@ class DaedalusTuiApp(App[None]):
         if status.registered and status.activated and status.schema == schema:
             progress = PersonalSupabaseActivationProgressScreen(project_path.name, schema)
             self._personal_supabase_progress_screen = progress
-            self.push_screen(progress)
+            self.push_screen(progress, self._on_personal_supabase_progress_action)
             self.call_after_refresh(
                 progress.finish,
                 True,
@@ -2086,7 +2094,7 @@ class DaedalusTuiApp(App[None]):
         self._set_error("")
         progress = PersonalSupabaseActivationProgressScreen(project_path.name, schema)
         self._personal_supabase_progress_screen = progress
-        self.push_screen(progress)
+        self.push_screen(progress, self._on_personal_supabase_progress_action)
         self._set_status(f"Activating personal Supabase schema {schema!r}…")
         root = project_path.resolve()
         lock = self._migration_push_locks.setdefault(root, threading.Lock())
@@ -2166,6 +2174,34 @@ class DaedalusTuiApp(App[None]):
             False,
             detail,
         )
+
+    def _on_personal_supabase_progress_action(self, action: str | None) -> None:
+        if action == "expose":
+            self._start_personal_supabase_exposure(self._active_project_path)
+
+    def _start_personal_supabase_exposure(self, project_path: Path) -> None:
+        self._set_error("")
+        self._set_status("Exposing personal Supabase schema through the Data API…")
+
+        def work() -> None:
+            result = expose_registered_personal_supabase_schema(project_path)
+            self.call_from_thread(self._on_personal_supabase_exposure_finished, result)
+
+        self.run_worker(
+            work,
+            thread=True,
+            exclusive=False,
+            group="personal-supabase-expose",
+            exit_on_error=False,
+        )
+
+    def _on_personal_supabase_exposure_finished(self, result: ActivationResult) -> None:
+        if result.status == "success":
+            self._set_error("")
+            self._set_status(result.message)
+        else:
+            self._set_error(result.message)
+            self._set_status("Personal Supabase schema exposure failed")
 
     @staticmethod
     def _finish_personal_supabase_progress(

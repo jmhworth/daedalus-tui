@@ -29,8 +29,8 @@ for Activate and is never copied to the project.
 - **Database access is separate from API keys**: Activate / `db push` still need
   one of `SUPABASE_DB_URL`, `SUPABASE_DB_URL_IPV4`, `SUPABASE_DB_URL_IPV6`, or
   `SUPABASE_ACCESS_TOKEN`; publishable/secret keys cannot apply SQL migrations.
-  Activate always requires `SUPABASE_ACCESS_TOKEN` for the Supabase Management
-  API, even when a database URL is configured.
+  `SUPABASE_ACCESS_TOKEN` is optional when a database URL is configured and is
+  required only for the separate hosted Data API exposure action.
   Optional family-specific URLs are probed in IPv4, IPv6, then default order;
   Activate pushes with the first reachable URL. The IPv4 URL should use the
   Supabase Session pooler. `SUPABASE_URL` remains the separate PostgREST/API URL.
@@ -53,13 +53,10 @@ for Activate and is never copied to the project.
   known scaffold paths + marker, TUI-root env validation, managed project `.env`
   credential sync,
   access-method-aware live preflight, then synchronize project migrations to the TUI root and apply them into the
-  project's remote schema. After migration application, Activate GETs and PATCHes
-  `/v1/projects/{ref}/postgrest`, preserving existing `db_schema` entries while
-  adding the registered schema. The initial migration grants `USAGE` and table
+  project's remote schema. The initial migration grants `USAGE` and table
   privileges to `service_role`, plus default table privileges for `postgres`; it
-  does not grant broad access to `anon` or `authenticated`. An API failure leaves
-  the marker unactivated and records a retryable Supabase failure. Activate
-  assumes the schema is a blank canvas and never clears remote objects or
+  does not grant broad access to `anon` or `authenticated`. Activate assumes the
+  schema is a blank canvas and never clears remote objects or
   migration history.
   Remote Git publish remains the optional operator Push action in the Command Menu.
 - **Existing projects only**: Personal Supabase is post-init for projects already
@@ -81,7 +78,7 @@ for Activate and is never copied to the project.
 - **Supabase connected**: TUI-root required API settings + one DB access method
   (`SUPABASE_DB_URL`, either family-specific URL, or `SUPABASE_ACCESS_TOKEN`), `supabase` on PATH, and a
   bounded non-destructive access-method-aware reachability probe before push.
-  The Management API token is required even when a database URL is set.
+  A Management API token is required only when exposing the hosted Data API schema.
   For canonical direct database hosts, activation checks the host project ref
   against `SUPABASE_URL` and gives a DNS-specific correction when resolution fails.
   That correction explains that direct endpoints are IPv6 by default and recommends
@@ -98,8 +95,10 @@ for Activate and is never copied to the project.
   keys for local app access. Use publishable keys in browser clients and keep
   secret/service-role keys server-side.
 - **Hosted API exposure**: The local TUI `supabase/config.toml` does not configure hosted
-  PostgREST. After migration application, Activate merges the project schema into the
-  Management API `db_schema` value while preserving existing exposed schemas. Generated
+  PostgREST. Once activation completes, the operator can press Expose schema on the
+  completed activation screen. This separate Management API action merges the project
+  schema into `db_schema` while preserving existing exposed schemas, and remains
+  available when reopening an already-activated project's flow for backward compatibility. Generated
   agent guidance explains `.schema(...)` usage and how to diagnose `PGRST106`, including
   a stale `authenticator` role override that can conflict with Dashboard settings.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
@@ -166,7 +165,7 @@ HACKING
 
 ## State Log
 2026-11-04: Fixed local cleanup to recognize the current generated hosted-schema guidance comment so empty `.env.example` scaffolds are removed.
-2026-11-04: Activate now merges the registered schema into hosted PostgREST settings and provisions service_role-only schema/table access; Management API failures remain retryable.
+2026-11-04: Activation now completes without hosted API exposure; the completed screen offers a separate, retryable Expose schema action for legacy and new projects.
 - 2026-11-04: Added the hosted Data API exposed-schema step and PGRST106 override diagnostics to personal Supabase setup instructions.
 - 2026-11-04: Registered-project task completion now checks the TUI-root aggregate for pending migrations on every task, even when that task did not change migration files.
 - 2026-11-04: Clarified generated guidance that app credentials enter only the ignored project `.env`, never tracked files.

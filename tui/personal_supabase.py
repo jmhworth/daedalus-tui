@@ -247,11 +247,6 @@ def resolve_personal_supabase_environment(
     db_url_ipv4 = values.get(db_url_ipv4_key, "").strip()
     db_url_ipv6 = values.get(db_url_ipv6_key, "").strip()
     access_token = values.get(access_token_key, "").strip()
-    if require_database_access and not access_token:
-        return None, (
-            f"Daedalus TUI .env is missing required Supabase setting(s): {access_token_key}. "
-            "Activate needs this token to configure the hosted Data API."
-        )
     if require_database_access and not any((db_url, db_url_ipv4, db_url_ipv6, access_token)):
         return None, (
             "Daedalus TUI .env must define one database access setting: "
@@ -1483,37 +1478,6 @@ def activate_personal_supabase(
             blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
         )
 
-    report_progress("Exposing schema through the Supabase Data API")
-    try:
-        with ROOT_MIGRATION_LOCK:
-            expose_personal_supabase_schema(
-                project_ref,
-                schema_name,
-                environment.get(str(settings["env_access_token_key"]), ""),
-                timeout=float(settings.get("management_api_timeout_seconds", 15)),
-            )
-    except ValueError as error:
-        detail = redact_environment_values(str(error), environment) or (
-            "check project settings and retry Activate"
-        )
-        message = f"Failed to expose the schema through the Supabase Data API: {detail}"
-        _write_registration_marker(
-            root,
-            schema_name,
-            activated=False,
-            last_activate_status=ACTIVATE_STATUS_BLOCKED_SUPABASE,
-            last_activate_error=_short_error(message),
-        )
-        return ActivationResult(
-            "blocked",
-            schema_name,
-            message,
-            root,
-            scaffolded=scaffolded,
-            committed=git_result.committed,
-            blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
-        )
-
     _write_registration_marker(
         root,
         schema_name,
@@ -1551,6 +1515,75 @@ def activate_personal_supabase(
     )
 
 
+def expose_registered_personal_supabase_schema(project_root: Path) -> ActivationResult:
+    """Expose an activated project's schema through hosted PostgREST on request."""
+    root = project_root.expanduser().resolve()
+    try:
+        status = load_personal_supabase_status(root)
+    except ValueError as error:
+        return ActivationResult("failed", "", str(error), root)
+    if not status.registered or not status.activated or not status.schema:
+        return ActivationResult(
+            "failed",
+            status.schema or "",
+            "Activate this project before exposing its schema.",
+            root,
+        )
+    settings = load_personal_supabase_settings()
+    environment, error = validate_project_personal_supabase_environment(
+        root, require_database_access=False, settings=settings
+    )
+    if error or environment is None:
+        return ActivationResult(
+            "failed",
+            status.schema,
+            error or "Supabase environment could not be resolved.",
+            root,
+            activated=True,
+        )
+    project_ref = resolve_project_ref_from_environment(environment, settings)
+    if not project_ref:
+        return ActivationResult(
+            "failed",
+            status.schema,
+            "Could not determine the Supabase project ref.",
+            root,
+            activated=True,
+        )
+    access_token = environment.get(str(settings["env_access_token_key"]), "").strip()
+    if not access_token:
+        return ActivationResult(
+            "failed",
+            status.schema,
+            f"Expose schema requires {settings['env_access_token_key']} in the Daedalus TUI root .env.",
+            root,
+            activated=True,
+        )
+    try:
+        expose_personal_supabase_schema(
+            project_ref,
+            status.schema,
+            access_token,
+            timeout=float(settings.get("management_api_timeout_seconds", 15)),
+        )
+    except ValueError as error:
+        detail = redact_environment_values(str(error), environment) or "check project settings and retry"
+        return ActivationResult(
+            "failed",
+            status.schema,
+            f"Failed to expose the schema through the Supabase Data API: {detail}",
+            root,
+            activated=True,
+        )
+    return ActivationResult(
+        "success",
+        status.schema,
+        f"Schema {status.schema!r} exposed through the Supabase Data API.",
+        root,
+        activated=True,
+    )
+
+
 def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
     """Return the markdown section appended to coding/architecture profiles."""
     values = settings or load_personal_supabase_settings()
@@ -1571,9 +1604,8 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "`SUPABASE_URL`, publishable/secret API keys (legacy anon/service_role aliases "
         "still work), and one database access setting (`SUPABASE_DB_URL`, "
         "`SUPABASE_DB_URL_IPV4`, `SUPABASE_DB_URL_IPV6`, or `SUPABASE_ACCESS_TOKEN`). "
-        "Activate also always requires `SUPABASE_ACCESS_TOKEN` in the TUI root `.env` "
-        "for the Management API, even when a database URL is configured; the token "
-        "is never copied into this project's `.env`. "
+        "`SUPABASE_ACCESS_TOKEN` is needed only when you explicitly expose this schema "
+        "through the hosted Data API; it is never copied into this project's `.env`. "
         "When multiple database URLs are set, Activate probes the IPv4 URL, then IPv6, "
         "then the default URL and passes the reachable URL to migration push. "
         "`SUPABASE_URL` remains the independent PostgREST/API endpoint. Project ref is optional when the URL is "
@@ -1596,8 +1628,8 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "- File scaffolding alone is not ecosystem-ready; the operator must Activate via Daedalus "
         "(from the Ctrl+K Command Menu) so the software layer commits the scaffold and pushes migrations.\n"
         "- Supabase CLI configuration and migration execution are owned by the Daedalus TUI root. "
-        "After applying migrations, Activate merges this schema into hosted PostgREST's "
-        "exposed schemas using the Management API while preserving existing entries. "
+        "After Activate completes, use Expose schema in the activation result when this app "
+        "needs hosted PostgREST access. The Management API update preserves existing exposed entries. "
         "The initial migration grants schema usage and table access to `service_role` "
         "and default table privileges for `postgres`; it does not grant broad access "
         "to `anon` or `authenticated`.\n"
@@ -1892,7 +1924,7 @@ def _ensure_supabase_scaffold(root: Path, schema: str, settings: dict) -> None:
         migration_path.write_text(
             (
                 f"-- Personal shared Supabase schema for this Daedalus project.\n"
-                f"-- Activate adds \"{schema}\" to hosted PostgREST exposed schemas.\n"
+                f"-- Use Expose schema after Activate to add \"{schema}\" to hosted PostgREST exposed schemas.\n"
                 f'CREATE SCHEMA IF NOT EXISTS "{schema}";\n'
                 "\n"
                 f'GRANT USAGE ON SCHEMA "{schema}" TO service_role;\n'
@@ -1993,7 +2025,7 @@ def _shared_env_example_block(settings: dict, keys: list[str] | None = None) -> 
 
 def _allow_list_comment(schema: str) -> str:
     return (
-        f"# Activate automatically adds schema \"{schema}\" to hosted PostgREST exposed schemas."
+        f"# Use Expose schema after activation to add \"{schema}\" to hosted PostgREST exposed schemas."
     )
 
 
