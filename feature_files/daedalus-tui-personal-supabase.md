@@ -165,6 +165,7 @@ for Activate and is never copied to the project.
 HACKING
 
 ## State Log
+2026-11-04: Fixed local cleanup to recognize the current generated hosted-schema guidance comment so empty `.env.example` scaffolds are removed.
 2026-11-04: Activate now merges the registered schema into hosted PostgREST settings and provisions service_role-only schema/table access; Management API failures remain retryable.
 - 2026-11-04: Added the hosted Data API exposed-schema step and PGRST106 override diagnostics to personal Supabase setup instructions.
 - 2026-11-04: Registered-project task completion now checks the TUI-root aggregate for pending migrations on every task, even when that task did not change migration files.
