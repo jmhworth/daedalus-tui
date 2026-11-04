@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "tui/app.py": {
-    "mtime": 1793500304.3956447,
-    "ast_hash": "98c5cd8edc5d2c54e2f993f5c02337d7",
+    "mtime": 1793806590.3035693,
+    "ast_hash": "d464d98a3993781d087932f032466579",
     "semantic_hash": ""
   },
   "tui/clipboard.py": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-orchestration.md": {
-    "mtime": 1791302066.5993192,
-    "ast_hash": "b09cb411b8ae222432635ef0b81f0f4b",
+    "mtime": 1793806590.300596,
+    "ast_hash": "25d68cbadf4fc2edb14e3339b3ee3dc9",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
@@ -280,13 +280,13 @@
     "semantic_hash": ""
   },
   "tui/templates/project-initializer/AGENTS.md": {
-    "mtime": 1790478000.0760438,
-    "ast_hash": "2bd6606dedae41f0529c5bebb2264238",
+    "mtime": 1793806590.3055031,
+    "ast_hash": "5c38cb19cdf99a210a5313cad04a3b3b",
     "semantic_hash": ""
   },
   "tui/templates/project-initializer/README.md": {
-    "mtime": 1789608912.908609,
-    "ast_hash": "45ca9bcda6f1d48f79a6ab8e31b3a1ac",
+    "mtime": 1793806590.3064654,
+    "ast_hash": "8fe23ce0c9bd951a927d01a3344e5274",
     "semantic_hash": ""
   },
   "tests/test_topics.py": {
@@ -445,13 +445,13 @@
     "semantic_hash": ""
   },
   "tui/personal_supabase.py": {
-    "mtime": 1793500942.9079921,
-    "ast_hash": "807b4c55c651286bc95c143e8d8a1de9",
+    "mtime": 1793806590.3044689,
+    "ast_hash": "adaa23cd5ebed2492003adcd5e6eb0cc",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-personal-supabase.md": {
-    "mtime": 1793500950.4832497,
-    "ast_hash": "19d9cf34267c13042453446e99f5c075",
+    "mtime": 1793806590.3010755,
+    "ast_hash": "4c46d4c49cd9f3bd9088f453fd9848d3",
     "semantic_hash": ""
   },
   "tests/test_environment.py": {
@@ -482,6 +482,16 @@
   "feature_files/daedalus-tui-codex-usage.md": {
     "mtime": 1790179068.7136724,
     "ast_hash": "2e15de368618cc971fc52131200152b2",
+    "semantic_hash": ""
+  },
+  "supabase/.temp/linked-project.json": {
+    "mtime": 1793504962.659493,
+    "ast_hash": "64776afc229ec5a9edacc27174e71abd",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/202610312344_medley_create_schema.sql": {
+    "mtime": 1793504664.4861639,
+    "ast_hash": "07f7565fc3e6d3d3d7b0ee0ecd3d0b8c",
     "semantic_hash": ""
   }
 }
