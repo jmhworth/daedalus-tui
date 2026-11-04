@@ -872,6 +872,46 @@ class PersonalSupabaseActivationProgressScreen(ModalScreen[str | None]):
             self.dismiss(None)
 
 
+class PersonalSupabaseExposureErrorScreen(ModalScreen[None]):
+    """Show the specific reason hosted schema exposure failed."""
+
+    BINDINGS = [
+        ("escape", "close_error", "Close"),
+    ]
+
+    def __init__(self, detail: str) -> None:
+        super().__init__()
+        self.detail = detail
+        self.settings = load_personal_supabase_settings()
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="personal-supabase-exposure-error-dialog"):
+            yield Static(
+                str(self.settings["exposure_error_title"]),
+                id="personal-supabase-exposure-error-title",
+            )
+            yield Static(
+                str(self.settings["exposure_error_intro"]),
+                id="personal-supabase-exposure-error-intro",
+                markup=False,
+            )
+            with VerticalScroll(id="personal-supabase-exposure-error-scroll"):
+                yield Static(
+                    self.detail,
+                    id="personal-supabase-exposure-error-detail",
+                    markup=False,
+                )
+            with Horizontal(id="personal-supabase-exposure-error-actions"):
+                yield Button("Close", id="close-personal-supabase-exposure-error-button")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "close-personal-supabase-exposure-error-button":
+            self.dismiss(None)
+
+    def action_close_error(self) -> None:
+        self.dismiss(None)
+
+
 class ProjectInitializerScreen(ModalScreen[dict | None]):
     """Collect a project slug and create a Daedalus-compatible directory."""
 
@@ -2200,8 +2240,10 @@ class DaedalusTuiApp(App[None]):
             self._set_error("")
             self._set_status(result.message)
         else:
-            self._set_error(result.message)
+            detail = _redact_supabase_diagnostic(result.message)
+            self._set_error(detail)
             self._set_status("Personal Supabase schema exposure failed")
+            self.push_screen(PersonalSupabaseExposureErrorScreen(detail))
 
     @staticmethod
     def _finish_personal_supabase_progress(

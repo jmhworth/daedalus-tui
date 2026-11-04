@@ -295,7 +295,7 @@ def expose_personal_supabase_schema(
         except (URLError, TimeoutError, OSError):
             raise ValueError(
                 f"Supabase Management API {method} could not reach the PostgREST settings endpoint; "
-                "check network access and retry Activate."
+                "check network access and retry schema exposure."
             ) from None
 
     try:

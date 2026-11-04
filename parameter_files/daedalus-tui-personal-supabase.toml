@@ -60,3 +60,5 @@ activation_progress_stages = [
 ]
 management_api_timeout_seconds = 15
 activation_progress_close_label = "Close"
+exposure_error_title = "Personal Supabase schema exposure failed"
+exposure_error_intro = "The hosted Data API did not accept this schema. The reason returned by Supabase is:"

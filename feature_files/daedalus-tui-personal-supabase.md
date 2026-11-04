@@ -98,9 +98,11 @@ for Activate and is never copied to the project.
   PostgREST. Once activation completes, the operator can press Expose schema on the
   completed activation screen. This separate Management API action merges the project
   schema into `db_schema` while preserving existing exposed schemas, and remains
-  available when reopening an already-activated project's flow for backward compatibility. Generated
-  agent guidance explains `.schema(...)` usage and how to diagnose `PGRST106`, including
-  a stale `authenticator` role override that can conflict with Dashboard settings.
+  available when reopening an already-activated project's flow for backward compatibility.
+  Failed exposures open a popup with the redacted detail returned from validation or the
+  Management API, while keeping the issue in the TUI error log. Generated agent guidance
+  explains `.schema(...)` usage and how to diagnose `PGRST106`, including a stale
+  `authenticator` role override that can conflict with Dashboard settings.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
   commits and migration push.
 - **Blank schema assumption**: Operators provide an empty project schema before
@@ -149,7 +151,8 @@ for Activate and is never copied to the project.
 - `tui/environment.py`: Comment-preserving `.env` reading/loading helpers;
   BOM-safe parse and process overrides.
 - `tui/app.py`: Command Menu, confirmation modal, setup wizard, activation progress
-  modal, and scaffold+Activate / retry worker.
+  modal, exposure failure popup, and scaffold+Activate / retry worker.
+- `tui/app.tcss`: Personal Supabase exposure failure popup layout and styling.
 - `tui/supabase_migrations.py`: Project-to-root migration synchronization and
   non-interactive `db push` from the TUI root for registered projects.
 - `tui/personal_supabase.py`: Activation-time write/update and cleanup of the
@@ -164,6 +167,7 @@ for Activate and is never copied to the project.
 HACKING
 
 ## State Log
+2026-11-04: Personal Supabase exposure failures now show a popup with the redacted underlying explanation, keep the issue in the on-screen error log, and recommend retrying exposure instead of Activate after network failures.
 2026-11-04: Personal Supabase cleanup now recognizes the generated manual-exposure guidance comment and removes an otherwise-empty `.env.example`.
 2026-11-04: Fixed local cleanup to recognize the current generated hosted-schema guidance comment so empty `.env.example` scaffolds are removed.
 2026-11-04: Activation now completes without hosted API exposure; the completed screen offers a separate, retryable Expose schema action for legacy and new projects.

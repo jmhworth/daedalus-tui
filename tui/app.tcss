@@ -733,6 +733,47 @@ TopicViewerScreen {
     height: 1;
 }
 
+#personal-supabase-exposure-error-dialog {
+    width: 76;
+    height: auto;
+    max-height: 90%;
+    border: round $error;
+    background: $surface;
+    padding: 1 2;
+}
+
+#personal-supabase-exposure-error-title {
+    color: $error;
+    text-style: bold;
+    height: 2;
+}
+
+#personal-supabase-exposure-error-intro {
+    color: $text-muted;
+    height: auto;
+    margin-bottom: 1;
+}
+
+#personal-supabase-exposure-error-scroll {
+    height: auto;
+    max-height: 1fr;
+    min-height: 3;
+    border: round $error;
+    padding: 1;
+    margin-bottom: 1;
+}
+
+#personal-supabase-exposure-error-detail {
+    width: 1fr;
+    height: auto;
+    color: $text;
+}
+
+#personal-supabase-exposure-error-actions {
+    height: 3;
+    align: left middle;
+}
+
 #personal-supabase-progress-actions {
     height: 3;
     align: left middle;
