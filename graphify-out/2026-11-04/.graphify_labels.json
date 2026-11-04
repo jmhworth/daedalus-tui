@@ -86,19 +86,9 @@
   "84": "RegistrationResult",
   "85": "._focus_submitted_task",
   "86": "CandidateFeatureGroup",
-  "87": "._shutdown_coordinators",
-  "88": ".action_view_topic",
   "89": "IntegrationCoordinator",
   "90": "remove_personal_supabase",
-  "91": "ProjectInitializerScreen",
   "92": "PersonalSupabaseSetupWizardScreen",
-  "93": ".__init__",
   "94": "SyncMergeConflictError",
-  "95": "._rebuild_plan_questions",
-  "96": ".on_unmount",
-  "97": "._on_personal_supabase_activation_progress",
-  "98": ".on_data_table_row_selected",
-  "99": "RegistrationResult",
-  "100": ".edit_paste_after",
-  "101": ".edit_paste_before"
+  "97": "._on_personal_supabase_activation_progress"
 }
