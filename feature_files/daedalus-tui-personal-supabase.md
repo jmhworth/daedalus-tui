@@ -89,9 +89,11 @@ tokens remain in the TUI root `.env` and are used only by TUI migration flows.
   secret/service-role keys server-side.
 - **Hosted API exposure**: The local TUI `supabase/config.toml` does not configure hosted
   PostgREST. Operators must add the project schema to Dashboard > Project Settings >
-  Data API > Exposed schemas after the migration is applied. Generated agent guidance
-  explains `.schema(...)` usage and how to diagnose `PGRST106`, including a stale
-  `authenticator` role override that can conflict with Dashboard settings.
+  Data API > Exposed schemas after the migration is applied. The registration wizard
+  now calls out this manual step because CLI migration pushes do not update hosted
+  PostgREST settings. Generated agent guidance explains `.schema(...)` usage and how to
+  diagnose `PGRST106`, including a stale `authenticator` role override that can conflict
+  with Dashboard settings.
 - **Ownership**: Agents never `db push` or push remotes; software owns Activate
   commits and migration push.
 - **Blank schema assumption**: Operators provide an empty project schema before
@@ -155,6 +157,7 @@ tokens remain in the TUI root `.env` and are used only by TUI migration flows.
 HACKING
 
 ## State Log
+- 2026-11-04: Added the hosted Data API exposed-schema step and PGRST106 override diagnostics to personal Supabase setup instructions.
 - 2026-11-04: Registered-project task completion now checks the TUI-root aggregate for pending migrations on every task, even when that task did not change migration files.
 - 2026-11-04: Clarified generated guidance that app credentials enter only the ignored project `.env`, never tracked files.
 - 2026-11-04: Activate now copies app-facing Supabase API settings and the registered schema into the project `.env`, while keeping migration access credentials in the TUI root and documenting the schema for app data.
