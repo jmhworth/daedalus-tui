@@ -152,6 +152,7 @@ tokens remain in the TUI root `.env` and are used only by TUI migration flows.
 HACKING
 
 ## State Log
+- 2026-11-04: Clarified generated guidance that app credentials enter only the ignored project `.env`, never tracked files.
 - 2026-11-04: Activate now copies app-facing Supabase API settings and the registered schema into the project `.env`, while keeping migration access credentials in the TUI root and documenting the schema for app data.
 - 2026-10-31: Personal Supabase removal now prunes empty generated agent directories and accurately describes the migration, profile, env-example, and marker cleanup.
 - 2026-10-31: Let Activate recognize plain or `IF NOT EXISTS` schema-creation migrations with or without a trailing semicolon when auto-committing a matching legacy Supabase config.

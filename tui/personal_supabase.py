@@ -1489,6 +1489,7 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "Daedalus copies the API connection settings and this schema into the managed "
         "Personal Supabase block at the end of this project's ignored `.env`; update "
         "the TUI root `.env` and Activate again to rotate them. "
+        "Daedalus never writes credentials to tracked files. "
         "`SUPABASE_URL`, publishable/secret API keys (legacy anon/service_role aliases "
         "still work), and one database access setting (`SUPABASE_DB_URL`, "
         "`SUPABASE_DB_URL_IPV4`, `SUPABASE_DB_URL_IPV6`, or `SUPABASE_ACCESS_TOKEN`). "
