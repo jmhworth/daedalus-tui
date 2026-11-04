@@ -1,16 +1,16 @@
 # Graph Report - daedalus-tui  (2026-11-04)
 
 ## Corpus Check
-- 99 files · ~97,238 words
+- 99 files · ~97,275 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1894 nodes · 5246 edges · 96 communities (81 shown, 15 thin omitted)
+- 1894 nodes · 5246 edges · 98 communities (82 shown, 16 thin omitted)
 - Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 595 edges (avg confidence: 0.54)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7c22e3f5`
+- Built from commit: `939b7601`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -109,6 +109,8 @@
 - PersonalSupabaseSetupWizardScreen
 - .__init__
 - SyncMergeConflictError
+- ._rebuild_plan_questions
+- .on_unmount
 - ._on_personal_supabase_activation_progress
 
 ## God Nodes (most connected - your core abstractions)
@@ -138,7 +140,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (96 total, 15 thin omitted)
+## Communities (98 total, 16 thin omitted)
 
 ### Community 0 - "PlanQuestion"
 Cohesion: 0.18
@@ -229,8 +231,8 @@ Cohesion: 0.29
 Nodes (6): Daedalus TUI Coding Statistics, Dev Mode, Key Points, Relevant Files, State Log, Summary
 
 ### Community 25 - "._set_status"
-Cohesion: 0.08
-Nodes (17): Log, RowSelected, Path, Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive., Surface Sync conflict recovery progress in the status bar., Promote only events that need the user's attention in the inbox., Return only direct-child projects, or the empty-root fallback. (+9 more)
+Cohesion: 0.09
+Nodes (15): RowSelected, Path, Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive., Surface Sync conflict recovery progress in the status bar., Promote only events that need the user's attention in the inbox., Render actionable history and tasks created during this session., Keep failures, active work, and all tasks submitted in this launch. (+7 more)
 
 ### Community 26 - ".provider_split"
 Cohesion: 0.16
@@ -297,8 +299,8 @@ Cohesion: 0.11
 Nodes (7): FakeCoordinator, FakeRunner, settings(), PersonalSupabaseRemovalResult, Outcome of removing the local personal-Supabase integration artifacts., DaedalusProject, A repository recognized by the presence of a ``feature_files`` folder.
 
 ### Community 44 - "CandidateFeatureGroup"
-Cohesion: 0.05
-Nodes (54): Binding, ComposeResult, Mount, Select, ConfigTests, CompactSettingsSelect, CreateTopicScreen, _format_codex_usage() (+46 more)
+Cohesion: 0.06
+Nodes (50): Binding, Mount, Select, ConfigTests, CompactSettingsSelect, _format_codex_usage(), _format_codex_window(), KeyboardShortcutsScreen (+42 more)
 
 ### Community 45 - "KeyboardShortcutsScreen"
 Cohesion: 0.20
@@ -417,8 +419,8 @@ Cohesion: 0.20
 Nodes (13): CodexUsageTests, CodexUsageWindow, fetch_codex_usage(), _find_response(), _first_undimensioned_window(), parse_codex_usage(), _parse_reset(), _parse_window() (+5 more)
 
 ### Community 80 - "PersonalSupabaseConfirmationScreen"
-Cohesion: 0.08
-Nodes (8): Changed, Pressed, Submitted, PersonalSupabaseConfirmationScreen, PersonalSupabaseRemovalConfirmationScreen, Confirm, then remove local personal-Supabase artifacts for the project., Require an explicit confirmation before scaffolding/Activating a shared schema., Require an exact project-name confirmation before local cleanup.
+Cohesion: 0.07
+Nodes (8): ComposeResult, Pressed, Submitted, CreateTopicScreen, PersonalSupabaseRemovalConfirmationScreen, Confirm, then remove local personal-Supabase artifacts for the project., Require an exact project-name confirmation before local cleanup., Collect the context needed to initialize and populate a topic file.
 
 ### Community 81 - "select_roots"
 Cohesion: 0.14
@@ -430,7 +432,7 @@ Nodes (7): copy_to_system_clipboard(), paste_from_system_clipboard(), System cli
 
 ### Community 84 - "RegistrationResult"
 Cohesion: 0.04
-Nodes (36): Text, DaedalusTuiApp, _literal_select_options(), Resize, Build Select prompts that Rich will not parse as markup., Synchronize registered projects; push migrations only when activated., Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com (+28 more)
+Nodes (33): Log, DaedalusTuiApp, Resize, Synchronize registered projects; push migrations only when activated., Apply the viewport-aware layout whenever the terminal changes size., Toggle responsive classes and dimensions after a viewport change.          ``com, Measure wide controls after their current layout pass completes., Run the wide-layout measurement after the next screen refresh. (+25 more)
 
 ### Community 85 - "._focus_submitted_task"
 Cohesion: 0.10
@@ -454,7 +456,11 @@ Nodes (4): probe_project_personal_supabase_environment(), Return the TUI root ``
 
 ### Community 94 - "SyncMergeConflictError"
 Cohesion: 0.08
-Nodes (16): Key, Remove known credential values before diagnostics reach the UI or log., Add Vim-like navigation without changing TextArea insert behavior., Confirm, then scaffold (if needed) and Activate personal Supabase., Scaffold files, then guide manual project env setup before Activate., Run scaffold+Activate in a background worker so the TUI stays responsive., Return provider metadata from the shared controls for a new task., Queue a coding task that writes and expands the requested topic file. (+8 more)
+Nodes (16): Key, Remove known credential values before diagnostics reach the UI or log., Add Vim-like navigation without changing TextArea insert behavior., Confirm, then scaffold (if needed) and Activate personal Supabase., Scaffold files, then guide manual project env setup before Activate., Run scaffold+Activate in a background worker so the TUI stays responsive., Launch plan-mode recovery against the preserved Sync conflict worktree., Show animated activity or a concise terminal task outcome. (+8 more)
+
+### Community 95 - "._rebuild_plan_questions"
+Cohesion: 0.12
+Nodes (7): Changed, Text, _literal_select_options(), Build Select prompts that Rich will not parse as markup., Finish Select setup without allowing a stale value to exit the TUI.          Pla, Prefer mounted selector values so clarification refreshes keep choices., Replace question controls after Textual has completed child removal.
 
 ### Community 97 - "._on_personal_supabase_activation_progress"
 Cohesion: 0.12
@@ -463,12 +469,12 @@ Nodes (10): PersonalSupabaseActivationProgressScreen, Forward worker phases to t
 ## Knowledge Gaps
 - **117 isolated node(s):** `daedalus-tui`, `Execution Boundaries (CRITICAL)`, `Evidence Extraction`, `Architecture Boundaries`, `Parameter Files` (+112 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **15 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `DaedalusTuiApp` connect `RegistrationResult` to `._on_personal_supabase_activation_progress`, `.emit`, `AgentRunner`, `log_exception`, `GitWorktreeError`, `GitWorktreeManager`, `._rebuild_plan_questions`, `CandidateFeatureGroup`, `bootstrap_personal_supabase`, `PersonalSupabaseConfirmationScreen`, `._rebuild_plan_questions`, `TranscriptLog`, `discover_projects`, `._persist_task`, `TranscriptLog`, `calculate_token_usage`, `._set_status`, `SyncMergeConflictError`?**
+- **Why does `DaedalusTuiApp` connect `RegistrationResult` to `AgentRunner`, `GitWorktreeManager`, `._set_status`, `calculate_token_usage`, `.emit`, `._rebuild_plan_questions`, `CandidateFeatureGroup`, `._persist_task`, `._rebuild_plan_questions`, `TranscriptLog`, `log_exception`, `GitWorktreeError`, `bootstrap_personal_supabase`, `PersonalSupabaseConfirmationScreen`, `TranscriptLog`, `discover_projects`, `SyncMergeConflictError`, `._rebuild_plan_questions`, `.on_unmount`, `._on_personal_supabase_activation_progress`?**
   _High betweenness centrality (0.143) - this node is a cross-community bridge._
 - **Why does `TuiAppTests` connect `bootstrap_personal_supabase` to `.emit`, `._on_personal_supabase_activation_progress`, `GitWorktreeError`, `._rebuild_plan_questions`, `CandidateFeatureGroup`, `test_app.py`, `PersonalSupabaseConfirmationScreen`, `._rebuild_plan_questions`, `TranscriptLog`, `RegistrationResult`, `._set_status`, `SyncMergeConflictError`?**
   _High betweenness centrality (0.055) - this node is a cross-community bridge._
