@@ -669,7 +669,14 @@ class LocalOrchestrator:
         # can be temporary or based on a commit that predates its marker.
         personal_registered = is_personal_supabase_registered(context.repository)
         while True:
-            if not migrations_pending(context.path, context.base_commit):
+            # Personal Supabase projects use the TUI root as the migration
+            # source of truth. Always synchronize and ask the CLI to apply any
+            # pending aggregate migrations after a task; limiting this check
+            # to files changed by the current task can leave earlier or
+            # activation-synced migrations unapplied.
+            if not personal_registered and not migrations_pending(
+                context.path, context.base_commit
+            ):
                 return
             database_url: str | None = None
             if personal_registered:

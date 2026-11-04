@@ -101,8 +101,11 @@ tokens remain in the TUI root `.env` and are used only by TUI migration flows.
   `daedalus-migrations/`, named `<YYYYMMDDHHMM>_<schema>_<description>.sql`.
   Activation, launch, and post-verification handling copy missing files into the
   TUI root `supabase/migrations/`, skip identical files, and preserve unrelated
-  root migrations. A same-name/different-content conflict trusts the root copy
-  and sends both SQL bodies to a repair agent.
+  root migrations. After every completed task for a registered project,
+  orchestration synchronizes its files and asks the TUI-root Supabase CLI to
+  apply any pending aggregate migrations, including migrations left pending by
+  an earlier task or activation. A same-name/different-content conflict trusts
+  the root copy and sends both SQL bodies to a repair agent.
 - **Legacy scaffold commit compatibility**: Activate also commits a dirty
   project-local `supabase/config.toml` with the registered schema in
   `[api].schemas` and a matching `*_create_personal_schema.sql` migration,
@@ -152,6 +155,7 @@ tokens remain in the TUI root `.env` and are used only by TUI migration flows.
 HACKING
 
 ## State Log
+- 2026-11-04: Registered-project task completion now checks the TUI-root aggregate for pending migrations on every task, even when that task did not change migration files.
 - 2026-11-04: Clarified generated guidance that app credentials enter only the ignored project `.env`, never tracked files.
 - 2026-11-04: Activate now copies app-facing Supabase API settings and the registered schema into the project `.env`, while keeping migration access credentials in the TUI root and documenting the schema for app data.
 - 2026-10-31: Personal Supabase removal now prunes empty generated agent directories and accurately describes the migration, profile, env-example, and marker cleanup.
