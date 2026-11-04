@@ -105,8 +105,8 @@
     "semantic_hash": "e5c00634ce8bd1e0a3f5dc86854c8119"
   },
   "tui/orchestrator.py": {
-    "mtime": 1791302066.6014102,
-    "ast_hash": "941e347dfb957bcaa2d422302f13e4cb",
+    "mtime": 1793810709.1170413,
+    "ast_hash": "82c7aa589db589e507d22dc7ede4787a",
     "semantic_hash": ""
   },
   "tui/projects.py": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-personal-supabase.md": {
-    "mtime": 1793806590.3010755,
-    "ast_hash": "4c46d4c49cd9f3bd9088f453fd9848d3",
+    "mtime": 1793810709.1162984,
+    "ast_hash": "2a984d79740ccb3e29fccbb8621a9617",
     "semantic_hash": ""
   },
   "tests/test_environment.py": {
@@ -485,13 +485,18 @@
     "semantic_hash": ""
   },
   "supabase/.temp/linked-project.json": {
-    "mtime": 1793504962.659493,
+    "mtime": 1793810013.2582207,
     "ast_hash": "64776afc229ec5a9edacc27174e71abd",
     "semantic_hash": ""
   },
   "supabase/migrations/202610312344_medley_create_schema.sql": {
     "mtime": 1793504664.4861639,
     "ast_hash": "07f7565fc3e6d3d3d7b0ee0ecd3d0b8c",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/202611041700_medley_create_songs.sql": {
+    "mtime": 1793809996.2802973,
+    "ast_hash": "25d8a12f162d0a2c4ee9a1b32b9846ac",
     "semantic_hash": ""
   }
 }
