@@ -33,6 +33,8 @@ PROFILE_RELATIVE_PATHS = (
     Path(".agents") / "profiles" / "architecture.md",
 )
 SECTION_TABLE = "personal_supabase"
+PROJECT_ENV_SECTION = "# Personal Supabase credentials managed by Daedalus TUI."
+PROJECT_ENV_SECTION_END = "# End Personal Supabase credentials managed by Daedalus TUI."
 
 # Activation outcome classes stored in the marker (never credentials).
 ACTIVATE_STATUS_SUCCESS = "success"
@@ -308,8 +310,8 @@ def remove_personal_supabase(project_root: Path) -> PersonalSupabaseRemovalResul
     The Supabase directory is owned wholly by this feature and is removed in
     full. Shared project files are edited surgically: the personal marker table,
     generated env-example content, and generated profile sections are removed
-    while unrelated project configuration and guidance remain intact. The
-    ignored project ``.env`` is operator-managed and is left untouched.
+    while unrelated project configuration and guidance remain intact. Only the
+    generated Personal Supabase block is removed from the ignored project ``.env``.
     """
     root = project_root.expanduser().resolve()
     settings = load_personal_supabase_settings()
@@ -342,6 +344,9 @@ def remove_personal_supabase(project_root: Path) -> PersonalSupabaseRemovalResul
     for relative in PROFILE_RELATIVE_PATHS:
         profile = root / relative
         record(profile, lambda profile=profile: _remove_personal_supabase_profile(profile, settings))
+
+    project_env = root / ".env"
+    record(project_env, lambda: _remove_personal_supabase_project_env(project_env))
 
     # Profile files may have been created solely for this integration. Remove
     # their empty parent directories, while preserving any unrelated agent
@@ -453,6 +458,21 @@ def _without_personal_supabase_env_values(text: str, keys: set[str] | None = Non
     )
 
 
+def _remove_personal_supabase_project_env(path: Path) -> bool:
+    """Remove only the generated Personal Supabase block from project ``.env``."""
+    if not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8-sig")
+    updated = _remove_managed_project_env_section(text)
+    if updated == text:
+        return False
+    if updated.strip():
+        path.write_text(updated, encoding="utf-8")
+    else:
+        path.unlink()
+    return True
+
+
 def _remove_personal_supabase_profile(path: Path, settings: dict) -> bool:
     """Remove the generated Personal Supabase section from one profile."""
     if not path.is_file():
@@ -528,17 +548,64 @@ def load_personal_supabase_status(project_root: Path) -> PersonalSupabaseStatus:
 
 
 def project_personal_supabase_env_path(project_root: Path) -> Path:
-    """Return the Daedalus TUI ``.env`` path used for Supabase settings."""
+    """Return the target project's ``.env`` path for client credentials."""
+    return project_root.expanduser().resolve() / ".env"
+
+
+def tui_personal_supabase_env_path() -> Path:
+    """Return the TUI root ``.env`` that remains the credential source of truth."""
     return TUI_ROOT / ".env"
 
 
 def load_project_personal_supabase_env_values(project_root: Path) -> dict[str, str]:
-    """Load Supabase values from the Daedalus TUI ``.env`` only.
-
-    The ``project_root`` argument remains for compatibility with callers, but
-    target project environment files are never inspected by this workflow.
-    """
+    """Load canonical Supabase values from the Daedalus TUI ``.env``."""
     return read_env_file(TUI_ROOT / ".env")
+
+
+def write_project_personal_supabase_environment(
+    project_root: Path,
+    schema: str,
+    environment: dict[str, str],
+    settings: dict | None = None,
+) -> Path:
+    """Append/update the managed project ``.env`` block, preserving other lines."""
+    config = settings or load_personal_supabase_settings()
+    path = project_personal_supabase_env_path(project_root)
+    keys = {
+        str(config["env_schema_key"]),
+        str(config["env_url_key"]),
+        str(config["env_project_ref_key"]),
+        str(config["env_publishable_key"]),
+        str(config["env_secret_key"]),
+        *(str(key) for key in config.get("env_publishable_key_aliases", [])),
+        *(str(key) for key in config.get("env_secret_key_aliases", [])),
+    }
+    entries = {key: value for key, value in environment.items() if key in keys}
+    entries[str(config["env_schema_key"])] = schema
+    text = path.read_text(encoding="utf-8-sig") if path.is_file() else ""
+    text = _remove_managed_project_env_section(text)
+    preserved = _without_personal_supabase_env_values(text, keys).rstrip()
+    block = [PROJECT_ENV_SECTION]
+    for key in sorted(entries):
+        value = entries[key].replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+        block.append(f'{key}="{value}"')
+    block.append(PROJECT_ENV_SECTION_END)
+    updated = (preserved + "\n\n" if preserved else "") + "\n".join(block) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(updated, encoding="utf-8")
+    return path
+
+
+def _remove_managed_project_env_section(text: str) -> str:
+    start = re.search(rf"(?m)^{re.escape(PROJECT_ENV_SECTION)}\s*$", text)
+    if start is None:
+        return text
+    end = re.search(rf"(?m)^{re.escape(PROJECT_ENV_SECTION_END)}\s*$", text[start.end():])
+    if end is None:
+        # An incomplete managed section is only treated as generated through EOF.
+        return _remove_text_span(text, start.start(), len(text))
+    end_index = start.end() + end.end()
+    return _remove_text_span(text, start.start(), end_index)
 
 
 def probe_project_personal_supabase_environment(
@@ -1286,6 +1353,26 @@ def activate_personal_supabase(
         )
 
     environment = prepared.environment or {}
+    try:
+        write_project_personal_supabase_environment(root, schema_name, environment, settings)
+    except (OSError, UnicodeError, ValueError) as error:
+        message = f"Could not update project .env with Personal Supabase credentials: {error}."
+        _write_registration_marker(
+            root,
+            schema_name,
+            activated=False,
+            last_activate_status=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+            last_activate_error=_short_error(message),
+        )
+        return ActivationResult(
+            "blocked",
+            schema_name,
+            message,
+            root,
+            scaffolded=scaffolded,
+            committed=git_result.committed,
+            blocked_reason=ACTIVATE_STATUS_BLOCKED_SUPABASE,
+        )
     project_ref = (prepared.project_ref or "").strip()
     report_progress("Synchronize and apply migrations from the Daedalus TUI root")
     try:
@@ -1398,16 +1485,22 @@ def profile_guidance_section(schema: str, settings: dict | None = None) -> str:
         "for application tables or migrations.\n\n"
         f"- Schema name is `{schema}` (see `{env_key}` in `.env.example` and the "
         "`[personal_supabase]` marker in `.daedalus`).\n"
-        "- This project's ignored `.env` is the canonical source for "
+        "- The Daedalus TUI root `.env` is the canonical credential source. On Activate, "
+        "Daedalus copies the API connection settings and this schema into the managed "
+        "Personal Supabase block at the end of this project's ignored `.env`; update "
+        "the TUI root `.env` and Activate again to rotate them. "
         "`SUPABASE_URL`, publishable/secret API keys (legacy anon/service_role aliases "
         "still work), and one database access setting (`SUPABASE_DB_URL`, "
         "`SUPABASE_DB_URL_IPV4`, `SUPABASE_DB_URL_IPV6`, or `SUPABASE_ACCESS_TOKEN`). "
         "When multiple database URLs are set, Activate probes the IPv4 URL, then IPv6, "
         "then the default URL and passes the reachable URL to migration push. "
         "`SUPABASE_URL` remains the independent PostgREST/API endpoint. Project ref is optional when the URL is "
-        "`https://<ref>.supabase.co`. Operators set those values manually; Daedalus "
-        "never writes credentials into project `.env` files.\n"
-        f"- Qualify SQL, migrations, RLS policies, and client/API configuration for `{schema}`.\n"
+        "`https://<ref>.supabase.co`. Use the publishable key in browser clients; keep "
+        "the secret/service-role key server-side only. The project `.env` block supports "
+        "the app's local Supabase client and data access; migration database URLs and "
+        "CLI use remain managed by Daedalus from its root `.env`.\n"
+        f"- Store and query this project's application data in the `{schema}` schema. "
+        f"Qualify SQL, migrations, RLS policies, and client/API configuration for `{schema}`.\n"
         f"- With supabase-js, select this schema explicitly (for example, "
         f"`supabase.schema('{schema}').from('table_name')`) or set the client's "
         f"default `db.schema` to `{schema}`. Do not silently fall back to `public`.\n"

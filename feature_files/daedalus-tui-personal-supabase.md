@@ -8,11 +8,15 @@ is software-owned Daedalus ecosystem readiness: commit the scaffold onto the
 already-checked-out operating branch, live-preflight Supabase connectivity, and
 TUI-root-owned Supabase CLI migration application. File scaffolding alone is not
 ecosystem-ready. Operators set credentials once in the Daedalus TUI root
-`.env`; project `.env` files are not read or changed for this workflow.
+`.env`. Activate copies the API URL, publishable/secret keys, project ref, and
+registered schema into a managed block at the end of the target project's
+ignored `.env` for application data access. Migration database URLs and access
+tokens remain in the TUI root `.env` and are used only by TUI migration flows.
 
 ## Key Points
 - **Shared database, per-project schema**: Schema identity is always the validated
-  project slug. Apps share auth on the single Supabase project; agents must never
+  project slug. All application data, SQL, migrations, and RLS policies belong in
+  that schema. Apps share auth on the single Supabase project; agents must never
   default to `public`.
 - **TUI-owned credentials**: Set `SUPABASE_URL`,
   `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` (Supabase's new API key
@@ -33,17 +37,18 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
   claim ecosystem readiness. Migration SQL is project-owned, while CLI configuration
   and the aggregate migration history are owned by the Daedalus TUI root.
 - **Setup wizard**: After name confirmation, Register opens a setup wizard that
-  scaffolds files, then instructs the operator to set the active project's
-  ignored `.env` values and shows the absolute path of that file. Continue runs
+  scaffolds files, then instructs the operator to set the Daedalus TUI root
+  `.env` values and shows the absolute path of that file. Continue runs
   `python -m tui.env_presence_probe` with cwd = the project root and gates on
   the child exit code (key-name diagnostics only; secret values stay in the child).
   Missing credentials keep the wizard open with an "Environment variables still
-  not detected" correction that repeats the checked path. Daedalus does not
-  write `.env` files.
+  not detected" correction that repeats the checked path. Activate writes the
+  app-facing API values into the managed project `.env` block.
 - **Phase 2 — Activate**: After the wizard succeeds, the software runs Activate when
   gates pass: require HEAD already on the selected operating/target branch (no
   checkout/switch), refuse unrelated dirty files, software-owned local commit of
-  known scaffold paths + marker, project-local env validation (read-only),
+  known scaffold paths + marker, TUI-root env validation, managed project `.env`
+  credential sync,
   access-method-aware live preflight, then synchronize project migrations to the TUI root and apply them into the
   project's remote schema. Activate assumes the schema is a blank canvas and
   never clears remote objects or migration history.
@@ -55,15 +60,16 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
   completeness, and re-run Phase 2. Incomplete scaffolds fail closed.
 - **Local cleanup**: The Command Menu also offers an exact-name-confirmed cleanup
   that removes the project's `daedalus-migrations/` directory, generated `.env.example`
-  entries, generated profile guidance, and only the `[personal_supabase]` table
-  from `.daedalus`. Empty generated agent directories are removed; directories
-  with unrelated files remain. The operator-managed `.env` is left untouched,
-  and cleanup never changes the remote database.
+  entries, generated profile guidance, the managed project `.env` credential
+  block, and only the `[personal_supabase]` table from `.daedalus`. Empty
+  generated agent directories are removed; directories with unrelated files
+  remain. Unrelated project `.env` entries are preserved; cleanup never changes
+  the remote database.
 - **Status model**: Distinguish unregistered, scaffolded (`registered`, not
   `activated`), activated, and blocked reasons (`last_activate_status` /
   redacted error class—no credentials). Launch validates all registered projects;
   launch `db push` runs only for activated projects when `supabase_db_push_enabled`.
-- **Supabase connected**: Project-local required API settings + one DB access method
+- **Supabase connected**: TUI-root required API settings + one DB access method
   (`SUPABASE_DB_URL`, either family-specific URL, or `SUPABASE_ACCESS_TOKEN`), `supabase` on PATH, and a
   bounded non-destructive access-method-aware reachability probe before push.
   For canonical direct database hosts, activation checks the host project ref
@@ -74,9 +80,13 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
   the Activate action stays disabled until the exact project name is entered.
 - **Agent teaching**: Idempotently appends a Personal Supabase Schema section to
   `.agents/profiles/coding.md` and `architecture.md` (no Cursor skill file).
-- **Canonical environment**: The Daedalus TUI root `.env` owns the connection
+- **Canonical environment**: The Daedalus TUI root `.env` owns Supabase connection
   values. Registration, activation, launch, and orchestration read that file;
-  project `.env` files are not inspected or changed for this flow.
+  Activate copies only app-facing API settings and schema into the target `.env`.
+  Database URLs and access tokens remain TUI-root-only.
+- **App key handling**: The project `.env` carries the publishable and secret API
+  keys for local app access. Use publishable keys in browser clients and keep
+  secret/service-role keys server-side.
 - **Hosted API exposure**: The local TUI `supabase/config.toml` does not configure hosted
   PostgREST. Operators must add the project schema to Dashboard > Project Settings >
   Data API > Exposed schemas after the migration is applied. Generated agent guidance
@@ -120,15 +130,18 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 ## Relevant Files
 - `tui/personal_supabase.py`: Scaffold helper, marker I/O, local cleanup, Git
   gate/commit, live preflight, Activate orchestration,
-  project-local env validation, child-process env presence probe, and temporary CLI configuration.
+  TUI-root env validation, project env block sync, child-process env presence
+  probe, and temporary CLI configuration.
 - `tui/env_presence_probe.py`: Project-root cwd child entry that exits 0/1 after
   resolving required Supabase keys (stderr key names only).
-- `tui/environment.py`: Comment-preserving `.env` reading/loading helpers (no
-  personal-Supabase credential writes); BOM-safe parse and process overrides.
+- `tui/environment.py`: Comment-preserving `.env` reading/loading helpers;
+  BOM-safe parse and process overrides.
 - `tui/app.py`: Command Menu, confirmation modal, setup wizard, activation progress
   modal, and scaffold+Activate / retry worker.
 - `tui/supabase_migrations.py`: Project-to-root migration synchronization and
   non-interactive `db push` from the TUI root for registered projects.
+- `tui/personal_supabase.py`: Activation-time write/update and cleanup of the
+  managed app-credential block in the target project's ignored `.env`.
 - `tui/orchestrator.py`, `tui/app.py`: Preflight registered project URLs and
   explicitly pass the reachable database URL for task and launch pushes.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation and
@@ -139,6 +152,7 @@ ecosystem-ready. Operators set credentials once in the Daedalus TUI root
 HACKING
 
 ## State Log
+- 2026-11-04: Activate now copies app-facing Supabase API settings and the registered schema into the project `.env`, while keeping migration access credentials in the TUI root and documenting the schema for app data.
 - 2026-10-31: Personal Supabase removal now prunes empty generated agent directories and accurately describes the migration, profile, env-example, and marker cleanup.
 - 2026-10-31: Let Activate recognize plain or `IF NOT EXISTS` schema-creation migrations with or without a trailing semicolon when auto-committing a matching legacy Supabase config.
 - 2026-10-31: Allowed the paired legacy Supabase config and schema migration to auto-commit when its SQL uses an unquoted valid schema identifier.

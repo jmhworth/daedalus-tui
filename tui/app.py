@@ -70,7 +70,7 @@ from .personal_supabase import (
     resolve_project_ref_from_environment,
     schema_from_project_root,
     temporary_supabase_cli_config,
-    project_personal_supabase_env_path,
+    tui_personal_supabase_env_path,
     probe_project_personal_supabase_environment,
 )
 from .projects import DaedalusProject, discover_projects, is_direct_child_project
@@ -600,9 +600,12 @@ class PersonalSupabaseSetupWizardScreen(ModalScreen[bool]):
         scaffold.update(
             str(self.settings["wizard_scaffold_done"]).format(schema=self.schema)
         )
-        env_path = project_personal_supabase_env_path(self.project_path)
+        env_path = tui_personal_supabase_env_path()
         instructions.update(
-            str(self.settings["wizard_env_instructions"]).format(env_path=env_path)
+            str(self.settings["wizard_env_instructions"]).format(
+                env_path=env_path,
+                schema=self.schema,
+            )
         )
         status.update("")
         continue_button.disabled = False
@@ -628,7 +631,7 @@ class PersonalSupabaseSetupWizardScreen(ModalScreen[bool]):
         )
         if not present:
             missing_prefix = str(self.settings["wizard_env_missing"])
-            env_path = project_personal_supabase_env_path(self.project_path)
+            env_path = tui_personal_supabase_env_path()
             detail = error or "required Supabase settings are missing."
             status.update(f"{missing_prefix} Checked {env_path}. {detail}")
             return
@@ -651,7 +654,7 @@ class PersonalSupabaseRemovalConfirmationScreen(ModalScreen[bool]):
         with Vertical(id="personal-supabase-removal-dialog"):
             yield Static("Remove personal Supabase", id="personal-supabase-removal-title")
             yield Static(
-                "This removes daedalus-migrations/, generated Supabase entries from .env.example and agent profiles, and the personal_supabase entry in .daedalus. Empty generated agent directories are removed; directories with other files are kept. The project .env and remote database are left untouched.",
+                "This removes daedalus-migrations/, generated Supabase entries from .env.example and agent profiles, the managed credential block from the project .env, and the personal_supabase entry in .daedalus. Empty generated agent directories are removed; directories with other files are kept. The remote database is left untouched.",
                 id="personal-supabase-removal-warning",
                 markup=False,
             )

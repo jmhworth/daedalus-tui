@@ -23,15 +23,18 @@ Do not automatically read every file under `.agents/`.
 
 ## Shared personal Supabase
 
-If this project has a `[personal_supabase]` registration in `.daedalus`, its
-schema and connection details belong to this project's ignored `.env`. Set those
-credentials there manually; Daedalus does not copy credentials between projects.
-Put all migration SQL in the project's `daedalus-migrations/` directory, named
+If this project has a `[personal_supabase]` registration in `.daedalus`, store
+application data in its registered schema (the project's validated slug), never
+in `public`. Activate copies the API URL and keys from the Daedalus TUI root
+`.env` into a managed block at the end of this project's ignored `.env`; the
+TUI root remains the credential source of truth. Put all migration SQL in the
+project's `daedalus-migrations/` directory, named
 `<YYYYMMDDHHMM>_<schema>_<description>.sql`. Do not create a project-local
 `supabase/` directory or run `supabase db push`. The Daedalus TUI copies these
 migrations into its root `supabase/migrations/` directory and handles schema
-operations after verification or Activate. Never commit credentials or use the
-`public` schema for this project's application tables.
+operations after verification or Activate. Use the registered schema explicitly
+in client queries, RLS policies, and SQL. Use publishable keys in browser
+clients; keep secret/service-role keys server-side. Never commit credentials.
 
 ## Topics
 
