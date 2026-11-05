@@ -82,10 +82,13 @@
   "80": ".enter_insert_mode",
   "81": "select_roots",
   "82": "TranscriptLog",
+  "83": "IntegrationCoordinator",
   "84": "RegistrationResult",
   "85": "expose_personal_supabase_schema",
   "86": "expose_personal_supabase_schema",
   "87": ".__init__",
+  "88": ".__init__",
+  "89": ".implement_plan",
   "90": "remove_personal_supabase",
   "91": "._apply_task_event",
   "92": "PersonalSupabaseSetupWizardScreen"

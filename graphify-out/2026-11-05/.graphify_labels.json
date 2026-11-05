@@ -82,7 +82,6 @@
   "80": ".enter_insert_mode",
   "81": "select_roots",
   "82": "TranscriptLog",
-  "83": ".nav_word_end",
   "84": "RegistrationResult",
   "85": "expose_personal_supabase_schema",
   "86": "expose_personal_supabase_schema",

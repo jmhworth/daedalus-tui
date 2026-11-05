@@ -15,13 +15,13 @@
     "semantic_hash": ""
   },
   "tests/test_app.py": {
-    "mtime": 1793855246.310149,
-    "ast_hash": "5b8e9fbdf2013e442a56dd0d1a9f8d4d",
+    "mtime": 1793856328.6481135,
+    "ast_hash": "cd8ddc760c9e20f192ad2f65b9a8384f",
     "semantic_hash": ""
   },
   "tests/test_config.py": {
-    "mtime": 1793855246.3108568,
-    "ast_hash": "9c1118713ee046ef0dc63d512e08c173",
+    "mtime": 1793855974.3097227,
+    "ast_hash": "094c24160fddb3011821ac46f57bf4f7",
     "semantic_hash": ""
   },
   "tests/test_git_worktree.py": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "tui/app.py": {
-    "mtime": 1793855246.31181,
-    "ast_hash": "a4c4aec0363f2edb2d677fd96038f15b",
+    "mtime": 1793856328.6495917,
+    "ast_hash": "194d20edae058a0118bea04d57159103",
     "semantic_hash": ""
   },
   "tui/clipboard.py": {
@@ -85,8 +85,8 @@
     "semantic_hash": "cf5f808e3a03a0cd04a9f08912c9cacd"
   },
   "tui/config.py": {
-    "mtime": 1793855246.3126857,
-    "ast_hash": "eaf081389ab804f28058457982d20c37",
+    "mtime": 1793855974.3102326,
+    "ast_hash": "2aad298e92cc215c07a262e48660b58c",
     "semantic_hash": ""
   },
   "tui/environment.py": {
@@ -145,8 +145,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
-    "mtime": 1793855246.307861,
-    "ast_hash": "f37f1a8b68963053f31c2163bccf9b00",
+    "mtime": 1793856328.6235344,
+    "ast_hash": "1738512cae4ceded59def886e2a08d1f",
     "semantic_hash": ""
   },
   "requirements.txt": {
@@ -200,8 +200,8 @@
     "semantic_hash": ""
   },
   "tui/transcript.py": {
-    "mtime": 1793848489.6770897,
-    "ast_hash": "cdefa192b475c7b3bee91aee41a93905",
+    "mtime": 1793855872.0157242,
+    "ast_hash": "4389f9d74d7d8aa24393fefdaa98ddfc",
     "semantic_hash": ""
   },
   "tests/test_token_usage.py": {
@@ -460,8 +460,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-command-menu.md": {
-    "mtime": 1793854984.1280713,
-    "ast_hash": "101f1be3c4c4d2f69325d5104c3c862d",
+    "mtime": 1793855974.3086014,
+    "ast_hash": "3da76e5428a074bff357d2dd66868e11",
     "semantic_hash": ""
   },
   "tui/env_presence_probe.py": {
@@ -502,6 +502,11 @@
   "supabase/migrations/202611041930_medley_search_songs.sql": {
     "mtime": 1793846769.8104587,
     "ast_hash": "2b62969080ae3ec9d92eb88e0351059d",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261105_051344_what_is_the__ready__status__and_is_it_possible_for.md": {
+    "mtime": 1793856328.646423,
+    "ast_hash": "4ea234aa3fd6f67ba9b496951f9e8fc0",
     "semantic_hash": ""
   }
 }
