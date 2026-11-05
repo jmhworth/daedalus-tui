@@ -73,6 +73,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-04: Aligned task inbox width defaults and prompt selection styling with the active narrow-sidebar layout.
 - 2026-11-04: Narrowed the task updates sidebar to 33 cells and resized its Task and Status columns to fit.
 - 2026-11-04: Updated task inbox UI regression assertions to account for grouped project headings and the two fixed-width task ID/status columns.
 - 2026-11-04: Grouped task updates by alphabetically sorted project headings and replaced prompt summaries with task IDs and statuses.
