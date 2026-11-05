@@ -204,3 +204,4 @@ HACKING
 - 2026-09-16: Added local personal-Supabase cleanup from the Command Menu and hardened its software-owned commits against deletions and concurrent file changes.
 - 2026-09-16: Restored Ctrl+T as a direct New Task binding while retaining the Command Menu entry.
 - 2026-09-19: Hardened plan JSON extraction to prefer the latest valid BEGIN/END block, escape raw control characters inside strings, and retry contiguous message joins so multi-draft soft-wrapped planning output still renders answerable questions.
+- 2026-11-04: Repaired the task inbox UI test to assert its configured fixed column widths of 12 and 5 cells.
