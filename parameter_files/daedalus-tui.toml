@@ -55,14 +55,11 @@ compact_task_sidebar_height = 14
 compact_prompt_height = 8
 compact_output_height = 16
 
-# Fixed content widths for the task-inbox marker, project, task, and status
-# columns. Together with DataTable's cell padding, the defaults fit the
-# fixed 44-cell sidebar and leave room for its vertical scrollbar.
+# Fixed content widths for task IDs and statuses in the grouped task inbox.
+# Together with DataTable cell padding, these fit the fixed 44-cell sidebar.
 [task_inbox]
-marker_width = 1
-project_width = 9
-task_width = 14
-status_width = 7
+task_width = 23
+status_width = 11
 
 # Fatal Textual exceptions are written to the launch-root debug log
 # (see orchestration `debug_log_filename`) and also printed to stderr.

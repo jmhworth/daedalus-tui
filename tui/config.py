@@ -57,9 +57,8 @@ class TuiSettings:
         ModelOption("Plan", "plan"),
     )
     output_width: str = "95%"
-    # Content widths for the four task-inbox columns, excluding DataTable
-    # cell padding. The defaults leave a cell for the sidebar scrollbar.
-    task_inbox_widths: tuple[int, int, int, int] = (1, 9, 14, 7)
+    # Content widths for task IDs and statuses, excluding DataTable padding.
+    task_inbox_widths: tuple[int, int] = (23, 11)
     layout: LayoutSettings = LayoutSettings()
 
 
@@ -113,10 +112,8 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
     task_inbox_widths = tuple(
         int(task_inbox.get(name, default))
         for name, default in (
-            ("marker_width", 1),
-            ("project_width", 9),
-            ("task_width", 14),
-            ("status_width", 7),
+            ("task_width", 23),
+            ("status_width", 11),
         )
     )
     if any(width < 1 for width in task_inbox_widths):

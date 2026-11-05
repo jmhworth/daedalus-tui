@@ -1509,6 +1509,7 @@ class DaedalusTuiApp(App[None]):
         # The task inbox spans all discovered projects. Row keys include the
         # project path because task IDs are only unique within a coordinator.
         self._task_rows: dict[str, tuple[Path, str]] = {}
+        self._task_row_indices: dict[str, int] = {}
         self._session_task_rows: set[str] = set()
         self._updated_task_rows: set[str] = set()
         self._new_task_mode = True
@@ -3383,17 +3384,13 @@ class DaedalusTuiApp(App[None]):
         """Render actionable history and tasks created during this session."""
         task_list = self.query_one("#task-list", DataTable)
         task_list.clear(columns=True)
-        marker_width, project_width, task_width, status_width = self.settings.task_inbox_widths
-        for label, width in (
-            ("", marker_width),
-            ("Project", project_width),
-            ("Task", task_width),
-            ("Status", status_width),
-        ):
-            # Explicit widths keep a new update marker from changing the
-            # table's virtual width and moving the visible horizontal slice.
+        task_width, status_width = self.settings.task_inbox_widths
+        for label, width in (("Task", task_width), ("Status", status_width)):
+            # Explicit widths keep long task IDs and statuses within the
+            # sidebar without introducing horizontal scrolling.
             task_list.add_column(label, width=width)
         self._task_rows.clear()
+        self._task_row_indices.clear()
 
         project_names = {
             project.path.resolve(): project.display_name
@@ -3409,41 +3406,36 @@ class DaedalusTuiApp(App[None]):
                 for record in coordinator.tasks()
                 if self._should_show_task(project_path, record)
             )
-        rows.sort(
-            key=lambda item: (
-                self._task_row_key(item[0], item[1].task_id) not in self._updated_task_rows,
-                -item[1].submission_sequence,
-            )
-        )
+        rows.sort(key=lambda item: (
+            project_names.get(item[0], item[0].name).casefold(),
+            -item[1].submission_sequence,
+        ))
 
         current_row_keys = {
             self._task_row_key(project_path, record.task_id)
             for project_path, record in rows
         }
         self._updated_task_rows.intersection_update(current_row_keys)
+        row_index = 0
+        previous_project: Path | None = None
         for project_path, record in rows:
+            if project_path != previous_project:
+                project_name = project_names.get(project_path, project_path.name)
+                task_list.add_row(Text(project_name, style="bold cyan"), "", key=f"project::{project_path}")
+                row_index += 1
+                previous_project = project_path
             row_key = self._task_row_key(project_path, record.task_id)
             self._task_rows[row_key] = (project_path, record.task_id)
-            project_name = self._fit_task_cell(
-                project_names.get(project_path, project_path.name), project_width
-            )
-            summary = " ".join(record.prompt.split())
-            summary = self._fit_task_cell(summary, task_width)
-            if record.status == "failed":
-                marker = Text("✗", style="bold red")
-            elif record.mode == "plan" and record.status in {"completed", "awaiting_answers"}:
-                marker = Text("●", style="bold orange1")
-            elif record.status == "completed":
-                marker = Text("✓", style="bold green")
-            else:
-                marker = "!" if row_key in self._updated_task_rows else ""
+            self._task_row_indices[row_key] = row_index
+            task_id = self._fit_task_cell(record.task_id, task_width)
             status = self._fit_task_cell(record.status, status_width)
-            task_list.add_row(marker, project_name, summary, status, key=row_key)
+            task_list.add_row(task_id, status, key=row_key)
+            row_index += 1
 
         if self._selected_task_id:
             selected_key = self._task_row_key(self._active_project_path, self._selected_task_id)
             if selected_key in self._task_rows:
-                task_list.move_cursor(row=list(self._task_rows).index(selected_key), column=0)
+                task_list.move_cursor(row=self._task_row_indices[selected_key], column=0)
 
     def _should_show_task(self, project_path: Path, record: TaskRecord) -> bool:
         """Keep failures, active work, and all tasks submitted in this launch."""

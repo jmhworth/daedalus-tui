@@ -41,8 +41,8 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Project selection**: Launching from a root directory discovers only immediate child directories with `feature_files` folders; nested descendants are excluded, and the launch root is used only as a fallback when no eligible child exists. The task toolbar selects the project for new submissions, editable prompt drafts survive project switches, and focusing an inbox row synchronizes the active project without mixing transcripts or worktrees. Each project's remembered operating branch is restored independently when focus returns.
 - **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
-- **Stable task inbox layout**: The task inbox uses fixed, parameterized marker/project/task/status widths and visible ellipses so background update markers cannot resize or horizontally scroll the sidebar.
-- **Task outcome icons**: The inbox's marker column shows a red cross for failed tasks, a green checkmark for completed coding tasks, and an orange circle for plan tasks ready to implement or awaiting answers; other nonterminal tasks retain the exclamation mark for unseen updates.
+- **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
+- **Stable task inbox layout**: The task inbox uses fixed, parameterized task-ID and status widths with visible ellipses so long IDs and statuses do not horizontally scroll the sidebar.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -73,6 +73,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-04: Grouped task updates by alphabetically sorted project headings and replaced prompt summaries with task IDs and statuses.
 - 2026-11-04: Marked completed and answer-waiting plan tasks with an orange inbox circle to signal they need user input or consideration.
 - 2026-11-04: Simplified the task context and gave the selectable agent output more space by removing redundant metadata and the error-view toggle; task errors now appear inline in red.
 - 2026-11-04: Replaced task inbox update markers with colored failure and completion icons for terminal task outcomes.
