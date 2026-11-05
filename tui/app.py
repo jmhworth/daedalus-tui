@@ -3629,8 +3629,8 @@ class DaedalusTuiApp(App[None]):
             outcome.update(activity)
         elif record.status == "proposed":
             spinner.styles.display = "none"
-            outcome.add_class("outcome-success")
-            outcome.update("✓ Plan proposed")
+            outcome.add_class("outcome-input")
+            outcome.update("● Plan proposed")
         elif record.status == "completed":
             spinner.styles.display = "none"
             outcome.add_class("outcome-success")
@@ -3642,7 +3642,7 @@ class DaedalusTuiApp(App[None]):
         elif record.status in {"questioning", "awaiting_answers"}:
             spinner.styles.display = "none"
             outcome.add_class("outcome-input")
-            outcome.update("✎ Input needed")
+            outcome.update("● Input needed")
         else:
             spinner.styles.display = "none"
             outcome.update(record.status.capitalize())
