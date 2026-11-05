@@ -98,5 +98,8 @@
   "96": "._apply_measured_responsive_layout",
   "97": ".has_active_sync_recovery",
   "98": ".test_push_conflict_launches_sync_recovery",
-  "101": "._on_personal_supabase_activation_progress"
+  "99": "ProjectInitializerScreen",
+  "100": ".edit_paste_before",
+  "101": "._on_personal_supabase_activation_progress",
+  "102": ".enter_insert_mode"
 }
