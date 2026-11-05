@@ -1628,7 +1628,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             prompt.insert("Submitted task prompt")
             app.action_submit_prompt()
             await pilot.pause()
-            self.assertTrue(prompt.read_only)
+            self.assertFalse(prompt.read_only)
+            self.assertEqual(prompt.text, "")
 
             app.query_one("#project-select", Select).value = str(second)
             await pilot.pause()
@@ -2667,8 +2668,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             output = app.query_one("#output", Log)
             self.assertTrue(output.allow_select)
+            assistant_line = output._lines.index("Selectable assistant transcript line.")
             selected = output.get_selection(
-                ScreenSelection.from_offsets(Offset(0, 0), Offset(10, 0))
+                ScreenSelection.from_offsets(Offset(assistant_line, 0), Offset(assistant_line, 10))
             )
             self.assertIsNotNone(selected)
             self.assertEqual(selected[0], "Selectable")
@@ -2708,11 +2710,12 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             output = app.query_one("#output", Log)
-            self.assertEqual(output._lines[:3], [
-                "Deciphering things",
-                "",
-                "Deciphering more things",
+            first_message = output._lines.index("Deciphering things")
+            self.assertEqual(output._lines[first_message:first_message + 3], [
+                "Deciphering things", "", "Deciphering more things",
             ])
+            self.assertEqual(output._lines[0], "Task 1")
+            self.assertEqual(output._lines[2], "Show progress")
             self.assertGreater(len(output._lines), 5)
             self.assertTrue(all(len(line) <= output.size.width for line in output._lines))
 
@@ -2819,7 +2822,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_submit_prompt()
             second = coordinator.records[1]
 
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
             self.assertFalse(prompt.disabled)
             self.assertEqual((first.model, first.reasoning), ("gpt-6-luna", "medium"))
             self.assertEqual((second.model, second.reasoning), ("gpt-5.6-terra", "high"))

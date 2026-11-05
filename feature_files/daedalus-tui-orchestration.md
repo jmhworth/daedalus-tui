@@ -52,6 +52,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-11-04: Updated app regression expectations for numbered transcript turns and blank editable prompts on selected tasks.
 - 2026-11-04: Added linked task follow-ups with persisted conversation context and numbered selectable transcript turns.
 - 2026-10-06: Coding tasks that finish with no worktree commit now complete as a successful no-op instead of failing with "Agent finished without creating a commit."
 - 2026-10-03: Repaired regression coverage for dirty target auto-commit at integration capture without weakening the TUI-root Supabase environment contract.
