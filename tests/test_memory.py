@@ -7,6 +7,19 @@ from tui.memory import TaskMemoryStore
 
 
 class TaskMemoryStoreTests(unittest.TestCase):
+    def test_persists_conversation_chain_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = TaskMemoryStore(Path(directory) / ".daedalus-memory.json")
+            store.record_task(
+                "task-follow-up", "Add context", "codex", "model", "medium",
+                "coding", "queued", project=Path(directory),
+                logical_task_id="002-child", chain_id="001-root", parent_task_id="001-root",
+            )
+
+            snapshot = store.get_tasks()["task-follow-up"]
+            self.assertEqual(snapshot["chain_id"], "001-root")
+            self.assertEqual(snapshot["parent_task_id"], "001-root")
+
     def test_records_task_metadata_with_nullable_provider_fields(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ".daedalus-memory.json"

@@ -149,6 +149,9 @@ class TaskRecord:
     plan_implemented: bool = False
     plan_error: str | None = None
     prompt_history: list[str] = field(default_factory=list, repr=False, compare=False)
+    chain_id: str | None = None
+    parent_task_id: str | None = None
+    conversation_context: str | None = field(default=None, repr=False, compare=False)
     plan_followup_prompt: str | None = field(default=None, repr=False, compare=False)
     retry_prompt: str | None = field(default=None, repr=False, compare=False)
     retry_output_context: str | None = field(default=None, repr=False, compare=False)
@@ -269,6 +272,7 @@ class TaskCoordinator:
                 topic=cleaned_topic,
             )
             record.prompt_history = [prompt]
+            record.chain_id = task_id
             record.memory_task_id = f"task-{task_id}"
             self._tasks[task_id] = record
             self._persist_task(record)
@@ -678,6 +682,48 @@ class TaskCoordinator:
             record.future = self.executor.submit(self._run, record)
         self._notify(record, "queued", "Task queued for retry.", "status")
         return True
+
+    def follow_up(self, task_id: str, prompt: str) -> TaskRecord | None:
+        """Submit a distinct task that continues a completed or failed chain."""
+        source = self.get(task_id)
+        if source is None or source.status not in {"completed", "failed"} or not prompt.strip():
+            return None
+        chain_id = source.chain_id or source.task_id
+        chain = sorted(
+            (
+                item for item in self.tasks()
+                if (item.chain_id or item.task_id) == chain_id
+                and item.submission_sequence <= source.submission_sequence
+            ),
+            key=lambda item: item.submission_sequence,
+        )
+        turns: list[str] = []
+        for item in chain:
+            turns.append(f"User: {item.prompt}")
+            response = "\n\n".join(message.strip() for message in item.messages if message.strip())
+            if response:
+                turns.append(f"Assistant: {response}")
+        context = "Conversation so far:\n" + "\n\n".join(turns)
+        with self._lock:
+            if self._closed:
+                return None
+            sequence = self._next_sequence
+            self._next_sequence += 1
+            new_id = f"{sequence:03d}-{uuid.uuid4().hex[:8]}"
+            record = TaskRecord(
+                new_id, sequence, prompt.strip(), source.provider, source.model,
+                source.reasoning, mode=source.mode, topic=source.topic,
+                chain_id=chain_id, parent_task_id=source.task_id,
+            )
+            record.prompt_history = [record.prompt]
+            record.resume_notes.append(context)
+            record.conversation_context = context
+            record.memory_task_id = f"task-{new_id}"
+            self._tasks[new_id] = record
+            self._persist_task(record)
+            record.future = self.executor.submit(self._run, record)
+        self._notify(record, "queued", "Follow-up task queued.", "status")
+        return record
 
     def cancel(self, task_id: str) -> bool:
         record = self.get(task_id)
@@ -1218,6 +1264,8 @@ class TaskCoordinator:
                 tokens=record.tokens_consumed,
                 project=self.repository,
                 prompt_history=tuple(record.prompt_history or (record.prompt,)),
+                chain_id=record.chain_id,
+                parent_task_id=record.parent_task_id,
                 branch_name=record.context.branch_name if record.context is not None else None,
                 worktree_path=record.context.path if record.context is not None else None,
                 base_commit=record.context.base_commit if record.context is not None else None,
@@ -1339,6 +1387,8 @@ class TaskCoordinator:
                 context=context,
                 memory_task_id=memory_task_id,
                 prompt_history=_string_list(snapshot.get("prompt_history")) or [prompt],
+                chain_id=snapshot.get("chain_id") if isinstance(snapshot.get("chain_id"), str) else task_id,
+                parent_task_id=snapshot.get("parent_task_id") if isinstance(snapshot.get("parent_task_id"), str) else None,
                 resume_from=resume_from,
                 sync_recovery=sync_recovery,
                 sync_operating_branch=sync_operating_branch,

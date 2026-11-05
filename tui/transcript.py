@@ -29,7 +29,7 @@ class TranscriptLog(Log):
         super().__init__(*args, **kwargs)
         self._line_tones: dict[int, str] = {}
         self._final_color = None
-        self._messages: list[tuple[str, bool]] = []
+        self._messages: list[tuple[str, str]] = []
         self._wrapped_width: int | None = None
 
     @property
@@ -68,9 +68,20 @@ class TranscriptLog(Log):
         """Append one assistant message and assign its semantic tone."""
         if not message:
             return self
-        self._messages.append((message, final))
+        self._messages.append((message, "final" if final else "generic"))
         self._rebuild_lines(scroll_end=self.auto_scroll)
         return self
+
+    def write_task_turn(self, number: int, prompt: str, messages: list[str], *, final: bool = False) -> None:
+        """Append a numbered task turn with a selectable italic prompt."""
+        if self._messages:
+            self._messages.append(("", "divider"))
+        self._messages.append((f"Task {number}", "task"))
+        self._messages.append((prompt, "prompt"))
+        for index, message in enumerate(messages):
+            if message:
+                self._messages.append((message, "final" if final and index == len(messages) - 1 else "generic"))
+        self._rebuild_lines(scroll_end=self.auto_scroll)
 
     def _rebuild_lines(self, *, scroll_end: bool) -> None:
         """Render logical messages as wrapped, selectable Log lines."""
@@ -80,17 +91,16 @@ class TranscriptLog(Log):
         width = max(0, content_width - 1)
         rendered_lines: list[str] = []
         tones: list[str] = []
-        for message_index, (message, final) in enumerate(self._messages):
-            if message_index:
-                # Keep one complete blank line between streamed messages.
+        for message, tone in self._messages:
+            if tone not in {"divider", "task"} and rendered_lines:
                 rendered_lines.append("")
                 tones.append("generic")
-
-            tone = "final" if final else "generic"
+            if tone == "divider":
+                rendered_lines.append("─" * max(1, width))
+                tones.append(tone)
+                continue
             for source_line in message.split("\n"):
-                wrapped_lines = self._wrap_line(
-                    source_line, width, allow_right_edge_buffer=False
-                )
+                wrapped_lines = ([source_line] if tone == "divider" else self._wrap_line(source_line, width, allow_right_edge_buffer=False))
                 rendered_lines.extend(wrapped_lines)
                 tones.extend([tone] * len(wrapped_lines))
 
@@ -203,6 +213,12 @@ class TranscriptLog(Log):
         line_text.stylize(rich_style)
         if self._line_tones.get(y) == "final" and self._final_color is not None:
             line_text.stylize(Style(color=self._final_color))
+        if self._line_tones.get(y) == "prompt":
+            line_text.stylize(Style(italic=True))
+        elif self._line_tones.get(y) == "task":
+            line_text.stylize(Style(bold=True))
+        elif self._line_tones.get(y) == "divider":
+            line_text.stylize(Style(color="white"))
 
         if self.highlight:
             line_text = self.highlighter(line_text)

@@ -52,6 +52,36 @@ class TaskCoordinatorTests(unittest.TestCase):
         FakeOrchestrator.starts = []
         FakeOrchestrator.release = threading.Event()
 
+    def test_follow_up_creates_linked_task_with_prior_conversation_context(self):
+        class ContextOrchestrator:
+            calls = []
+
+            def __init__(self, _repository, _runner, _settings, on_event, **_kwargs):
+                self.on_event = on_event
+
+            def run(self, prompt, _provider, _model, _reasoning, task_id=None, **kwargs):
+                type(self).calls.append((prompt, kwargs.get("resume_notes", ())))
+                return OrchestrationResult(True, task_id, f"agent/task-{task_id}", Path("/tmp") / task_id)
+
+        with tempfile.TemporaryDirectory() as directory:
+            coordinator = TaskCoordinator(Path(directory), object(), OrchestrationSettings(max_concurrent_tasks=1))
+            original = TaskRecord("001-root", 1, "Initial request", "codex", "model", "medium", status="completed")
+            original.chain_id = original.task_id
+            original.messages = ["Initial answer"]
+            coordinator._tasks[original.task_id] = original
+            coordinator._next_sequence = 2
+            with patch("tui.task_coordinator.LocalOrchestrator", ContextOrchestrator):
+                follow_up = coordinator.follow_up(original.task_id, "Add one detail")
+                self.assertIsNotNone(follow_up)
+                follow_up.future.result(timeout=5)
+
+            self.assertEqual(follow_up.parent_task_id, original.task_id)
+            self.assertEqual(follow_up.chain_id, original.task_id)
+            self.assertIn("User: Initial request", ContextOrchestrator.calls[0][1][0])
+            self.assertIn("Assistant: Initial answer", ContextOrchestrator.calls[0][1][0])
+            self.assertEqual(ContextOrchestrator.calls[0][0], "Add one detail")
+            coordinator.shutdown()
+
     def test_executor_limits_concurrent_agent_tasks_and_snapshots_settings(self):
         self.assertIn("blocked", TASK_STATUSES)
         with tempfile.TemporaryDirectory() as directory:
@@ -555,6 +585,7 @@ class TaskCoordinatorTests(unittest.TestCase):
                     "error": None,
                     "tokens": 17,
                     "project": str(Path(directory).resolve()),
+                    "chain_id": record.task_id,
                 },
             )
 

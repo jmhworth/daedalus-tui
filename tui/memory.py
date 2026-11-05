@@ -226,6 +226,8 @@ class TaskMemoryStore:
         sync_used_temp_branch: bool = False,
         sync_temp_branch_name: str | None = None,
         sync_conflict_attempt_limit: int | None = None,
+        chain_id: str | None = None,
+        parent_task_id: str | None = None,
     ) -> None:
         """Upsert a task snapshot keyed by the task worktree's directory name."""
         task = {
@@ -249,6 +251,10 @@ class TaskMemoryStore:
             task["prompt_history"] = list(prompt_history)
         if logical_task_id is not None:
             task["task_id"] = logical_task_id
+        if chain_id is not None:
+            task["chain_id"] = chain_id
+        if parent_task_id is not None:
+            task["parent_task_id"] = parent_task_id
         if branch_name is not None:
             task["branch_name"] = branch_name
         if worktree_path is not None:
