@@ -98,6 +98,7 @@
   "96": "PlanClarificationScreen",
   "97": ".edit_paste_before",
   "98": ".compose",
+  "99": "CommandMenuScreen",
   "100": ".__init__",
   "101": "._on_personal_supabase_activation_progress",
   "105": ".nav_word_end"
