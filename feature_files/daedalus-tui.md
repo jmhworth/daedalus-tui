@@ -73,6 +73,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-04: Updated task inbox UI regression assertions to account for grouped project headings and the two fixed-width task ID/status columns.
 - 2026-11-04: Grouped task updates by alphabetically sorted project headings and replaced prompt summaries with task IDs and statuses.
 - 2026-11-04: Marked completed and answer-waiting plan tasks with an orange inbox circle to signal they need user input or consideration.
 - 2026-11-04: Simplified the task context and gave the selectable agent output more space by removing redundant metadata and the error-view toggle; task errors now appear inline in red.

@@ -236,7 +236,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             task_list = app.query_one("#task-list", DataTable)
             self.assertEqual(
                 [column.width for column in task_list.columns.values()],
-                [1, 9, 14, 7],
+                [23, 11],
             )
             self.assertTrue(all(not column.auto_width for column in task_list.columns.values()))
             self.assertIsInstance(app.query_one("#prompt-input", TextArea), DaedalusVimTextArea)
@@ -1742,11 +1742,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(app._selected_task_id, record.task_id)
                 self.assertFalse(app._new_task_mode)
                 task_list = app.query_one("#task-list", DataTable)
+                task_row_key = app._task_row_key(app._active_project_path, record.task_id)
                 self.assertEqual(
                     task_list.cursor_row,
-                    list(app._task_rows).index(
-                        app._task_row_key(app._active_project_path, record.task_id)
-                    ),
+                    app._task_row_indices[task_row_key],
                 )
 
     async def test_new_task_unlocks_a_blank_prompt_after_viewing_submitted_task(self):
@@ -1780,7 +1779,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_new_task()
             await pilot.pause()
             task_list = app.query_one("#task-list", DataTable)
-            task_list.move_cursor(row=0, column=0)
+            row_key = app._task_row_key(app._active_project_path, record.task_id)
+            task_list.move_cursor(row=app._task_row_indices[row_key], column=0)
             task_list.action_select_cursor()
             await pilot.pause()
 
