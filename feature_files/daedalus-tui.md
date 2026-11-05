@@ -33,7 +33,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Plan completion crash guard**: Deferred `PlanAnswerSelect` initialization catches illegal leftover option ids and half-removed overlays so a follow-up plan round cannot fatal-exit the TUI; fatal Textual exceptions also print a stderr pointer to the launch-root debug log.
 - **Plan recommended defaults**: Plan and follow-up prompts require every multiple-choice question to mark exactly one option with ` (Recommended)` so a safe default is always visible when the user does not care which answer to pick.
 - **Filtered logs and copying**: The output pane uses Textual's selectable `Log` widget for completed assistant messages; Vim yank commands copy selected transcript or diagnostic text to the system clipboard.
-- **Agent activity and outcomes**: The output toolbar animates a spinner while a task is active, keeps a green checkmark for completed implementations, a red X for failures, and an orange circle for proposed plans or tasks awaiting answers, and prefixes bracketed file paths and filenames in transcript messages with a file glyph.
+- **Agent activity and outcomes**: The output toolbar animates a spinner while a task is active, keeps a green checkmark for completed implementations, a red X for failures, and an orange circle for proposed plans or tasks awaiting answers. Transcript file references use a file glyph and basename, retain a source line number when present, and omit Markdown link destinations.
 - **Inline task errors**: Agent messages and task errors appear together in one selectable output panel, with errors rendered in red. The task context shows only the task branch and worktree, while Codex plan usage stays visible above it; phase remains available in the status line.
 - **Readable streamed output**: Assistant messages are separated by a blank line, transcript lines reflow at word boundaries with hyphenation only for overlong words, and the output pane keeps a small width buffer so long responses remain visible.
 - **Incremental Vim input**: The prompt uses a modal VimTextArea with a practical command subset; additional Vim commands can be added as they become useful instead of implementing the entire Vim language up front.
@@ -53,7 +53,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
 - `tui/app.tcss`: Shared full-height output-panel layout and readable transcript/diagnostic styling.
-- `tui/transcript.py`: Selectable transcript and red inline task-error rendering, wrapping, and bracketed file-marker annotation.
+- `tui/transcript.py`: Selectable transcript and red inline task-error rendering, wrapping, and compact file-reference annotation.
 - `tui/config.py`: Read-only provider and responsive-layout configuration models and loaders.
 - `tui/git_worktree.py`: Local Git helpers including operating-branch pull-then-push sync for the Command Menu action.
 - `tui/prompts.py`: Task, repair, and resolver prompt wrappers, including plan-mode recommended-option instructions.
@@ -73,6 +73,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-05: Compacted transcript file links to a glyph, basename, and optional line number so full paths do not consume output width.
 - 2026-11-04: Kept proposed plans and answer-waiting tasks visibly orange in the output outcome while preserving green completed and red failed markers.
 - 2026-11-04: Updated task inbox UI regression assertions to account for grouped project headings and the two fixed-width task ID/status columns.
 - 2026-11-04: Grouped task updates by alphabetically sorted project headings and replaced prompt summaries with task IDs and statuses.
