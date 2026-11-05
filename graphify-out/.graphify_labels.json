@@ -96,10 +96,9 @@
   "94": "SyncMergeConflictError",
   "95": "render_html",
   "96": "PlanClarificationScreen",
+  "97": ".edit_paste_before",
   "98": ".compose",
-  "99": "._render_line_strip",
   "100": ".__init__",
   "101": "._on_personal_supabase_activation_progress",
-  "102": ".action_view_topic",
   "105": ".nav_word_end"
 }
