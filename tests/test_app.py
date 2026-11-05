@@ -1470,7 +1470,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 app.screen.query_one("#command-pick-theme-button", Button).press()
                 await pilot.pause()
-                for theme_name in ("rainbow", "jet_blue", "ember", "forest", "violet"):
+                for theme_name in ("clown", "jet_blue", "ember", "forest", "violet"):
                     self.assertIsInstance(
                         app.screen.query_one(f"#theme-{theme_name}-button", Button), Button
                     )

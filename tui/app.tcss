@@ -9,12 +9,14 @@ Screen {
 }
 
 #screen {
+    layers: checkerboard content;
     height: 1fr;
     padding: 1 2;
     overflow-x: hidden;
 }
 
 #workspace {
+    layer: content;
     height: 1fr;
 }
 
@@ -329,68 +331,78 @@ Screen {
     color: $text-muted;
 }
 
-/* The Rainbow theme gives each main workspace region its own spectrum color. */
-#screen.rainbow-theme #task-sidebar {
-    background: #351016;
+/* The Clown theme gives the workspace a spectrum palette over a soft checkerboard. */
+#screen.clown-theme #clown-checkerboard {
+    layer: checkerboard;
+    position: absolute;
+    width: 1fr;
+    height: 1fr;
+    color: rgba(255, 255, 255, 0.08);
+    background: transparent;
+    overflow: hidden;
+}
+
+#screen.clown-theme #task-sidebar {
+    background: rgba(255, 51, 79, 0.18);
     border: round #ff334f;
 }
 
-#screen.rainbow-theme #task-label,
-#screen.rainbow-theme #title {
+#screen.clown-theme #task-label,
+#screen.clown-theme #title {
     color: #ff4d5a;
 }
 
-#screen.rainbow-theme #project-label,
-#screen.rainbow-theme #project-select {
+#screen.clown-theme #project-label,
+#screen.clown-theme #project-select {
     color: #ff9e24;
 }
 
-#screen.rainbow-theme #project-select {
-    background: #30200d;
+#screen.clown-theme #project-select {
+    background: rgba(255, 158, 36, 0.16);
 }
 
-#screen.rainbow-theme #task-bar {
+#screen.clown-theme #task-bar {
     border-bottom: solid #ff9e24;
 }
 
-#screen.rainbow-theme #codex-usage {
+#screen.clown-theme #codex-usage {
     color: #ffd43b;
 }
 
-#screen.rainbow-theme #task-context,
-#screen.rainbow-theme #agent-state-row {
+#screen.clown-theme #task-context,
+#screen.clown-theme #agent-state-row {
     color: #52dc76;
 }
 
-#screen.rainbow-theme #output-view-label,
-#screen.rainbow-theme #agent-spinner {
+#screen.clown-theme #output-view-label,
+#screen.clown-theme #agent-spinner {
     color: #39c5ff;
 }
 
-#screen.rainbow-theme #output-toolbar {
+#screen.clown-theme #output-toolbar {
     border-bottom: solid #39c5ff;
 }
 
-#screen.rainbow-theme #output {
-    background: #0c2b1b;
+#screen.clown-theme #output {
+    background: rgba(39, 191, 112, 0.18);
     border: round #39d98a;
 }
 
-#screen.rainbow-theme #prompt-input,
-#screen.rainbow-theme #resume-notes {
-    background: #101d3b;
+#screen.clown-theme #prompt-input,
+#screen.clown-theme #resume-notes {
+    background: rgba(77, 114, 255, 0.17);
     border: round #4d72ff;
 }
 
-#screen.rainbow-theme #plan-review {
+#screen.clown-theme #plan-review {
     border: round #b35cff;
 }
 
-#screen.rainbow-theme #resume-notes-panel {
+#screen.clown-theme #resume-notes-panel {
     border-left: solid #ff4d5a;
 }
 
-#screen.rainbow-theme #settings {
+#screen.clown-theme #settings {
     border-bottom: solid #ffd43b;
 }
 
