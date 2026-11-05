@@ -3400,13 +3400,6 @@ class DaedalusTuiApp(App[None]):
         task_list = self.query_one("#task-list", DataTable)
         task_list.clear(columns=True)
         task_width, status_width = self.settings.task_inbox_widths
-        if self._compact_mode:
-            # The compact workspace stacks the inbox above the output, so the
-            # inbox can use the available terminal width without competing
-            # with the transcript for horizontal space.
-            available_width = max(task_width + status_width, self.size.width - 12)
-            status_width = max(status_width, min(20, available_width // 4))
-            task_width = max(task_width, available_width - status_width - 4)
         for label, width in (("Task", task_width), ("Status", status_width)):
             # Explicit widths keep long values within the current inbox
             # layout without introducing horizontal scrolling.

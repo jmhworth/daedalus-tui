@@ -43,7 +43,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
 - **Project heading task entry**: Selecting a project heading in the task updates sidebar switches to that project and opens a blank, editable task composer.
-- **Stable task inbox layout**: The horizontal workspace uses fixed, parameterized task-ID and status widths with visible ellipses so long values do not horizontally scroll the compact sidebar. In the vertical workspace, the inbox fills the terminal width and expands its columns because it no longer competes with agent output horizontally.
+- **Stable task inbox layout**: Both workspaces use fixed, parameterized task-ID and status widths with visible ellipses so long values do not horizontally scroll the compact sidebar. The vertical workspace keeps the same compact columns while the agent output uses the available width.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -74,6 +74,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-05: Kept task inbox columns at their configured widths in the vertical workspace so the agent output retains the available width.
 - 2026-11-05: Synchronized the project selector when inbox focus switches projects and corrected a task selection regression assertion to account for grouped heading rows.
 - 2026-11-05: Let the vertical workspace's full-width task inbox expand its task and status columns, since stacked output no longer competes for horizontal space.
 - 2026-11-05: Made task inbox project headings open a fresh prompt in the selected project and added an app regression case for cross-project task entry.

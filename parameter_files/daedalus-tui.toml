@@ -56,7 +56,7 @@ compact_prompt_height = 8
 compact_output_height = 16
 
 # Baseline content widths for task IDs and statuses in the grouped task inbox.
-# Compact vertical layout expands these columns to use its full-width inbox.
+# These widths apply in both horizontal and vertical layouts.
 [task_inbox]
 task_width = 12
 status_width = 5
