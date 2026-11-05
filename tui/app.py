@@ -2741,7 +2741,7 @@ class DaedalusTuiApp(App[None]):
                     self._update_sync_recovery_status(record, phase)
             if is_selected:
                 self._render_selected_task_safely(f"task event phase={phase}")
-            if phase.lower() == "completed" and record.provider == "codex":
+            if phase.lower() in {"proposed", "completed"} and record.provider == "codex":
                 self._start_codex_usage_refresh()
         except Exception as error:
             log_exception(f"Could not render task event task={record.task_id} phase={phase}", error)
@@ -2787,7 +2787,7 @@ class DaedalusTuiApp(App[None]):
     def _should_promote_task_update(record: TaskRecord, phase: str) -> bool:
         """Promote only events that need the user's attention in the inbox."""
         normalized_phase = phase.lower()
-        if normalized_phase in {"completed", "failed"}:
+        if normalized_phase in {"proposed", "completed", "failed"}:
             return True
         return record.mode == "plan" and normalized_phase in {"questions", "clarification"}
 
@@ -3427,7 +3427,7 @@ class DaedalusTuiApp(App[None]):
             for index, message in enumerate(record.messages):
                 output.write_message(
                     message,
-                    final=record.status == "completed" and index == len(record.messages) - 1,
+                    final=record.status in {"proposed", "completed"} and index == len(record.messages) - 1,
                 )
         worktree = str(record.worktree_path) if record.worktree_path else "—"
         branch = record.branch_name or "—"
@@ -3481,6 +3481,10 @@ class DaedalusTuiApp(App[None]):
                 "resolving": "Resolving…",
             }[record.status]
             outcome.update(activity)
+        elif record.status == "proposed":
+            spinner.styles.display = "none"
+            outcome.add_class("outcome-success")
+            outcome.update("✓ Plan proposed")
         elif record.status == "completed":
             spinner.styles.display = "none"
             outcome.add_class("outcome-success")
@@ -3599,7 +3603,7 @@ class DaedalusTuiApp(App[None]):
         )
         answer_nodes.first().disabled = not (
             bool(record.plan_questions)
-            and record.status in {"completed", "awaiting_answers"}
+            and record.status in {"proposed", "completed", "awaiting_answers"}
             and len(selected) == len(record.plan_questions)
             and all_answered
             and not record.plan_confirmed

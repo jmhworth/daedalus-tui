@@ -98,7 +98,7 @@ def calculate_token_usage(
         current = current.replace(tzinfo=UTC)
     normalized = tuple(
         sorted(
-            (entry for entry in entries if entry.state == "completed"),
+            (entry for entry in entries if entry.state in {"proposed", "completed"}),
             key=lambda entry: entry.timestamp,
             reverse=True,
         )
@@ -186,7 +186,7 @@ def usage_entries_from_memory(store) -> tuple[TokenUsageEntry, ...]:
     """Convert persisted task snapshots into usage records."""
     entries: list[TokenUsageEntry] = []
     for task_id, task in store.get_tasks().items():
-        if task.get("state") != "completed":
+        if task.get("state") not in {"proposed", "completed"}:
             continue
         timestamp = _parse_timestamp(task.get("timestamp"))
         if timestamp is None:
@@ -233,7 +233,7 @@ def _parse_timestamp(value: object) -> datetime | None:
 
 def task_usage_entry(record) -> TokenUsageEntry | None:
     """Convert a live task record without coupling this module to its class."""
-    if record.status != "completed":
+    if record.status not in {"proposed", "completed"}:
         return None
     return TokenUsageEntry(
         record.memory_task_id or f"task-{record.task_id}",
