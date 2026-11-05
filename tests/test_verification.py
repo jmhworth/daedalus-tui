@@ -1,3 +1,5 @@
+import os
+import shutil
 import tempfile
 import sys
 import time
@@ -7,22 +9,85 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tui.agent_runner import AgentControl
-from tui.verification import discover_commands, run_verification
+from tui.verification import discover_commands, python_executable, run_verification
 
 
 class VerificationTests(unittest.TestCase):
+    def _suite_tree(self, root: Path) -> None:
+        (root / "tests").mkdir()
+        (root / "package.json").write_text('{"scripts":{"test":"pytest"}}', encoding="utf-8")
+        child = root / "child"
+        child.mkdir()
+        (child / "tests").mkdir()
+
     def test_discovers_root_and_nested_test_suites(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "tests").mkdir()
-            (root / "package.json").write_text('{"scripts":{"test":"pytest"}}', encoding="utf-8")
-            child = root / "child"
-            child.mkdir()
-            (child / "tests").mkdir()
+            self._suite_tree(root)
+            interpreter = python_executable(root)
             self.assertEqual(
                 discover_commands(root, []),
-                [["npm", "test"], ["python", "-m", "pytest"], ["python", "-m", "pytest", "child/tests"]],
+                [
+                    ["npm", "test"],
+                    [interpreter, "-m", "pytest"],
+                    [interpreter, "-m", "pytest", "child/tests"],
+                ],
             )
+
+    def test_falls_back_to_path_when_no_virtual_environment_is_available(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._suite_tree(root)
+            with patch.dict(os.environ, {}, clear=True), patch(
+                "tui.verification.shutil.which",
+                side_effect=lambda name: "/usr/bin/python3" if name == "python3" else None,
+            ):
+                self.assertEqual(
+                    discover_commands(root, []),
+                    [
+                        ["npm", "test"],
+                        ["/usr/bin/python3", "-m", "pytest"],
+                        ["/usr/bin/python3", "-m", "pytest", "child/tests"],
+                    ],
+                )
+
+    def test_never_emits_a_bare_python_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._suite_tree(root)
+            for command in discover_commands(root, []):
+                self.assertNotEqual(command[0], "python")
+
+    def test_python_executable_resolves_to_an_existing_interpreter(self):
+        resolved = python_executable()
+        self.assertTrue(shutil.which(resolved) or Path(resolved).exists())
+
+    def test_discovered_interpreter_is_an_existing_executable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tests").mkdir()
+            command = discover_commands(root, [])[0]
+
+            self.assertTrue(Path(command[0]).is_file(), command[0])
+            self.assertTrue(os.access(command[0], os.X_OK), command[0])
+
+    def test_prefers_a_virtual_environment_belonging_to_the_code_under_test(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binaries = root / ".venv" / "bin"
+            binaries.mkdir(parents=True)
+            interpreter = binaries / "python"
+            interpreter.write_text("#!/bin/sh\n", encoding="utf-8")
+            interpreter.chmod(0o755)
+
+            self.assertEqual(python_executable(root), str(interpreter))
+
+    def test_missing_executable_is_reported_as_an_environment_problem(self):
+        result = run_verification(Path("/"), [["daedalus-missing-executable"]])
+
+        self.assertFalse(result.succeeded)
+        self.assertIn("was not found on PATH", result.output)
+        self.assertIn("verification_commands", result.output)
 
     @patch("tui.verification.subprocess.run")
     def test_stops_at_first_failed_command(self, run):

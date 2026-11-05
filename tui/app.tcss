@@ -20,6 +20,39 @@ Screen {
     height: 1fr;
 }
 
+/* The main workspace (task inbox + composer/output) and the optional viewer
+   are siblings so the viewer can take one third of the whole usable width. */
+#main-workspace {
+    width: 1fr;
+    height: 1fr;
+}
+
+#output-viewer {
+    display: none;
+    width: 1fr;
+    height: 1fr;
+    margin-left: 1;
+}
+
+#workspace.viewer-visible #main-workspace {
+    width: 2fr;
+}
+
+#workspace.viewer-visible #output-viewer {
+    display: block;
+}
+
+/* Narrow terminals show the same viewer as a full-width alternate view. */
+#workspace.viewer-full #main-workspace {
+    display: none;
+}
+
+#workspace.viewer-full #output-viewer {
+    display: block;
+    width: 1fr;
+    margin-left: 0;
+}
+
 #task-sidebar {
     width: 25;
     min-width: 22;
@@ -38,6 +71,22 @@ Screen {
     /* The inbox columns have fixed cell widths; never introduce a second
        layout by horizontally scrolling when an update marker appears. */
     overflow-x: hidden;
+}
+
+#history-toggle-button {
+    width: 1fr;
+    height: 3;
+    margin-top: 1;
+}
+
+#usage-bar {
+    height: auto;
+    margin-top: 1;
+    color: $text-muted;
+}
+
+#screen.compact-width #usage-bar {
+    display: none;
 }
 
 #project-main {
@@ -91,9 +140,127 @@ Screen {
     align: left middle;
 }
 
+#new-task-button {
+    width: 14;
+}
+
+#orchestrate-mode-button {
+    width: auto;
+    min-width: 18;
+    margin-left: 1;
+}
+
+/* Orchestrate Mode view: the switcher swaps it with the task view. */
+#view-switcher {
+    height: 1fr;
+}
+
+#tasks-view, #orchestrate-view {
+    height: 1fr;
+}
+
+#orchestrate-roles {
+    height: 3;
+    align: left middle;
+}
+
+.orchestrate-role {
+    width: 1fr;
+    height: 3;
+    align: left middle;
+}
+
+.orchestrate-role-workers {
+    width: auto;
+}
+
+.orchestrate-role-label {
+    width: auto;
+    color: $text-muted;
+    margin-right: 1;
+}
+
+#orchestrate-roles Select {
+    width: 1fr;
+    margin-right: 1;
+}
+
+/* Provider and effort names are short and fixed-width so the model name gets
+   the spare width. The select's border, padding, and arrow take 8 columns, so
+   20 fits "Claude Code" and 23 fits "Not applicable" on one line. */
+#orchestrate-roles .orchestrate-role-provider {
+    width: 20;
+}
+
+#orchestrate-roles .orchestrate-role-reasoning {
+    width: 23;
+}
+
+#max-workers-input {
+    width: 9;
+}
+
+#orchestrate-prompt {
+    height: 7;
+    border: round $secondary;
+    color: $text;
+}
+
+#orchestrate-actions {
+    height: 3;
+    align: left middle;
+}
+
+#orchestrate-start-button, #orchestrate-stop-button {
+    width: 11;
+    margin-right: 1;
+}
+
+#orchestrate-session-select {
+    width: 1fr;
+    max-width: 40;
+    margin-right: 1;
+}
+
+#orchestrate-status {
+    width: 1fr;
+    color: $text-muted;
+}
+
+#orchestrate-board {
+    height: 10;
+    min-height: 4;
+    border: round $primary;
+    overflow-x: hidden;
+}
+
+#planner-log {
+    height: 1fr;
+    min-height: 3;
+    border: round $primary;
+    padding: 1;
+    overflow-x: hidden;
+    color: $text-disabled;
+}
+
+#orchestrate-summary {
+    height: 1;
+    color: $text-muted;
+}
+
+#new-project-button, #create-topic-button, #register-backend-button, #sign-in-button {
+    width: auto;
+    min-width: 16;
+    margin-right: 1;
+}
+
 #settings Select {
     width: 1fr;
     margin-right: 1;
+}
+
+#settings Button {
+    min-width: 0;
 }
 
 #view-topic-button {
@@ -102,6 +269,16 @@ Screen {
 }
 
 #codex-usage, #title, #task-context, #status,
+#push-branch-button {
+    width: 10;
+}
+
+#push-history-button {
+    width: 12;
+    margin-left: 1;
+}
+
+#directory, #phase, #title, #task-context, #status,
 #resume-notes-label {
     color: $text-muted;
     pointer: text;
@@ -143,6 +320,13 @@ Screen {
     height: 1;
     display: none;
     color: $text-accent;
+#output-toggle-button {
+    width: 21;
+    margin-right: 1;
+}
+
+#viewer-toggle-button {
+    width: 15;
 }
 
 #agent-outcome {
@@ -287,6 +471,28 @@ Screen {
     min-height: 7;
 }
 
+#task-title {
+    height: 1;
+    color: $text-accent;
+    text-style: bold;
+}
+
+#composer-tools {
+    height: 3;
+    align: left middle;
+}
+
+#prompt-history-select {
+    width: 1fr;
+    max-width: 60;
+}
+
+#vim-mode {
+    width: 10;
+    color: $text-muted;
+    text-style: bold;
+}
+
 #prompt-input {
     height: 7;
     border: round $secondary;
@@ -418,13 +624,59 @@ Screen {
 }
 
 /* Narrow terminals use a scrollable vertical workspace and a three-column settings grid. */
+/* Mid-width terminals keep the side-by-side workspace but wrap the task
+   toolbar and the settings row onto two rows instead of clipping them. */
+#screen.wrapped-toolbars #task-bar {
+    layout: grid;
+    grid-size: 4;
+    grid-gutter: 0 1;
+    height: auto;
+}
+
+#screen.wrapped-toolbars #task-bar #project-label {
+    display: none;
+}
+
+#screen.wrapped-toolbars #task-bar > * {
+    width: 1fr;
+    min-width: 0;
+    margin: 0;
+}
+
+#screen.wrapped-toolbars #settings {
+    layout: grid;
+    grid-size: 5;
+    grid-gutter: 0 1;
+    height: auto;
+}
+
+#screen.wrapped-toolbars #settings > * {
+    margin: 0;
+}
+
+#screen.wrapped-toolbars #orchestrate-roles {
+    layout: vertical;
+    height: auto;
+    align: left top;
+}
+
+#screen.wrapped-toolbars #orchestrate-roles > * {
+    width: 1fr;
+    margin-right: 0;
+}
+
+/* Narrow terminals use a vertical workspace and a two-level settings picker. */
 #screen.compact-width {
     padding: 1;
 }
 
-#screen.compact-width #workspace {
+#screen.compact-width #main-workspace {
     layout: vertical;
     height: auto;
+}
+
+#screen.compact-width #history-toggle-button {
+    display: none;
 }
 
 #screen.compact-width #task-sidebar {
@@ -437,6 +689,8 @@ Screen {
 #screen.compact-width #task-list {
     width: 1fr;
     min-width: 0;
+#screen.compact-width #composer-tools {
+    display: none;
 }
 
 #screen.compact-width #project-main {
@@ -494,6 +748,24 @@ Screen {
 
 #screen.compact-width #output-panel {
     min-height: 8;
+/* Compact mode stacks the roles vertically; each role stays on one line. */
+#screen.compact-width #orchestrate-roles {
+    layout: vertical;
+    height: auto;
+    align: left top;
+}
+
+#screen.compact-width #orchestrate-roles > * {
+    width: 1fr;
+    margin-right: 0;
+}
+
+#screen.compact-width .orchestrate-role-label {
+    width: 8;
+}
+
+#screen.compact-width #orchestrate-board {
+    height: 6;
 }
 
 /* Short terminals keep the output flexible by reducing surrounding chrome. */
@@ -540,6 +812,7 @@ PersonalSupabaseSetupWizardScreen {
 }
 
 PersonalSupabaseActivationProgressScreen {
+OpenProjectDirectoryScreen {
     align: center middle;
 }
 
@@ -865,6 +1138,35 @@ TopicViewerScreen {
     align: left middle;
 }
 
+#open-directory-dialog {
+    width: 72;
+    height: auto;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#open-directory-title {
+    color: $text-accent;
+    text-style: bold;
+    height: 2;
+}
+
+#open-directory-subtitle, #open-directory-status {
+    color: $text-muted;
+    height: 1;
+    margin-bottom: 1;
+}
+
+#open-directory-input {
+    margin-bottom: 1;
+}
+
+#open-directory-actions {
+    height: 3;
+    align: left middle;
+}
+
 #plan-clarification-dialog {
     width: 72;
     height: auto;
@@ -907,6 +1209,37 @@ TopicViewerScreen {
     border: round $primary;
     background: $surface;
     padding: 1 2;
+}
+
+#pushed-commits-dialog {
+    width: 94%;
+    height: 78%;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#pushed-commits-title {
+    color: $text-accent;
+    text-style: bold;
+    height: 2;
+}
+
+#pushed-commits-subtitle {
+    color: $text-muted;
+    height: auto;
+    margin-bottom: 1;
+}
+
+#pushed-commits-content {
+    height: 1fr;
+    border: round $primary;
+    margin-bottom: 1;
+}
+
+#pushed-commits-footer {
+    color: $text-muted;
+    height: 1;
 }
 
 #coding-statistics-title {
@@ -1083,4 +1416,45 @@ TopicViewerScreen {
 
 .shortcut-row {
     height: 1;
+}
+
+#sign-in-dialog, #backend-dialog {
+    width: 72;
+    max-width: 90%;
+    height: auto;
+    padding: 1 2;
+    background: $surface;
+    border: round $primary;
+}
+
+#sign-in-title, #backend-title {
+    color: $text-accent;
+    text-style: bold;
+}
+
+#sign-in-mode, #backend-subtitle, #backend-note {
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+#sign-in-detail, #backend-registered, #backend-status {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#backend-select {
+    margin-bottom: 1;
+}
+
+#sign-in-actions, #backend-actions {
+    height: auto;
+    align: right middle;
+}
+
+#sign-in-actions Button, #backend-actions Button {
+    margin-left: 1;
+}
+
+#project-backend-label {
+    margin-top: 1;
 }

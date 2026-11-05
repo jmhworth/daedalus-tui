@@ -37,6 +37,11 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 
+# Daedalus runtime artifacts
+.daedalus-debug.log*
+.daedalus-memory.json
+.daedalus-worktrees/
+
 # Temporary files and logs
 *.log
 *.tmp

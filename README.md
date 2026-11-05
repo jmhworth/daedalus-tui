@@ -28,21 +28,41 @@ projects:
 python3 -m tui
 ```
 
-The launch directory is treated as a project workspace. The TUI discovers only
-its immediate child directories that contain a `feature_files/` folder; nested
-descendants are not traversed or listed. If no eligible child project exists,
-the launch directory remains available as a usability fallback. Each project
+The launch directory is treated as a project workspace. The TUI discovers its
+immediate child directories; nested descendants are not traversed or listed.
+Folders with a `feature_files/` directory are listed first as Daedalus
+projects, and plain Git checkouts are listed after them so the TUI is not
+limited to projects you have already converted. The selector shows each
+project's plain directory name. Set `include_all_directories = true` in the
+`[projects]` table of
+`parameter_files/daedalus-tui.toml` to list every child directory, or
+`include_git_repositories = false` to show Daedalus projects only. If no
+eligible child project exists, the launch directory remains available as a
+usability fallback. Each project
 has its own task coordinator, task numbering, Git worktrees, and transcripts;
 switching the sidebar does not interrupt tasks running in another project.
 
-The layout adapts to terminal size. Below the configured compact-width safety
-guard, or whenever a wide task/settings control is actually clipped, the task
-inbox becomes a short full-width panel, the main workspace stacks vertically,
-and the task toolbar's project and action controls remain available without
-clipping. The wide settings row is replaced by a category and value picker
-covering provider, model, reasoning, mode, topic, and operating branch. Short
-terminals also use a smaller prompt and reduced vertical chrome. Tune these
-defaults in the `[layout]` table of
+A project that lives somewhere else — created, cloned, or moved outside the
+launch root — is reachable through the project selector's trailing **Open
+directory…** entry. It asks for one path (absolute, `~`-relative, or relative
+to the launch root), then adds that directory to the selector and switches
+onto it. Opened directories are remembered in `.daedalus-memory.json` and
+return on the next launch, so the selector only
+ever grows by the projects you actually open, and an opened directory that no
+longer exists is dropped and forgotten at startup.
+
+The layout adapts to terminal size in three tiers. Very wide terminals keep
+the task toolbar, the settings row, and the Orchestrate role row on single
+lines. When any of those controls would be clipped or would wrap its label,
+the toolbars wrap onto two rows (the roles stack one per row) while the task
+inbox and the workspace stay side by side; this is the layout most
+full-screen terminals get. Only below the configured compact-width safety
+guard, or when even the wrapped toolbars are clipped, does the task inbox
+become a short full-width panel, the main workspace stack vertically, and the
+wide settings row give way to a category and value picker covering provider,
+model, reasoning, mode, topic, and operating branch. Short terminals also use
+a smaller prompt and reduced vertical chrome. Tune these defaults in the
+`[layout]` table of
 `parameter_files/daedalus-tui.toml` (`compact_width`, `short_height`,
 `compact_task_sidebar_height`, and `compact_prompt_height`).
 
@@ -50,6 +70,43 @@ For Cursor CLI, set `CURSOR_API_KEY` in the Daedalus TUI checkout's `.env`
 (copy `.env.example` there if needed). The TUI reads that file for its agent
 credential; target project and launch-directory `.env` files are not loaded
 into agent processes. You can also authenticate with `agent login`.
+## Providers and sign-in
+
+Three providers are available: Codex (`codex`), Claude Code (`claude`), and
+Cursor CLI (`agent`). Each provider's models and effort levels live in
+`parameter_files/daedalus-tui.toml`; Claude Code has its own effort scale that
+adds `max`, and Cursor is a provider-only choice with model and reasoning
+disabled. Claude Code runs with `--permission-mode acceptEdits`, so it edits
+files without prompting while orchestration still runs verification itself.
+Because `claude --print` is non-interactive, nobody can answer a permission
+prompt: any Bash command that is not pre-approved is denied. The TUI therefore
+passes `--allowedTools` with `[claude] allowed_tools` from
+`parameter_files/daedalus-tui.toml` (test runners, `npm run`, read-only `git`)
+plus the project's discovered verification commands, so agents can run the
+same checks orchestration will. Widen that list for other commands, or set
+`[claude] permission_mode = "bypassPermissions"` to let it run anything; that
+grants autonomy comparable to Codex but without Codex's sandbox.
+
+By default the TUI runs agents on your **signed-in account** rather than an API
+key, so work bills your plan. In this mode it removes each provider's API-key
+variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
+`CURSOR_API_KEY`) from the agent subprocess environment, and a local `.env`
+cannot put them back. Sign in once from your own terminal:
+
+```bash
+claude auth login
+codex login
+agent login
+```
+
+The task bar's **Sign In** control reports the selected provider's status and
+repeats the exact command to run. The TUI does not host the login itself,
+because an interactive CLI that takes over the terminal would hide the
+interface.
+
+To go back to key-based execution, set `mode = "api-key"` in the `[auth]` table
+of `parameter_files/daedalus-tui.toml`. Cursor then reads `CURSOR_API_KEY` from
+the process environment or a local `.env`:
 
 ```bash
 cp /path/to/daedalus-tui/.env.example /path/to/daedalus-tui/.env
@@ -86,55 +143,148 @@ longer needed. Cleanup does not change the remote database. Process environment
 variables remain runtime overrides and are never written to disk. Copy the
 project's `.env.example` to `.env`; do not put Supabase credentials in tracked
 feature, parameter, or `.env.example` files.
+API keys never belong in a parameter file; those tables list variable names
+only.
+
+## Project backends
+
+New Project can scaffold **Firebase** (`firebase.json`, deny-by-default
+`firestore.rules`, `firestore.indexes.json`, `storage.rules`). The task bar's
+**Register Backend** control can scaffold Firebase or a personal Supabase schema
+for an existing project. Personal Supabase registration remains post-init.
+Firebase is the default for new projects; change
+`default_backend` in
+`parameter_files/daedalus-tui-project-initialization.toml` to pick another.
+
+Registration writes files only. After verification passes, orchestration
+deploys changed Firestore rules and indexes with
+`firebase deploy --only firestore:rules,firestore:indexes --non-interactive`,
+and pushes pending Supabase migrations, repairing failures with the coding
+agent before integration proceeds. Agents never run either command themselves.
+Tune the deploy in `parameter_files/daedalus-tui-firebase.toml` and disable it
+with `firebase_deploy_enabled = false` in the orchestration parameter file.
 
 Each prompt creates an independent local Git worktree based on the configured
 `target_branch` (default `main`; `primary_branch` remains accepted as an
-alias), runs Codex or Cursor there, verifies the result, resolves integration
+alias), runs the selected agent (Codex, Claude Code, or Cursor) there, verifies
+the result, resolves integration
 failures with the selected agent, and fast-forwards that target branch after
 successful checks. The operator does not need the target branch checked out.
 Up to four prompts can run concurrently; integration and promotion remain
-serialized. Automated orchestration never pushes remotes; use the Command Menu
-(`Ctrl+K`) when you want to publish the selected operating branch to `origin`.
-Failed worktrees are preserved
-for inspection. After a successful promotion, the orchestrator refreshes and
-commits `graphify-out` onto the target branch when the target repository has
-graphify configured; graph refresh failures are reported as warnings and never
-trigger resolver attempts.
+serialized. When the target branch is checked out with uncommitted work,
+orchestration commits those changes and pushes the branch to `origin` before creating the task worktree, so
+the task starts from what you actually have. A missing remote or a failed push
+is reported as a warning and the task still runs. Set
+`dirty_primary_autocommit_enabled = false` in the orchestration parameter file
+to get the old "primary worktree must be clean" error back, or
+`dirty_primary_push_enabled = false` to commit without publishing. Every
+successful promotion is also pushed: once a task's merge conflicts are
+resolved, the target branch fast-forwarded, and any graph refresh committed,
+orchestration publishes the branch to `origin` before the task is reported
+complete (`promotion_push_enabled = false` keeps promotions local). The
+settings-bar Push control remains for publishing the selected operating
+branch by hand. Failed worktrees are preserved
+for inspection. Task-owned commits use the task's readable title (derived from
+the requested goal), adding a short repair, resolver, or graphify-stage suffix
+when applicable, so the Git history describes the work that completed. A
+successful Push reports the branch and commit in the status line and records
+the full SHA in the launch-root `.daedalus-memory.json`; open the **Push log**
+settings action or press `Ctrl+H` to browse those records. After a successful
+promotion, the orchestrator refreshes and commits `graphify-out` onto the
+target branch when the target repository has graphify configured; graph
+refresh failures are reported as warnings and never trigger resolver attempts.
 
 Target projects may add an optional `.daedalus` TOML file to prepare each task
 worktree before the agent starts. The `[worktree]` table accepts one argv-style
-`install_command` and repository-relative `readonly_paths`; the command runs in
-the task worktree, then each declared path is symlinked from the primary
-worktree. For example:
+`install_command`, repository-relative `readonly_paths`, and
+`environment_files`; the command runs in the task worktree, then each declared
+path is symlinked from the primary worktree. Environment files are loaded into
+the agent process without copying them into its worktree. A `[claude]` table
+can load a project-specific Claude settings JSON and add non-interactive tool
+permissions for workers and repair agents. For example:
 
 ```toml
 [worktree]
 install_command = ["npm", "ci"]
 readonly_paths = ["food-data"]
+environment_files = ["fstore/.env"]
+
+[claude]
+settings_file = "orchestrator/worker_permissions.json"
+allowed_tools = ["Bash(python3:*)", "WebFetch", "WebSearch"]
 ```
 
 Symlinked paths are shared local resources and are not OS-enforced read-only;
 agents and setup commands must treat them as immutable.
+Daedalus still stages, commits, and promotes worker changes itself.
 
 The launch root stores task history in `.daedalus-memory.json`. Its `tasks`
-entry maps each task worktree directory name to the submission timestamp,
-prompt, provider/model/reasoning/mode selection, current state, assistant
-outputs, token usage, resolved project path, and any error so failed, paused,
-and cancelled work can be reopened for analysis. Failed tasks and tasks
-interrupted by a TUI restart are rehydrated into the task inbox; failed tasks
-can be retried and interrupted tasks can be resumed when their worktrees still
-exist. The memory file also keeps a single `last_opened_project` entry.
-Plan tasks with submitted answers additionally retain generated review requests
-in an optional `prompt_history` list on the same worktree record.
-Runtime diagnostics are written to `.daedalus-debug.log` next to that memory
-file (rotated at 2 MB). It records UI exceptions, task/agent lifecycle events,
-and shutdown state. During Python exit it cancels active agent process groups
-before the executor can block on their worker threads. If the process is
-stuck, run `kill -USR1 <pid>` to append all Python thread stacks to the same
-log before terminating it; this command writes only to the log by design.
-The first launch initializes it to the default project, every sidebar focus
-change updates it, and the next startup restores it when that project still
-exists. The file is intentionally ignored by Git.
+entry maps each task's stable logical key (`task-<id>`) to the submission
+timestamp, prompt, generated title, provider/model/reasoning/mode selection,
+current state, assistant outputs, token usage, resolved project path, any
+error, and (schema version 2) the ordered conversation turns and runs. Older
+worktree-keyed snapshots are migrated once and loaded with the original prompt
+as the first turn. Failed tasks can be retried; tasks that were running when
+the TUI stopped come back as `interrupted` and can be resumed or continued
+with a new prompt, never auto-launched. The memory file also keeps a single
+`last_opened_project` entry, an `opened_project_directories` list for projects
+opened by path, and small UI preferences (viewer visibility, All tasks).
+The first launch initializes the project marker to the default project, every
+sidebar focus change updates it, and the next startup restores it when that
+project still exists. The file is intentionally ignored by Git.
+
+## Prompts, drafts, and errors on disk
+
+Every prompt you send and every draft you type is saved under the TUI's own
+`prompts/` folder, and every diagnostic under its `errors/` folder. Both live
+under the storage root configured in
+`parameter_files/daedalus-tui-prompting.toml` (`[storage] data_root`, default
+`.` = the TUI project directory that owns `parameter_files`); a relative root
+never depends on the working directory or on which repository a task targets,
+and packaged installs in a read-only location should point it at a writable
+absolute path such as `~/.local/share/daedalus-tui`. Both folders are
+gitignored and never appear as projects in the selector.
+
+```text
+daedalus-tui/
+  prompts/<project-basename>-<digest>/
+    drafts/new-task.json              # unsent new-task draft
+    <task-id>/draft.json              # follow-up or recovered draft
+    <task-id>/turn-0001.md            # exact first submission
+    <task-id>/turn-0002.md            # exact next submission
+  errors/
+    daedalus.log                      # rotating runtime log (2 MB × 3)
+    faults.log                        # fault-handler and SIGUSR1 stack dumps
+    <project-basename>-<digest>/<task-id>/turn-0002-run-0001.log
+```
+
+Archived prompts are written byte-for-byte (indentation, blank lines, and
+trailing newlines included) through atomic file replacement. Drafts save after
+a short typing pause (`[drafts] autosave_delay_ms`) and before Send, Cancel,
+task or project switches, New Task, and quit, so at most the last unflushed
+interval can be lost. If storage cannot be written the editor stays usable and
+the status line names the exact path that failed; a prompt that cannot be
+archived is not sent. On restart the latest draft returns to the composer, a
+missing archive is regenerated from the task index, and an archived prompt the
+index does not know is offered back as a recovered draft.
+
+Daedalus installs its own handlers for `SIGINT`, `SIGTERM`, and `SIGHUP`
+before the Textual loop starts. Textual runs the terminal with signals off,
+so a `SIGINT` can only come from outside the TUI; left to Python's default
+handling it cancelled the event loop and the app vanished with no return
+code, no unmount, and nothing in the log. A `SIGINT` is now treated exactly
+like `Ctrl+C` (stop the selected run, or the orchestrate session), `SIGTERM`
+and `SIGHUP` exit the way `Ctrl+Q` does with the agents paused, and every
+one of them is logged with the terminal's signal state for diagnosis.
+
+`errors/daedalus.log` replaces the older launch-root `.daedalus-debug.log`
+(existing files are left in place). It records UI exceptions, task/agent
+lifecycle events with project, task, turn, run, phase, and provider, and
+shutdown state, with known credential patterns redacted. Each run's complete
+error text is also appended to its own `turn-NNNN-run-NNNN.log` before the
+on-screen summary is truncated; the Errors view names both files. If the
+process is stuck, run `kill -USR1 <pid>` to append all Python thread stacks to
+`errors/faults.log`.
 
 The task list keeps each prompt's provider, model, reasoning, status, branch,
 worktree, and filtered assistant-message transcript separate. Raw diffs,
@@ -146,15 +296,161 @@ if you want your terminal emulator's native selection instead, hold Option in
 iTerm or Shift in Terminal.app while dragging.
 
 Vim-style shortcuts are also available without changing normal prompt typing.
-The prompt itself is a modal Vim text area: it starts in Insert mode, `Esc`
-enters Normal mode, and `i`, `a`, `o`, `h/j/k/l`, `w`, `e`, `0`, `$`, `gg`, `G`,
-`d`, `u`, `y`, `p`, Visual mode, and `Shift+V` visual-line mode are available.
-`Enter` inserts a newline;
-`Ctrl+Enter` submits the prompt. Yanks are mirrored to the system clipboard,
-and `p` falls back to the system clipboard when the Vim register is empty.
-The supported command subset is intentionally incremental so additional Vim
-commands can be added as they become useful. Mouse clicks and standard
-Textual key navigation remain available.
+The prompt itself is a modal Vim text area with a compact INSERT/NORMAL/VISUAL
+indicator: it starts in Insert mode and `Esc` enters Normal mode. Supported
+commands: `i a I A o O` (Insert), `h j k l`, `w b e`, `0 $`, `gg G` (moves,
+with counts such as `3j`), `v` / `V` (character / whole-line selection),
+`x dd dw d$` and visual `d`/`x` (cut, `2dd` cuts two lines), visual `c`
+(change), `yy yw y$` and visual `y` (copy, `2yy` copies two lines), `p` / `P`
+(paste after / before; whole lines stay whole lines, including on the last
+line), `u` / `Ctrl+R` (undo / redo while the prompt has focus). Every cut and
+yank also copies to the system clipboard, even when the same text is yanked
+twice; if the host clipboard is unavailable the text stays in the Vim
+register and the status line says so. `p` uses the Vim register first and the
+system clipboard when the register is empty; `"+y`, `"+p`, and `"+P` address
+the system clipboard explicitly so newly copied external text is always
+reachable. `Enter` inserts a newline; `Shift+Enter` and `Ctrl+Enter` both send,
+from any Vim mode. Reporting a modifier on Enter at all requires a terminal
+that implements the Kitty keyboard protocol (Ghostty, Kitty, WezTerm, or
+iTerm2 with CSI u reporting enabled); terminals without it send a plain Enter
+for every variant, and **Send** remains the way to submit there. Mouse clicks
+and standard Textual key navigation remain available.
+
+## Conversations, follow-ups, and stopping a run
+
+Each task is a conversation with an automatically generated title taken from
+the first meaningful line of its first prompt (Markdown decoration removed,
+cut at a word boundary to `[titles] maximum_length`). The title is shown in
+the inbox and above the composer and never changes on follow-ups. **New Task**
+saves the current draft and starts a separate conversation; with a task
+selected, **Send** (`Shift+Enter`) sends the composer text as the next turn of
+that task. Sending is available once the task's current run has stopped or
+finished; you can type the next prompt while a run is active. Follow-ups keep
+the task's provider, model, reasoning, mode, and topic unless you change them
+after selecting the task, in which case the change is recorded on the new
+turn. The agent receives the original request, recent history, and the latest
+instruction within a configurable character budget
+(`[conversation] context_budget_chars`), with omitted older turns marked
+explicitly; the complete history stays on disk. A preserved worktree is
+reused; a cleaned-up one is replaced by a fresh worktree from the operating
+branch under the same task. **Prompt history** above the composer reloads any
+earlier prompt (or a saved follow-up) into the editor without changing its
+archived file. The **All tasks** toggle under the inbox lists completed and
+interrupted conversations so they can be reopened after a restart.
+
+Focus a task row and press **`dd`** to delete an inactive conversation and its
+task snapshot; active runs must be stopped first.
+
+**`Ctrl+C`, Cancel, and `Ctrl+X`** all stop the selected task's active run
+without discarding anything: the worktree, branch, and uncommitted files are
+kept, the run is recorded as `interrupted` (not an error), and the interrupted
+prompt's exact text returns to the composer in Insert mode with the cursor at
+the end. If you had typed a different follow-up, it is saved first and listed
+under Prompt history. Edit the restored prompt and Send to continue the same
+task, or press Resume to continue in the existing worktree unchanged. Pressing
+`Ctrl+C` repeatedly is harmless, with nothing running it leaves the draft
+alone, and on the main screen it never copies text or quits (use
+`Ctrl+Alt+S` to copy a selection and `Ctrl+Q` to quit; closing the window
+clears the composer's unsent prompt). Modal dialogs keep their own
+Escape/Cancel behavior.
+
+Drafts autosave while Daedalus runs, but closing the window deliberately
+clears the prompt the composer was holding, so the next launch starts on an
+empty composer instead of a stale half-typed sentence. A crash never reaches
+that close hook, so its last autosave is still restored, and prompts stashed by
+an interruption stay under Prompt history. Set `[drafts] clear_on_exit = false`
+in `parameter_files/daedalus-tui-prompting.toml` to keep unsent prompts across
+sessions instead.
+
+## Output viewer
+
+**Show viewer** in the output toolbar opens a read-only Markdown viewer that
+takes the right third of the whole usable width on a wide terminal (about 60
+of 180 columns), leaving two thirds for the task inbox and the composer. Its
+source selector offers the latest response, earlier responses, and the current
+plan text; **Raw** shows the exact Markdown source on a selectable surface.
+
+The response's action items head the viewer, above the rendered output: the
+unchecked task-list boxes it contains, the list items under a "Next steps" or
+"Follow-ups" heading, and any `TODO:`/`NEXT:`/`ACTION:` lines, with the run's
+identity on the same header line. Set `[viewer] action_items_by_default =
+false` in `parameter_files/daedalus-tui-prompting.toml` to hide that header,
+or `action_item_limit` to change how many items it lists.
+
+Every single newline inside a paragraph renders as a real line break, so a
+hard-wrapped response reads the way the agent wrote it instead of reflowing
+into one block. Fenced and indented code are untouched and **Raw** always
+shows the response byte-for-byte; set `[viewer] hard_line_breaks = false` for
+strict CommonMark paragraph joining.
+
+Live output re-renders with a short debounce, follows streaming only when you
+are already at the bottom, and the viewer never executes code blocks, opens
+links, or fetches images (activating a link shows its target in the status
+line). When the terminal is narrower than `[viewer] minimum_width +
+main_minimum_width` or in compact mode, the same viewer becomes a full-width
+alternate view with a **Back** control. The choice is remembered.
+
+## Usage bar
+
+The bottom-left usage bar refreshes every `[usage] interval_seconds` (default
+60) in `parameter_files/daedalus-tui.toml`. Neither CLI offers a
+non-interactive `usage` subcommand (Claude Code waits for a terminal; Codex
+refuses without one), so by default the bar reads the same local data their
+own `/usage` and `/status` views show: Codex rate-limit windows (5-hour and
+weekly percentages with reset times) from its session logs under
+`~/.codex/sessions`, and today's token and message totals for Claude Code.
+
+Claude's `~/.claude/stats-cache.json` is only a derived summary and is often
+absent or stale, which used to leave the bar reading `0 tok · 0 msgs` after a
+heavy day, so the session transcripts under `[usage] claude_projects_dir`
+(default `~/.claude/projects`) are counted as well: every turn appends a JSON
+line carrying its `message.usage`, which makes them the authoritative record.
+Each figure shown is the larger of the two sources, since neither is complete
+on its own and both describe the same calendar day. Transcripts touched within
+`[usage] claude_transcript_days` (default 30) are parsed once and afterwards
+only from where the previous poll stopped, and turns replayed by a resumed or
+forked session are counted once. Claude rate-limit windows (`five_hour`,
+`seven_day`, and `spend_limit`) are also drawn when that cache or a configured
+JSON command provides them. A configured Claude JSON source may also expose a
+`context_window.used_percentage` bar. Every window that reports a percentage is
+drawn as a progress bar under its provider's line; `[usage] bar_width` sets how
+many cells each bar uses. Set `[usage.<provider>] command` to run any program
+instead; it runs with stdin closed and a timeout, and its JSON usage fields or
+first output line are shown. Hover the bar for details, including how old the
+reading is.
+
+Codex only writes rate limits once a turn finishes, so its most recently
+touched session log is often a just-started session with no usage in it. The
+reader scans back through `[usage] session_scan_limit` logs (newest first)
+until it finds real percentages, reads only the last `session_tail_bytes` of
+each, and accepts both the `resets_in_seconds` and `resets_at` spellings of a
+window's reset time.
+
+That payload is a snapshot of a turn that has since finished, so each window's
+reset time is counted from the moment Codex wrote it, not from the moment the
+bar is drawn. A window whose reset has already gone by reads as `0%`: the quota
+really did refill while Codex was idle, and repainting the last recorded
+percentage would keep claiming usage you got back hours or days ago. The
+tooltip names what the window held before it reset and how old the reading is,
+so the empty bar is never mistaken for missing data.
+
+## Coding statistics
+
+`Ctrl+U` opens the coding statistics screen: cumulative, today's, and projected
+usage from the tasks Daedalus itself launched, a per-task history table, and a
+per-provider breakdown, all switchable between tokens and tasks.
+
+Its fourth summary tile, **All Claude tokens**, is not limited to Daedalus: it
+totals every Claude Code token recorded on this machine, including sessions run
+from a plain terminal. It reads the same two local sources as the usage bar --
+all-time model totals from `~/.claude/stats-cache.json` and the per-turn
+transcripts under `[usage] claude_projects_dir` -- and shows the larger of the
+two, since neither is complete on its own. That scan looks back `[usage]
+claude_account_scan_days` (default 3650) rather than the bar's 30-day window,
+so it runs off the UI thread: the tile reads `reading…` until it finishes, and
+hovering it shows today's total, the span covered, and what each source
+reported. Setting `[usage] enabled = false` turns the reading off with the rest
+of the usage readings, and the tile then shows `—`.
 
 Use the mode selector for Coding, Ask, or Plan, or press `Tab` on the main
 prompting screen to toggle between Coding and Plan. Ask runs are read-only and do
@@ -163,10 +459,10 @@ task list through their `planning`, `questioning`, and answer-review states.
 They return a structured implementation plan and multiple-choice questions;
 submit selected answers for another review round, or use the follow-up
 controls to continue planning. The Implement button remains unavailable until
-the agent confirms that no questions remain, then creates a separate coding
-task from the approved plan. Pause preserves the task worktree and allows
-resume later; Cancel stops the agent and removes that task's worktree and
-branch.
+the agent confirms that no questions remain, then continues the same
+conversation as a coding run from the approved plan. Pause preserves the task
+worktree and allows resume later; Cancel (or `Ctrl+C`) stops the run, keeps
+its worktree and branch, and returns the prompt to the composer.
 
 Optional Topics group closely related tasks under shared markdown in
 `topic_files/` (Topic Goal, Topic Status, State Log). Create or edit those
@@ -179,3 +475,59 @@ way they update feature files.
 When resuming, the optional notes field is sent to the agent only when it has
 content. The resume prompt tells the agent to preserve existing work, inspect
 `git status` and `git diff`, and continue from the current worktree.
+
+## Orchestrate Mode
+
+The **Orchestrate Mode** button (or `Ctrl+O`) swaps the task view for a
+second view where one prompt is planned and run by a team of agents. A
+**Planner** (Claude Fable by default) reads the repository in a read-only
+worktree and returns a JSON plan of small task cards; at most *N* **Workers**
+(Claude Opus by default, *N* set in the max-workers input, capped by the
+parameter file and by `max_concurrent_tasks`) each run one card as an
+ordinary coding task with its own worktree, verification, integration, and
+promotion. Each role has its own provider, model, and effort selectors in the
+role row, so the planner or the workers may run on Claude Code, Codex
+(ChatGPT), or Cursor CLI in any combination. After every wave the planner
+receives a bounded status digest and may add cards, re-issue a failed card
+under a new id, or declare the session done; the planner decides how many
+rounds the work needs (`planner_round_limit` is an optional safety cap, off
+by default). The first planner turn carries a bounded listing of the
+repository's tracked files so it can write cards without exploring the tree,
+and the planner log shows its streamed messages with elapsed time while a
+round runs. Merge conflicts between worker branches are resolved with the
+planner's model. Each worker prompt carries only the role rules, the coding
+profile, its card, and the worktree boundary, never the operator's prompt or
+other cards, so a session costs fewer tokens than running every task with
+the full prompt; the summary line shows how many characters reached the
+workers. Session files (`PLAN.md`, `cards/`, `reports/`, digests) live under
+`prompts/<project>/orchestrate/<session-id>/` in the TUI storage root, and
+the card a worker ticks is written to `.daedalus-orchestration/task.md` in
+its worktree, a runtime artifact that is never committed. Worker rows in the
+inbox show their card id; `Ctrl+C` in the orchestrate view stops the whole
+session, and sessions do not resume after a restart. Roles, caps, and
+budgets live in `parameter_files/daedalus-tui-orchestrate-mode.toml`.
+Workers must report `done` with every card checklist item ticked before
+Daedalus promotes their code. A partial or blocked report fails the card so
+the planner sees the actual error instead of treating unfinished work as done.
+
+One session artifact does reach the repository: after every accepted planner
+round, and again when the session ends, Daedalus writes `DAEDALUS_CONTEXT.md`
+(`context_filename`) at the root of the operating branch with every
+session's prompt, summary, and full cards (goal, ticked checklist, scope,
+interfaces, verify command, worker notes, outcome), commits only that file,
+and pushes it immediately when `promotion_push_enabled` is on. The round-one
+write lands before the workers' worktrees are cut, so every worker starts
+from a branch that already carries it. The next session's first planner turn
+receives the file inline (bounded by `planner_context_chars`, dropping the
+oldest sessions whole), so a prompt such as "continue the plan you made"
+works across sessions, restarts, and machines instead of failing with a
+planner that sees only a bare repository. Set `context_filename = ""` to
+disable the file.
+
+The planner and its workers may run on different CLIs, and a card may rely
+only on what a worker session has: its worktree, the CLI's standard tools,
+and the card itself. Every planner turn says so, naming the worker CLI and
+model, and a card whose text sends the worker after a skill or plugin (such
+as "use the Sites building skill") is rejected and returned to the planner
+for one corrective round rather than dispatched to a worker that will report
+it as partial.

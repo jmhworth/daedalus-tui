@@ -14,9 +14,13 @@ from .verification import truncate_diagnostic
 
 DEFAULT_MEMORY_FILE = ".daedalus-memory.json"
 LAST_OPENED_PROJECT_KEY = "last_opened_project"
+OPENED_PROJECT_DIRECTORIES_KEY = "opened_project_directories"
 PROJECT_TARGET_BRANCHES_KEY = "project_target_branches"
 PROJECT_TOPICS_KEY = "project_topics"
+UI_PREFERENCES_KEY = "ui_preferences"
 TASKS_KEY = "tasks"
+PUSHED_COMMITS_KEY = "pushed_commits"
+ORCHESTRATIONS_KEY = "orchestrations"
 
 
 class TaskMemoryStore:
@@ -64,6 +68,65 @@ class TaskMemoryStore:
     def record_last_opened_project(self, project_path: Path) -> None:
         """Backward-compatible alias for :meth:`set_last_opened_project`."""
         self.set_last_opened_project(project_path)
+
+    def get_opened_project_directories(self) -> tuple[Path, ...]:
+        """Return the directories opened by path, in the order they were added."""
+        with self._lock:
+            entries = self._read_entries()
+        paths: list[Path] = []
+        seen: set[Path] = set()
+        for entry in entries:
+            value = entry.get(OPENED_PROJECT_DIRECTORIES_KEY)
+            if not isinstance(value, list):
+                continue
+            for item in value:
+                if not isinstance(item, str) or not item:
+                    continue
+                resolved = Path(item).expanduser().resolve()
+                if resolved not in seen:
+                    seen.add(resolved)
+                    paths.append(resolved)
+        return tuple(paths)
+
+    def add_opened_project_directory(self, project_path: Path) -> None:
+        """Remember a directory opened by path so it returns on the next launch."""
+        self._write_opened_project_directories(add=project_path)
+
+    def remove_opened_project_directory(self, project_path: Path) -> None:
+        """Forget a directory opened by path, used when it no longer exists."""
+        self._write_opened_project_directories(remove=project_path)
+
+    def _write_opened_project_directories(
+        self,
+        add: Path | None = None,
+        remove: Path | None = None,
+    ) -> None:
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            paths: list[str] = []
+            seen: set[str] = set()
+            for existing in entries:
+                existing_paths = existing.get(OPENED_PROJECT_DIRECTORIES_KEY)
+                if isinstance(existing_paths, list):
+                    for item in existing_paths:
+                        if isinstance(item, str) and item and item not in seen:
+                            seen.add(item)
+                            paths.append(item)
+                    continue
+                if "tokens" in existing:
+                    continue
+                updated_entries.append(existing)
+            if remove is not None:
+                key = str(remove.expanduser().resolve())
+                paths = [item for item in paths if item != key]
+            if add is not None:
+                key = str(add.expanduser().resolve())
+                if key not in paths:
+                    paths.append(key)
+            if paths:
+                updated_entries.append({OPENED_PROJECT_DIRECTORIES_KEY: paths})
+            self._write_entries(updated_entries)
 
     def get_project_target_branch(self, project_path: Path) -> str | None:
         """Return the remembered operating branch for a project, if any."""
@@ -183,6 +246,106 @@ class TaskMemoryStore:
                 updated_entries.append({PROJECT_TOPICS_KEY: mapping})
             self._write_entries(updated_entries)
 
+    def get_ui_preference(self, key: str, default: object = None) -> object:
+        """Return one remembered UI preference (for example viewer visibility)."""
+        with self._lock:
+            entries = self._read_entries()
+        for entry in reversed(entries):
+            mapping = entry.get(UI_PREFERENCES_KEY)
+            if isinstance(mapping, dict) and key in mapping:
+                return mapping[key]
+        return default
+
+    def set_ui_preference(self, key: str, value: object) -> None:
+        """Remember one UI preference without losing other entries."""
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            mapping: dict[str, object] = {}
+            replaced = False
+            for existing in entries:
+                existing_map = existing.get(UI_PREFERENCES_KEY)
+                if isinstance(existing_map, dict):
+                    if not replaced:
+                        mapping.update(existing_map)
+                        replaced = True
+                    continue
+                if "tokens" in existing:
+                    continue
+                updated_entries.append(existing)
+            mapping[key] = value
+            updated_entries.append({UI_PREFERENCES_KEY: mapping})
+            self._write_entries(updated_entries)
+
+    def get_pushed_commits(self, project: Path | None = None) -> tuple[dict[str, object], ...]:
+        """Return recorded successful pushes, optionally limited to one project."""
+        project_key = str(project.expanduser().resolve()) if project is not None else None
+        with self._lock:
+            entries = self._read_entries()
+        records: list[dict[str, object]] = []
+        for entry in entries:
+            value = entry.get(PUSHED_COMMITS_KEY)
+            if not isinstance(value, list):
+                continue
+            for record in value:
+                if not isinstance(record, dict):
+                    continue
+                if project_key is not None and record.get("project") != project_key:
+                    continue
+                records.append(dict(record))
+        return tuple(records)
+
+    def record_pushed_commit(
+        self,
+        project: Path,
+        branch: str,
+        remote: str,
+        commit: str,
+        pushed_at: float | None = None,
+    ) -> None:
+        """Persist one successful branch-push tip without disturbing task history."""
+        project_text = str(project.expanduser().resolve())
+        branch = branch.strip()
+        remote = remote.strip()
+        commit = commit.strip()
+        if not branch or not remote or not commit:
+            raise ValueError("A pushed commit requires a project, branch, remote, and commit SHA.")
+        record = {
+            "timestamp": datetime.fromtimestamp(pushed_at or 0, timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+            if pushed_at is not None
+            else datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "project": project_text,
+            "branch": branch,
+            "remote": remote,
+            "commit": commit,
+        }
+        identity = (project_text, branch, remote, commit)
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            records: list[dict[str, object]] = []
+            for existing in entries:
+                existing_records = existing.get(PUSHED_COMMITS_KEY)
+                if isinstance(existing_records, list):
+                    records.extend(item for item in existing_records if isinstance(item, dict))
+                    continue
+                updated_entries.append(existing)
+            if not any(
+                (
+                    item.get("project"),
+                    item.get("branch"),
+                    item.get("remote"),
+                    item.get("commit"),
+                )
+                == identity
+                for item in records
+            ):
+                records.append(record)
+            updated_entries.append({PUSHED_COMMITS_KEY: records})
+            self._write_entries(updated_entries)
+
     def get_tasks(self) -> dict[str, dict[str, object]]:
         """Return persisted task snapshots keyed by their stable task ID."""
         with self._lock:
@@ -196,6 +359,30 @@ class TaskMemoryStore:
                 if isinstance(task_id, str) and isinstance(task, dict):
                     tasks[task_id] = dict(task)
         return tasks
+
+    def delete_task(self, task_id: str) -> bool:
+        """Remove one persisted task snapshot without touching other entries."""
+        if not task_id:
+            return False
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            tasks: dict[str, object] = {}
+            found = False
+            for existing in entries:
+                existing_tasks = existing.get(TASKS_KEY)
+                if isinstance(existing_tasks, dict):
+                    tasks.update(existing_tasks)
+                    continue
+                updated_entries.append(existing)
+            if task_id not in tasks:
+                return False
+            tasks.pop(task_id, None)
+            found = True
+            if tasks:
+                updated_entries.append({TASKS_KEY: tasks})
+            self._write_entries(updated_entries)
+            return found
 
     def record_task(
         self,
@@ -228,8 +415,27 @@ class TaskMemoryStore:
         sync_conflict_attempt_limit: int | None = None,
         chain_id: str | None = None,
         parent_task_id: str | None = None,
+        title: str | None = None,
+        turns: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+        runs: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+        active_turn_id: str | None = None,
+        active_run_id: str | None = None,
+        schema_version: int | None = None,
+        prompt_count: int | None = None,
+        project_key: str | None = None,
+        diagnostics_dir: Path | None = None,
+        prompts_dir: Path | None = None,
+        session_id: str | None = None,
+        card_id: str | None = None,
     ) -> None:
-        """Upsert a task snapshot keyed by the task worktree's directory name."""
+        """Upsert a task snapshot keyed by its stable logical task key.
+
+        Older snapshots were keyed by the worktree directory name; passing
+        ``previous_task_id`` migrates such an entry onto the new key once while
+        leaving every other entry untouched. The conversation fields (title,
+        turns, runs, active identifiers) are written only when supplied so a
+        legacy-shaped record stays byte-compatible.
+        """
         task = {
             "timestamp": datetime.fromtimestamp(submitted_at or 0, timezone.utc)
             .isoformat()
@@ -279,6 +485,32 @@ class TaskMemoryStore:
                 task["sync_temp_branch_name"] = sync_temp_branch_name
             if sync_conflict_attempt_limit is not None:
                 task["sync_conflict_attempt_limit"] = int(sync_conflict_attempt_limit)
+        if title is not None:
+            task["title"] = title
+        if turns is not None:
+            task["turns"] = [dict(turn) for turn in turns]
+        if runs is not None:
+            task["runs"] = [dict(run) for run in runs]
+        if active_turn_id is not None:
+            task["active_turn_id"] = active_turn_id
+        if active_run_id is not None:
+            task["active_run_id"] = active_run_id
+        if schema_version is not None:
+            task["schema_version"] = int(schema_version)
+        if prompt_count is not None:
+            task["prompt_count"] = max(0, int(prompt_count))
+        if project_key is not None:
+            task["project_key"] = project_key
+        if diagnostics_dir is not None:
+            task["diagnostics_dir"] = str(diagnostics_dir)
+        if prompts_dir is not None:
+            task["prompts_dir"] = str(prompts_dir)
+        # Orchestrate Mode worker tasks carry their session and card so the
+        # inbox can tell them apart from ordinary tasks after a restart.
+        if session_id is not None:
+            task["session_id"] = session_id
+        if card_id is not None:
+            task["card_id"] = card_id
         with self._lock:
             entries = self._read_entries()
             updated_entries: list[dict[str, object]] = []
@@ -299,6 +531,69 @@ class TaskMemoryStore:
             tasks[task_id] = task
             updated_entries.append({TASKS_KEY: tasks})
             self._write_entries(updated_entries)
+
+    def get_orchestrations(self) -> dict[str, dict[str, object]]:
+        """Return persisted Orchestrate Mode sessions keyed by session id."""
+        with self._lock:
+            entries = self._read_entries()
+        sessions: dict[str, dict[str, object]] = {}
+        for entry in entries:
+            value = entry.get(ORCHESTRATIONS_KEY)
+            if not isinstance(value, dict):
+                continue
+            for session_id, session in value.items():
+                if isinstance(session_id, str) and isinstance(session, dict):
+                    sessions[session_id] = dict(session)
+        return sessions
+
+    def record_orchestration(self, session: dict[str, object]) -> None:
+        """Upsert one session snapshot beside the task snapshots.
+
+        The snapshot must carry ``session_id``; a ``schema_version`` is added
+        when missing so a later layout change can migrate old sessions.
+        """
+        session_id = session.get("session_id")
+        if not isinstance(session_id, str) or not session_id:
+            raise ValueError("An orchestration snapshot requires a session_id.")
+        snapshot = dict(session)
+        snapshot.setdefault("schema_version", 1)
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            sessions: dict[str, object] = {}
+            for existing in entries:
+                existing_sessions = existing.get(ORCHESTRATIONS_KEY)
+                if isinstance(existing_sessions, dict):
+                    sessions.update(existing_sessions)
+                    continue
+                if "tokens" in existing:
+                    continue
+                updated_entries.append(existing)
+            sessions[session_id] = snapshot
+            updated_entries.append({ORCHESTRATIONS_KEY: sessions})
+            self._write_entries(updated_entries)
+
+    def delete_orchestration(self, session_id: str) -> bool:
+        """Remove one session snapshot without touching tasks or other entries."""
+        if not session_id:
+            return False
+        with self._lock:
+            entries = self._read_entries()
+            updated_entries: list[dict[str, object]] = []
+            sessions: dict[str, object] = {}
+            for existing in entries:
+                existing_sessions = existing.get(ORCHESTRATIONS_KEY)
+                if isinstance(existing_sessions, dict):
+                    sessions.update(existing_sessions)
+                    continue
+                updated_entries.append(existing)
+            if session_id not in sessions:
+                return False
+            sessions.pop(session_id, None)
+            if sessions:
+                updated_entries.append({ORCHESTRATIONS_KEY: sessions})
+            self._write_entries(updated_entries)
+            return True
 
     def _read_entries(self) -> list[dict[str, object]]:
         try:

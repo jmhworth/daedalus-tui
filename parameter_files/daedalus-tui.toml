@@ -1,5 +1,6 @@
 providers = [
   { label = "Codex", value = "codex" },
+  { label = "Claude Code", value = "claude" },
   { label = "Cursor CLI", value = "cursor" },
 ]
 
@@ -13,6 +14,27 @@ codex_models = [
 ]
 
 codex_reasoning = [
+  { label = "Light", value = "light" },
+  { label = "Medium", value = "medium" },
+  { label = "High", value = "high" },
+  { label = "Extra high", value = "extra-high" },
+  { label = "Max", value = "max" },
+]
+
+# Claude Code models are passed to `claude --model`. Full model ids are used
+# instead of the moving `opus`/`sonnet` aliases so a task's recorded selection
+# keeps meaning the same model later.
+claude_models = [
+  { label = "Opus 5", value = "claude-opus-5" },
+  { label = "Sonnet 5", value = "claude-sonnet-5" },
+  { label = "Fable 5.1", value = "claude-fable-5-1" },
+  { label = "Haiku 4.5", value = "claude-haiku-4-5-20251001" },
+]
+
+# Claude Code exposes effort directly through `claude --effort`, so it gets its
+# own scale rather than reusing the Codex reasoning mapping. `max` has no Codex
+# equivalent.
+claude_reasoning = [
   { label = "Light", value = "light" },
   { label = "Medium", value = "medium" },
   { label = "High", value = "high" },
@@ -35,13 +57,191 @@ reasoning = "high"
 label = "Cursor CLI"
 value = "cursor"
 
+# Claude Code permission handling for non-interactive task runs. `acceptEdits`
+# auto-approves file edits and matches the profile boundary that agents edit
+# files rather than execute source code; orchestration still runs verification
+# itself. `bypassPermissions` grants Codex-equivalent autonomy including
+# command execution, without Codex's workspace sandbox.
+[claude]
+permission_mode = "acceptEdits"
+# Bash commands Claude Code may run without a prompt under acceptEdits. Claude
+# runs non-interactively (`claude --print`), so nobody can approve a prompt:
+# anything not listed here, and not one of the project's verification commands
+# (which orchestration adds automatically per task), is denied outright.
+allowed_tools = [
+  "Bash(npm test:*)", "Bash(npm run:*)", "Bash(npx vitest:*)", "Bash(npx tsc:*)", "Bash(npx eslint:*)",
+  "Bash(pytest:*)", "Bash(python -m pytest:*)", "Bash(python3 -m pytest:*)",
+  "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(ls:*)",
+]
+
+# Provider sign-in. In `account` mode the TUI removes each provider's API-key
+# variables from the agent subprocess environment so the CLI falls back to the
+# signed-in account and bills the operator's plan instead of API credit. Set
+# `mode = "api-key"` to restore key-based execution, which reads keys from the
+# process environment and local `.env` files as before.
+#
+# API keys never belong in this file; only the variable names are listed here.
+[auth]
+mode = "account"
+
+[auth.codex]
+label = "Codex"
+api_key_variables = ["OPENAI_API_KEY"]
+status_command = ["codex", "login", "status"]
+sign_in_command = ["codex", "login"]
+
+[auth.claude]
+label = "Claude Code"
+api_key_variables = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
+status_command = ["claude", "auth", "status"]
+sign_in_command = ["claude", "auth", "login"]
+
+[auth.cursor]
+label = "Cursor CLI"
+api_key_variables = ["CURSOR_API_KEY"]
+status_command = ["agent", "status"]
+sign_in_command = ["agent", "login"]
+
+# Launch-root project discovery. Daedalus-formatted projects have a
+# `feature_files/` directory; `include_git_repositories` also lists plain Git
+# checkouts under the launch root so tasks can run against them, and
+# `include_all_directories` lists every immediate child directory.
+[projects]
+include_git_repositories = true
+include_all_directories = false
+skipped_directory_names = [
+  ".git",
+  ".daedalus-worktrees",
+  ".venv",
+  "__pycache__",
+  "node_modules",
+  # The TUI's own generated prompt and error archives are never projects.
+  "prompts",
+  "errors",
+]
+
 [output]
 width = "95%"
 
+# Usage bar (bottom left). Every `interval_seconds` the TUI reads each
+# provider's usage and refreshes the bar.
+#
+# The percentages each provider's own /usage view reports are the only ones
+# that know the operator's real plan limits, so the bar asks the CLIs for them
+# first, via the `commands` listed per provider below. Neither CLI is built to
+# be scripted -- Claude Code waits for a terminal, Codex refuses without one,
+# and both stop on a permission prompt when run headless -- so those commands
+# carry each CLI's documented permission override and run attached to a
+# pseudo-terminal (`use_pty`). A CLI that draws its usage panel and then waits
+# is killed at `command_timeout_seconds` and whatever it printed is still
+# scraped, because the percentages are already in that text. Only percentages
+# whose wording names a known window (session/5h, week/7d, opus, context,
+# spend) become bars, so a stray number in the output cannot invent one.
+#
+# When no command yields percentages, the bar falls back to the same local data
+# those views are drawn from: Codex rate-limit windows from its session logs,
+# and Claude Code's per-day token statistics cache, including any `rate_limits`
+# payload it provides. The Claude cache is only a derived summary and can be
+# missing or stale, so its session transcripts are counted as well and the
+# larger figure from the two sources is shown; when Claude Code publishes no
+# rate limits, its bars are measured from transcript tokens over the rolling
+# windows configured below. Those fall-back bars are calibrated against this
+# machine's busiest window rather than a real quota, which is why the CLIs are
+# asked first. Set `fallback_to_local = false` for a provider to show nothing
+# rather than an approximation. Why each command failed is recorded in the
+# usage bar's tooltip.
+#
+# Note that these commands start a real CLI session. If a CLI does not treat
+# the slash command as a built-in it will send it to the model as a prompt,
+# which costs a small number of tokens each time it runs -- capped by
+# `command_interval_seconds` below. Clear a provider's `commands` to stop
+# asking that CLI entirely and read only local files.
+[usage]
+enabled = true
+interval_seconds = 60
+command_timeout_seconds = 20
+# How often the provider CLIs are actually asked. The bar still refreshes every
+# `interval_seconds`; between command runs it redraws the last reading. Starting
+# a CLI is far more expensive than reading a local file and these windows move
+# over hours, so asking every minute would buy nothing.
+command_interval_seconds = 300
+codex_sessions_dir = "~/.codex/sessions"
+claude_stats_file = "~/.claude/stats-cache.json"
+# Claude Code appends one JSON line per turn to a session transcript here.
+claude_projects_dir = "~/.claude/projects"
+# How far back transcripts are read. Each transcript in the window is parsed
+# once and afterwards only from where the previous poll stopped, so this bounds
+# the one-time cost of the first reading after launch.
+claude_transcript_days = 30
+# How far back the Ctrl+U coding statistics screen reads transcripts for its
+# account-wide Claude token total. That screen answers "how much Claude have I
+# used in total", so it looks back over the whole retained history instead of
+# the usage bar's recent window; the scan runs off the UI thread.
+claude_account_scan_days = 3650
+# Token budgets the Claude progress bars are drawn against, for the rolling 5h
+# and 7d windows Claude Code's own /usage view reports. Claude Code stores no
+# plan limit locally, so 0 means "calibrate against the busiest equivalent
+# window in the scanned transcripts": a full bar then means as busy as this
+# machine has ever been, instead of a bar drawn against an invented limit. Set
+# a token count to measure against a fixed budget instead.
+claude_five_hour_token_limit = 0
+claude_weekly_token_limit = 0
+# Codex only writes rate limits after a turn completes, so the most recently
+# touched session log is often a just-started session with no usage in it.
+# Scan back through this many logs (newest first) before reporting no data.
+session_scan_limit = 12
+# Only the tail of each session log is read; the newest rate-limit payload is
+# always at the end and the files grow without bound.
+session_tail_bytes = 262144
+# Cells used by each percentage progress bar in the usage panel. The panel
+# lives in the fixed-width task sidebar, so keep this well under its width.
+bar_width = 12
+# Size of the pseudo-terminal a usage command runs in. A CLI lays its usage
+# panel out against the terminal width, so a narrow terminal wraps or truncates
+# the very percentages being read.
+pty_columns = 200
+pty_lines = 60
+# How long to wait after a usage command starts before typing `input_text` into
+# its terminal, so an interactive CLI has finished starting up first.
+input_delay_seconds = 1.5
+
+# Candidate usage commands per provider, tried in order until one produces
+# percentages. These subcommands are not a stable scripting interface, so
+# listing more than one means a rename does not blank the bar; a candidate that
+# does not exist fails immediately and costs nothing. Each carries the CLI's
+# own permission override so it cannot stop at a prompt. `input_text` is typed
+# into the terminal once the CLI has started, for a CLI whose usage view is
+# only reachable as a slash command typed into a running session; `env` adds
+# environment variables (never put API keys here).
+[usage.claude]
+label = "Claude"
+command = []
+commands = [
+  ["claude", "--permission-mode", "bypassPermissions", "-p", "/usage"],
+  ["claude", "--permission-mode", "bypassPermissions", "-p", "/status"],
+]
+use_pty = true
+input_text = ""
+fallback_to_local = true
+env = {}
+
+[usage.codex]
+label = "Codex"
+command = []
+commands = [
+  ["codex", "exec", "--ask-for-approval", "never", "--sandbox", "read-only", "--skip-git-repo-check", "/status"],
+  ["codex", "exec", "--ask-for-approval", "never", "--sandbox", "read-only", "--skip-git-repo-check", "/usage"],
+]
+use_pty = true
+input_text = ""
+fallback_to_local = true
+env = {}
+
 # Responsive safety guard and compact dimensions. Above the guard, the TUI
-# measures the wide controls' laid-out regions and enters compact mode if any
-# control is clipped. Compact mode uses a vertical workspace; short mode
-# reduces vertical chrome independently.
+# measures the wide controls' laid-out regions; a clipped toolbar first wraps
+# onto two rows with the workspace still side by side, and only enters compact
+# mode if the wrapped toolbars are clipped too. Compact mode uses a vertical
+# workspace; short mode reduces vertical chrome independently.
 [layout]
 compact_width = 100
 # Switch the wide settings row to the category/value picker when a selector

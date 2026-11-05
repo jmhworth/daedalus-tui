@@ -1,0 +1,29 @@
+# Tunables for opt-in Firebase backend registration and the orchestration-owned
+# deploy step. Secrets never belong here; connection values live only in the
+# target project's .env.example.
+snippet_version = 1
+maximum_project_id_length = 100
+env_project_id_key = "FIREBASE_PROJECT_ID"
+env_api_key_key = "FIREBASE_API_KEY"
+env_app_id_key = "FIREBASE_APP_ID"
+env_auth_domain_key = "FIREBASE_AUTH_DOMAIN"
+env_storage_bucket_key = "FIREBASE_STORAGE_BUCKET"
+config_filename = "firebase.json"
+rules_filename = "firestore.rules"
+indexes_filename = "firestore.indexes.json"
+storage_rules_filename = "storage.rules"
+profile_section_heading = "## Firebase Backend"
+config_project_id_placeholder = "YOUR_FIREBASE_PROJECT_ID"
+
+# Repository-relative paths whose changes trigger the orchestration deploy.
+watched_paths = [
+  "firebase.json",
+  "firestore.rules",
+  "firestore.indexes.json",
+  "storage.rules",
+]
+
+# Deploy targets passed to `firebase deploy --only`. Storage rules are
+# scaffolded but not deployed by default because the deploy fails until a
+# default storage bucket exists on the Firebase project.
+deploy_targets = ["firestore:rules", "firestore:indexes"]

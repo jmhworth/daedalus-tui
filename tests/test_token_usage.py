@@ -138,3 +138,39 @@ class TokenUsageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PromptAndAttemptAccountingTests(unittest.TestCase):
+    def test_conversations_count_prompts_and_attempts_separately_from_tasks(self):
+        now = datetime(2026, 8, 17, 12, 0, tzinfo=timezone.utc)
+        entries = (
+            TokenUsageEntry("conversation", now, "codex", 900, prompts=3, runs=5),
+            TokenUsageEntry("single", now, "codex", 100),
+        )
+        stats = calculate_token_usage(entries, now=now)
+        self.assertEqual(stats.cumulative_tasks, 2)
+        self.assertEqual(stats.cumulative_prompts, 4)
+        self.assertEqual(stats.cumulative_runs, 6)
+        self.assertEqual(stats.average_tokens_per_prompt_by_provider, (("codex", 250.0),))
+        self.assertEqual(stats.average_tasks_per_prompt_by_provider, (("codex", 0.5),))
+
+    def test_memory_entries_read_prompt_and_run_counts_with_legacy_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = TaskMemoryStore(Path(directory) / ".daedalus-memory.json")
+            store.record_task("legacy", "old", "codex", "luna", "high", "coding", "completed", submitted_at=1, tokens=10)
+            store.record_task(
+                "conversation",
+                "new",
+                "codex",
+                "luna",
+                "high",
+                "coding",
+                "completed",
+                submitted_at=2,
+                tokens=60,
+                prompt_count=3,
+                runs=[{"run_id": "a", "turn_id": "t"}, {"run_id": "b", "turn_id": "t"}],
+            )
+            entries = {entry.task_id: entry for entry in usage_entries_from_memory(store)}
+        self.assertEqual((entries["legacy"].prompts, entries["legacy"].runs), (1, 1))
+        self.assertEqual((entries["conversation"].prompts, entries["conversation"].runs), (3, 2))

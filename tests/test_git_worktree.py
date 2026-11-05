@@ -1,13 +1,34 @@
 import unittest
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import call, patch
 
-from tui.git_worktree import GitWorktreeError, GitWorktreeManager, WorktreeContext
+from tui.git_worktree import (
+    DIRTY_PRIMARY_COMMIT_MESSAGE,
+    GitWorktreeError,
+    GitWorktreeManager,
+    WorktreeContext,
+)
 from tui.project_config import ProjectWorktreeSettings
 
 
+def status_process(stdout: str):
+    """A CompletedProcess-alike carrying raw `git status --porcelain` stdout."""
+    return type("Process", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+
 class GitWorktreeTests(unittest.TestCase):
+    def test_commit_changes_skips_commit_when_only_runtime_files_remain(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        with patch.object(manager, "stage_changes") as stage, patch.object(
+            manager, "git_output", return_value=""
+        ) as output, patch.object(manager, "run_git") as run_git:
+            self.assertFalse(manager.commit_changes(Path("/task"), "repair"))
+        stage.assert_called_once_with(Path("/task"))
+        output.assert_called_once_with(["diff", "--cached", "--name-only"], Path("/task"))
+        run_git.assert_not_called()
+
     def test_list_local_branches_returns_short_ref_names(self):
         with patch("tui.git_worktree.subprocess.run") as run:
             run.return_value = type(
@@ -45,14 +66,108 @@ class GitWorktreeTests(unittest.TestCase):
             self.assertEqual(context.path, Path(directory).resolve() / ".daedalus-worktrees" / "repo" / "task-task-1")
             self.assertEqual(run_git.call_args.args[0][:4], ["worktree", "add", "-b", "agent/task-task-1"])
 
-    def test_primary_validation_rejects_dirty_repository_when_target_checked_out(self):
+    def test_primary_validation_commits_and_pushes_a_dirty_repository(self):
+        """A dirty operating branch starts the task instead of failing it."""
         manager = GitWorktreeManager(Path("/repo"))
         with patch("tui.git_worktree.subprocess.run") as run, patch.object(
-            manager, "git_output", side_effect=["main", " M changed.py"]
+            manager, "git_output", side_effect=["main", "changed.py"]
+        ), patch.object(
+            manager, "run_git", return_value=status_process(" M changed.py\n")
+        ) as run_git, patch("tui.git_worktree.push_branch") as push_branch:
+            run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            manager._validate_primary()
+
+        commands = [call.args[0] for call in run_git.call_args_list]
+        self.assertIn(["add", "-A", "--", "changed.py"], commands)
+        self.assertIn(["commit", "-m", DIRTY_PRIMARY_COMMIT_MESSAGE], commands)
+        push_branch.assert_called_once_with(Path("/repo").resolve(), "main", "origin")
+
+    def test_primary_autocommit_leaves_daedalus_runtime_files_untracked(self):
+        """Staging is limited to real changes so the debug log stays untracked."""
+        manager = GitWorktreeManager(Path("/repo"))
+        status = " M .daedalus-debug.log\n M tui/app.py\n"
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "git_output", side_effect=["main", "tui/app.py"]
+        ), patch.object(manager, "run_git", return_value=status_process(status)) as run_git, patch(
+            "tui.git_worktree.push_branch"
         ):
             run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
-            with self.assertRaises(GitWorktreeError):
-                manager._validate_primary()
+            manager.validate_primary()
+
+        commands = [call.args[0] for call in run_git.call_args_list]
+        self.assertIn(["add", "-A", "--", "tui/app.py"], commands)
+
+    def test_primary_autocommit_reports_a_failed_push_without_blocking(self):
+        notices: list[tuple[str, str]] = []
+        manager = GitWorktreeManager(
+            Path("/repo"), on_notice=lambda message, kind="status": notices.append((message, kind))
+        )
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "git_output", side_effect=["main", "changed.py"]
+        ), patch.object(manager, "run_git", return_value=status_process(" M changed.py\n")), patch(
+            "tui.git_worktree.push_branch", side_effect=GitWorktreeError("Authentication failed")
+        ):
+            run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            manager.validate_primary()
+
+        self.assertTrue(any("Authentication failed" in message for message, _ in notices))
+
+    def test_primary_autocommit_keeps_the_commit_local_without_a_remote(self):
+        notices: list[tuple[str, str]] = []
+        manager = GitWorktreeManager(
+            Path("/repo"), on_notice=lambda message, kind="status": notices.append((message, kind))
+        )
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "git_output", side_effect=["main", "changed.py"]
+        ), patch.object(manager, "run_git", return_value=status_process(" M changed.py\n")), patch(
+            "tui.git_worktree.push_branch"
+        ) as push_branch:
+            run.side_effect = [
+                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+                type("Process", (), {"returncode": 2, "stdout": "", "stderr": "no remote"})(),
+            ]
+            manager.validate_primary()
+
+        push_branch.assert_not_called()
+        self.assertTrue(any("kept the commit local" in message for message, _ in notices))
+
+    def test_primary_validation_names_the_uncommitted_paths_when_autocommit_is_off(self):
+        manager = GitWorktreeManager(Path("/repo"), autocommit_primary=False)
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "git_output", return_value="main"
+        ), patch.object(manager, "run_git", return_value=status_process(" M changed.py\n")):
+            run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            with self.assertRaisesRegex(GitWorktreeError, "changed.py"):
+                manager.validate_primary()
+
+    def test_primary_validation_ignores_daedalus_own_runtime_files(self):
+        """The TUI writes its debug log on every launch; that must not block tasks."""
+        manager = GitWorktreeManager(Path("/repo"))
+        status = " M .daedalus-debug.log\n M .daedalus-debug.log.1\n?? .daedalus-memory.json\n"
+        with patch("tui.git_worktree.subprocess.run") as run, patch.object(
+            manager, "git_output", return_value="main"
+        ), patch.object(manager, "run_git", return_value=status_process(status)):
+            run.return_value = type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            manager.validate_primary()
+
+    def test_atomic_memory_temp_file_is_not_staged_as_project_work(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        status = "?? ..daedalus-memory.json.tpqh_jjy.tmp\n M tui/app.py\n"
+        with patch.object(manager, "run_git", return_value=status_process(status)):
+            self.assertEqual(manager.dirty_paths(Path("/repo")), ["tui/app.py"])
+
+    def test_dirty_paths_keeps_real_changes_alongside_runtime_files(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        status = " M .daedalus-debug.log\n M tui/app.py\nR  old.py -> new.py\n"
+        with patch.object(manager, "run_git", return_value=status_process(status)):
+            self.assertEqual(manager.dirty_paths(Path("/repo")), ["tui/app.py", "new.py"])
+
+    def test_runtime_artifacts_are_configurable(self):
+        manager = GitWorktreeManager(Path("/repo"), runtime_artifacts=(".custom-debug.log",))
+        self.assertTrue(manager.is_runtime_artifact(".custom-debug.log"))
+        self.assertTrue(manager.is_runtime_artifact(".custom-debug.log.2"))
+        self.assertFalse(manager.is_runtime_artifact(".daedalus-debug.log"))
+        self.assertFalse(manager.is_runtime_artifact(".custom-debug.log.backup"))
 
     def test_primary_validation_auto_commits_dirty_repository_when_requested(self):
         manager = GitWorktreeManager(Path("/repo"))
@@ -223,14 +338,58 @@ class GitWorktreeTests(unittest.TestCase):
                 ],
             )
 
-    def test_stage_changes_stages_the_entire_worktree(self):
+    def test_stage_changes_stages_the_worktree_without_runtime_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
-            manager = GitWorktreeManager(Path(directory) / "repo")
+            manager = GitWorktreeManager(Path(directory) / "repo", runtime_artifacts=(".daedalus-orchestration",))
             worktree = Path(directory) / "task"
             with patch.object(manager, "run_git") as run_git:
                 manager.stage_changes(worktree)
 
-            run_git.assert_called_once_with(["add", "-A"], worktree)
+            run_git.assert_called_once_with(
+                [
+                    "add",
+                    "-A",
+                    "--",
+                    ".",
+                    ":(exclude).daedalus-orchestration",
+                    ":(exclude,glob).daedalus-orchestration.[0-9]*",
+                    ":(exclude,glob)..daedalus-orchestration.*.tmp",
+                ],
+                worktree,
+            )
+
+    def test_stage_changes_leaves_the_card_directory_untracked_in_a_real_repository(self):
+        """The pathspec exclusions are load-bearing, so check them against real git."""
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            (repository / "sub").mkdir(parents=True)
+            (repository / ".daedalus-orchestration").mkdir()
+            (repository / "sub" / "a.py").write_text("a\n", encoding="utf-8")
+            (repository / ".daedalus-orchestration" / "task.md").write_text("# t1\n", encoding="utf-8")
+            (repository / ".daedalus-debug.log.1").write_text("log\n", encoding="utf-8")
+            manager = GitWorktreeManager(repository)
+            manager.run_git(["init", "-q", "."], repository)
+
+            manager.stage_changes(repository)
+
+            staged = manager.git_output(["diff", "--cached", "--name-only"], repository).splitlines()
+            self.assertEqual(staged, ["sub/a.py"])
+
+    def test_orchestrate_card_directory_is_a_runtime_artifact(self):
+        """Orchestrate Mode's card directory must never be staged or committed."""
+        manager = GitWorktreeManager(Path("/repo"))
+        self.assertTrue(manager.is_runtime_artifact(".daedalus-orchestration"))
+        # `git status --porcelain` reports an untracked directory with a
+        # trailing slash and a tracked change inside it with the prefix.
+        self.assertTrue(manager.is_runtime_artifact(".daedalus-orchestration/"))
+        self.assertTrue(manager.is_runtime_artifact(".daedalus-orchestration/task.md"))
+        self.assertFalse(manager.is_runtime_artifact(".daedalus-orchestration-notes.md"))
+
+    def test_dirty_paths_ignores_the_orchestrate_card_directory(self):
+        manager = GitWorktreeManager(Path("/repo"))
+        status = "?? .daedalus-orchestration/\n M tui/app.py\n"
+        with patch.object(manager, "run_git", return_value=status_process(status)):
+            self.assertEqual(manager.dirty_paths(Path("/repo")), ["tui/app.py"])
 
     @patch("tui.git_worktree.subprocess.run")
     def test_provision_runs_install_and_links_readonly_path(self, run):
@@ -316,12 +475,13 @@ class GitWorktreeTests(unittest.TestCase):
         with patch("tui.git_worktree.subprocess.run") as run:
             run.side_effect = [
                 type("Process", (), {"returncode": 0, "stdout": "git@example.com:repo.git\n", "stderr": ""})(),
-                type("Process", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+                type("Process", (), {"returncode": 0, "stdout": "a" * 40 + "\n", "stderr": ""})(),
                 type("Process", (), {"returncode": 0, "stdout": "ok\n", "stderr": ""})(),
             ]
             from tui.git_worktree import push_branch
 
             push_branch(Path("/repo"), "james", pull_first=False)
+            self.assertEqual(push_branch(Path("/repo"), "james"), "a" * 40)
             self.assertEqual(
                 [call.args[0] for call in run.call_args_list],
                 [
@@ -377,6 +537,90 @@ class GitWorktreeTests(unittest.TestCase):
                 run.call_args.args[0],
                 ["git", "fetch", "origin", "refs/heads/main:refs/remotes/origin/main"],
             )
+    def test_push_primary_notice_names_the_pushed_commit(self):
+        notices: list[tuple[str, str]] = []
+        manager = GitWorktreeManager(
+            Path("/repo"),
+            on_notice=lambda message, kind="status": notices.append((message, kind)),
+        )
+        with patch("tui.git_worktree.remote_exists", return_value=True), patch(
+            "tui.git_worktree.push_branch", return_value="a" * 40
+        ):
+            self.assertTrue(manager.push_primary())
+
+        self.assertEqual(
+            notices,
+            [(f"Pushed main to origin (commit {'a' * 40}).", "pushed")],
+        )
+
+    def test_push_primary_enabled_override_ignores_the_autocommit_flag(self):
+        """The promotion push and the context file push have their own setting."""
+        notices: list[tuple[str, str]] = []
+        manager = GitWorktreeManager(
+            Path("/repo"),
+            autocommit_push=False,
+            on_notice=lambda message, kind="status": notices.append((message, kind)),
+        )
+        with patch("tui.git_worktree.remote_exists", return_value=True), patch(
+            "tui.git_worktree.push_branch", return_value="b" * 40
+        ) as push_branch:
+            self.assertFalse(manager.push_primary())
+            self.assertFalse(manager.push_primary(enabled=False))
+            push_branch.assert_not_called()
+            self.assertTrue(manager.push_primary(enabled=True))
+            push_branch.assert_called_once_with(Path("/repo").resolve(), "main", "origin")
+
+        self.assertEqual(notices, [(f"Pushed main to origin (commit {'b' * 40}).", "pushed")])
+
+    def test_commit_primary_file_commits_only_that_file_and_skips_unchanged_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            repository.mkdir()
+            git = lambda *args: subprocess.run(["git", *args], cwd=repository, capture_output=True, text=True, check=True).stdout.strip()
+            git("init", "-q", "-b", "main")
+            git("config", "user.email", "tests@example.com")
+            git("config", "user.name", "Daedalus Tests")
+            (repository / "README.md").write_text("# repo\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-q", "-m", "initial")
+            # Something the operator staged must not ride along with the context commit.
+            (repository / "staged.txt").write_text("operator work\n", encoding="utf-8")
+            git("add", "staged.txt")
+            manager = GitWorktreeManager(repository, primary_branch="main")
+
+            self.assertTrue(manager.commit_primary_file("DAEDALUS_CONTEXT.md", "# context v1\n", "Daedalus: context"))
+            self.assertFalse(manager.commit_primary_file("DAEDALUS_CONTEXT.md", "# context v1\n", "Daedalus: context again"))
+            self.assertTrue(manager.commit_primary_file("docs/nested.md", "nested\n", "Daedalus: nested"))
+
+            subjects = git("log", "--format=%s", "main").splitlines()
+            self.assertEqual(subjects, ["Daedalus: nested", "Daedalus: context", "initial"])
+            self.assertEqual(git("show", "--name-only", "--format=", "main~1"), "DAEDALUS_CONTEXT.md")
+            self.assertEqual(git("show", "main~1:DAEDALUS_CONTEXT.md"), "# context v1")
+            # The operator's staged file is still staged and still uncommitted.
+            self.assertEqual(git("diff", "--cached", "--name-only"), "staged.txt")
+            self.assertNotIn("staged.txt", git("ls-tree", "--name-only", "main"))
+
+    def test_commit_primary_file_uses_a_temporary_checkout_when_main_is_not_checked_out(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            repository.mkdir()
+            git = lambda *args: subprocess.run(["git", *args], cwd=repository, capture_output=True, text=True, check=True).stdout.strip()
+            git("init", "-q", "-b", "main")
+            git("config", "user.email", "tests@example.com")
+            git("config", "user.name", "Daedalus Tests")
+            (repository / "README.md").write_text("# repo\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-q", "-m", "initial")
+            git("checkout", "-q", "-b", "feature")
+            manager = GitWorktreeManager(repository, primary_branch="main")
+
+            self.assertTrue(manager.commit_primary_file("DAEDALUS_CONTEXT.md", "# context\n", "Daedalus: context"))
+
+            self.assertEqual(git("branch", "--show-current"), "feature")
+            self.assertEqual(git("log", "--format=%s", "main").splitlines()[0], "Daedalus: context")
+            self.assertEqual(git("show", "main:DAEDALUS_CONTEXT.md"), "# context")
+            self.assertFalse((repository / "DAEDALUS_CONTEXT.md").exists())
+            self.assertEqual(git("worktree", "list").count("\n"), 0)
 
     def test_push_branch_rejects_missing_remote(self):
         with patch("tui.git_worktree.subprocess.run") as run:

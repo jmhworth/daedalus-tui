@@ -110,3 +110,6 @@ Adhere strictly to the execution style mandated by the active feature file's Dev
 
 # Debugging
 - When debugging code, every suspected root cause should include supporting evidence: the file path, relevant line numbers, and function names. Do not present a debugging hypothesis without citing the code that led to it.
+
+# Orchestrate Mode worker cards
+A task whose worktree contains `.daedalus-orchestration/task.md` is a worker task in an Orchestrate Mode session. That card is authoritative for scope: do exactly what it says, stay inside its file scope, tick its checklist items as you finish them, and end your response with the required `BEGIN_DAEDALUS_WORKER_REPORT` payload. The card directory is Daedalus bookkeeping and is never committed.

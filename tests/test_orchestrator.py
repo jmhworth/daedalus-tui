@@ -8,6 +8,14 @@ from tui.git_worktree import GitWorktreeError, WorktreeContext
 from tui.graphify import GraphifyResult
 from tui.orchestrator import LocalOrchestrator, OrchestrationSettings
 from tui.supabase_migrations import PushResult, TUI_ROOT
+from tui.orchestrator import (
+    BUNDLED_PROFILE_ROOT,
+    LocalOrchestrator,
+    OrchestrationSettings,
+    task_commit_subject,
+)
+from tui.firebase import DeployResult, FirebaseStatus
+from tui.supabase_migrations import PushResult
 from tui.verification import VerificationResult
 
 
@@ -44,6 +52,62 @@ class OrchestratorTests(unittest.TestCase):
             self.assertTrue(all(request.credential_files == () for request in requests))
 
         self.assertEqual(events, [])
+    def test_worker_uses_project_claude_permissions_and_environment_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            worktree = Path(directory) / "worktree"
+            repository.mkdir()
+            worktree.mkdir()
+            (repository / "orchestrator").mkdir()
+            (repository / "orchestrator" / "permissions.json").write_text("{}", encoding="utf-8")
+            (repository / "fstore").mkdir()
+            (repository / "fstore" / ".env").write_text("R2_BUCKET=test\n", encoding="utf-8")
+            (repository / ".daedalus").write_text(
+                '[worktree]\nenvironment_files = ["fstore/.env"]\n'
+                '[claude]\nsettings_file = "orchestrator/permissions.json"\n'
+                'allowed_tools = ["Bash(python3:*)", "WebFetch"]\n',
+                encoding="utf-8",
+            )
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            orchestrator = LocalOrchestrator(
+                repository, runner, OrchestrationSettings(), lambda *_: None
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task", worktree)
+            with patch.object(orchestrator, "verification_tool_rules_for", return_value=()):
+                orchestrator.run_agent(Mock(), context, ("claude", "opus", "high"), "work")
+            request = runner.run.call_args.args[0]
+            self.assertEqual(request.settings_file, repository.resolve() / "orchestrator" / "permissions.json")
+            self.assertIn(repository.resolve() / "fstore" / ".env", request.environment_files)
+            self.assertEqual(request.allowed_tools, ("Bash(python3:*)", "WebFetch"))
+
+    def test_missing_configured_environment_fails_before_worker_launch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repo"
+            worktree = Path(directory) / "worktree"
+            repository.mkdir()
+            worktree.mkdir()
+            (repository / ".daedalus").write_text(
+                '[worktree]\nenvironment_files = ["fstore/.env"]\n', encoding="utf-8"
+            )
+            runner = Mock()
+            orchestrator = LocalOrchestrator(
+                repository, runner, OrchestrationSettings(), lambda *_: None
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task", worktree)
+            with self.assertRaisesRegex(RuntimeError, "environment file is missing"):
+                orchestrator.run_agent(Mock(), context, ("claude", "opus", "high"), "work")
+            runner.run.assert_not_called()
+
+    def test_task_commit_subject_uses_the_task_goal_and_formats_the_title(self):
+        self.assertEqual(
+            task_commit_subject("ignored generated implementation prompt", "task-1", "Fix login validation"),
+            "Daedalus: Fix login validation",
+        )
+        self.assertEqual(
+            task_commit_subject("# Add the account settings screen\nDetailed requirements follow.", "task-1"),
+            "Daedalus: Add the account settings screen",
+        )
 
     def test_plan_waits_for_questions_and_preserves_worktree(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -75,7 +139,8 @@ class OrchestratorTests(unittest.TestCase):
         manager.reset_task_to_base.assert_called_once_with(context)
         self.assertIn("PLANNING_PROFILE_FROM_WORKTREE", runner.run.call_args.args[0].prompt)
 
-    def test_missing_profile_is_reported_without_changing_plan_lifecycle(self):
+    def test_missing_profile_falls_back_to_the_bundled_profile(self):
+        """Projects opened by path have no .agents/; Daedalus' own profile still applies."""
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
             runner = Mock()
@@ -96,8 +161,75 @@ class OrchestratorTests(unittest.TestCase):
 
         self.assertTrue(result.succeeded)
         self.assertTrue(result.awaiting_plan)
-        self.assertTrue(any(phase == "profile" and channel == "error" for phase, _, channel in events))
+        profile_events = [(message, channel) for phase, message, channel in events if phase == "profile"]
+        self.assertEqual([channel for _, channel in profile_events], ["status"])
+        self.assertIn("bundled plan profile", profile_events[0][0])
+        bundled = (BUNDLED_PROFILE_ROOT / "planning.md").read_text(encoding="utf-8")
+        self.assertIn(bundled.strip(), runner.run.call_args.args[0].prompt)
         self.assertNotIn(".agents/profiles", runner.run.call_args.args[0].prompt)
+
+    def test_missing_profile_is_reported_when_no_bundled_fallback_exists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "plan")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda phase, message, channel: events.append((phase, message, channel)),
+            )
+
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager), patch(
+                "tui.orchestrator.BUNDLED_PROFILE_ROOT", repository / "no-bundled-profiles"
+            ):
+                result = orchestrator.run("Make a plan", "codex", "luna", "high", mode="plan")
+
+        self.assertTrue(result.succeeded)
+        self.assertTrue(result.awaiting_plan)
+        self.assertTrue(any(phase == "profile" and channel == "error" for phase, _, channel in events))
+        self.assertNotIn("BEGIN_DAEDALUS_PROFILE", runner.run.call_args.args[0].prompt)
+
+    def test_agent_requests_allowlist_the_discovered_verification_commands(self):
+        """Claude runs non-interactively, so its own checks must be pre-approved."""
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            worktree = repository / "worktree"
+            (worktree / "tests").mkdir(parents=True)
+            (worktree / "package.json").write_text('{"scripts": {"test": "vitest run"}}', encoding="utf-8")
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", worktree)
+            manager = Mock()
+            orchestrator = LocalOrchestrator(repository, runner, OrchestrationSettings(), lambda *_: None)
+
+            with patch("tui.orchestrator.discover_commands", return_value=[
+                ["npm", "test"],
+                ["/opt/venv/bin/python3", "-m", "pytest"],
+            ]):
+                orchestrator.run_agent(manager, context, ("claude", "claude-opus-5", "high"), "Do it")
+
+        request = runner.run.call_args.args[0]
+        self.assertEqual(
+            request.allowed_tools,
+            ("Bash(npm test:*)", "Bash(/opt/venv/bin/python3 -m pytest:*)", "Bash(python3 -m pytest:*)"),
+        )
+
+    def test_agent_requests_skip_discovery_for_a_missing_worktree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "missing")
+            orchestrator = LocalOrchestrator(repository, runner, OrchestrationSettings(), lambda *_: None)
+
+            orchestrator.run_agent(Mock(), context, ("claude", "claude-opus-5", "high"), "Do it")
+
+        self.assertEqual(runner.run.call_args.args[0].allowed_tools, ())
 
     def test_planning_followup_uses_the_planning_profile_through_task_wrapper(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -191,11 +323,78 @@ class OrchestratorTests(unittest.TestCase):
                 orchestrator.refresh_graphify(manager, "task-1")
 
         manager.commit_graphify_changes.assert_called_once_with(
-            "Daedalus graphify update after task task-1",
+            "Daedalus: Task 1 (graphify update)",
             repository.resolve(),
         )
         manager.discard_graphify_changes.assert_not_called()
         manager.cleanup_temporary_checkout.assert_called_once_with(None)
+
+    def test_successful_promotion_pushes_the_target_branch(self):
+        """Once conflicts are resolved and the branch fast-forwarded, the tip is published."""
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(verification_commands=(("true",),), graphify_update_enabled=False),
+                lambda phase, message, channel: events.append((phase, message, channel)),
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            manager.has_unmerged_paths.return_value = False
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch("tui.orchestrator.migrations_pending", return_value=False),
+                patch("tui.orchestrator.load_firebase_status", return_value=FirebaseStatus(False, None)),
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-5.6-luna", "medium")
+
+        self.assertTrue(result.succeeded)
+        manager.promote.assert_called_once()
+        manager.push_primary.assert_called_once_with(enabled=True)
+        self.assertLess(
+            manager.method_calls.index(call.promote(context, manager.capture_primary.return_value)),
+            manager.method_calls.index(call.push_primary(enabled=True)),
+        )
+        self.assertTrue(any("Publishing main to origin after promotion." == message for _, message, _ in events))
+
+    def test_promotion_push_can_be_disabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(
+                    verification_commands=(("true",),),
+                    graphify_update_enabled=False,
+                    promotion_push_enabled=False,
+                ),
+                lambda *_: None,
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            manager.has_unmerged_paths.return_value = False
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch("tui.orchestrator.migrations_pending", return_value=False),
+                patch("tui.orchestrator.load_firebase_status", return_value=FirebaseStatus(False, None)),
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-5.6-luna", "medium")
+
+        self.assertTrue(result.succeeded)
+        manager.promote.assert_called_once()
+        manager.push_primary.assert_not_called()
 
     def test_merge_failure_deploys_resolver_and_retries_verification(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -232,6 +431,11 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(result.succeeded)
         self.assertTrue(any(phase == "resolving" for phase, _, _ in events))
         self.assertGreaterEqual(runner.run.call_count, 2)
+        manager.commit_changes.assert_any_call(context.path, "Daedalus: Build it")
+        manager.commit_changes.assert_any_call(
+            context.path,
+            "Daedalus: Build it (integration resolver 1)",
+        )
         integrate.assert_called_once()
         manager.stage_changes.assert_called_once_with(context.path)
         stage_call = call.stage_changes(context.path)
@@ -316,6 +520,11 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(any(phase == "repairing" for phase, _, _ in events))
         self.assertIn("CODING_PROFILE_FOR_INITIAL_AND_REPAIR", runner.run.call_args_list[0].args[0].prompt)
         self.assertIn("CODING_PROFILE_FOR_REPAIR", runner.run.call_args_list[1].args[0].prompt)
+        manager.commit_changes.assert_any_call(context.path, "Daedalus: Build it")
+        manager.commit_changes.assert_any_call(
+            context.path,
+            "Daedalus: Build it (verification repair 1)",
+        )
 
     def test_exhausted_verification_logs_each_failure_reason(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -718,7 +927,10 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(any(phase == "repairing" for phase, _, _ in events))
         self.assertIn("Migration push failure", runner.run.call_args_list[1].args[0].prompt)
         self.assertIn("CODING_PROFILE_FOR_MIGRATION_REPAIR", runner.run.call_args_list[1].args[0].prompt)
-        manager.commit_changes.assert_any_call(context.path, "Daedalus migration repair 1")
+        manager.commit_changes.assert_any_call(
+            context.path,
+            "Daedalus: Build it (Supabase migration repair 1)",
+        )
 
     def test_exhausted_migration_push_logs_each_failure(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -771,6 +983,187 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIn("Migration push failed after 3 attempts", failed_events[0])
         manager.remove_successful.assert_not_called()
         manager.promote.assert_not_called()
+
+    def _firebase_orchestrator(self, repository, runner, events=None, **settings):
+        context = WorktreeContext(
+            repository, "task", "base", "agent/task-task", repository / "worktree"
+        )
+        manager = Mock()
+        manager.create.return_value = context
+        manager.head.return_value = "changed"
+        orchestrator = LocalOrchestrator(
+            repository,
+            runner,
+            OrchestrationSettings(verification_commands=(("true",),), **settings),
+            (lambda phase, message, channel: events.append((phase, message, channel)))
+            if events is not None
+            else (lambda *_: None),
+        )
+        return orchestrator, manager, context
+
+    def test_firebase_deploy_skipped_when_the_project_is_not_registered(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            orchestrator, manager, _ = self._firebase_orchestrator(repository, runner)
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch(
+                    "tui.orchestrator.load_firebase_status",
+                    return_value=FirebaseStatus(registered=False),
+                ),
+                patch("tui.orchestrator.firebase_changes_pending") as pending,
+                patch("tui.orchestrator.deploy_firebase") as deploy,
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-6-astra", "medium")
+
+        self.assertTrue(result.succeeded)
+        pending.assert_not_called()
+        deploy.assert_not_called()
+
+    def test_firebase_deploy_skipped_when_disabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            orchestrator, manager, _ = self._firebase_orchestrator(
+                repository, runner, firebase_deploy_enabled=False
+            )
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch(
+                    "tui.orchestrator.load_firebase_status",
+                    return_value=FirebaseStatus(True, "demo-app"),
+                ) as status,
+                patch("tui.orchestrator.deploy_firebase") as deploy,
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-6-astra", "medium")
+
+        self.assertTrue(result.succeeded)
+        status.assert_not_called()
+        deploy.assert_not_called()
+
+    def test_firebase_deploy_skipped_when_no_firebase_files_changed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            orchestrator, manager, _ = self._firebase_orchestrator(repository, runner)
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch(
+                    "tui.orchestrator.load_firebase_status",
+                    return_value=FirebaseStatus(True, "demo-app"),
+                ),
+                patch("tui.orchestrator.firebase_changes_pending", return_value=False) as pending,
+                patch("tui.orchestrator.deploy_firebase") as deploy,
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-6-astra", "medium")
+
+        self.assertTrue(result.succeeded)
+        pending.assert_called()
+        deploy.assert_not_called()
+
+    def test_firebase_deploy_runs_once_after_verification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            events = []
+            orchestrator, manager, context = self._firebase_orchestrator(
+                repository, runner, events
+            )
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch(
+                    "tui.orchestrator.load_firebase_status",
+                    return_value=FirebaseStatus(True, "demo-app"),
+                ),
+                patch("tui.orchestrator.firebase_changes_pending", return_value=True),
+                patch(
+                    "tui.orchestrator.deploy_firebase",
+                    return_value=DeployResult(True, "Deploy complete!"),
+                ) as deploy,
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-6-astra", "medium")
+
+        self.assertTrue(result.succeeded)
+        deploy.assert_called_once()
+        self.assertEqual(deploy.call_args.args[0], context.path)
+        self.assertEqual(deploy.call_args.kwargs["project_id"], "demo-app")
+        self.assertTrue(any(phase == "firebase" for phase, _, _ in events))
+        self.assertTrue(any(phase == "ready" for phase, _, _ in events))
+
+    def test_firebase_deploy_failure_repairs_then_succeeds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            orchestrator, manager, context = self._firebase_orchestrator(repository, runner)
+            (context.path / ".agents" / "profiles").mkdir(parents=True)
+            (context.path / ".agents" / "profiles" / "coding.md").write_text(
+                "CODING_PROFILE_FOR_FIREBASE_REPAIR", encoding="utf-8"
+            )
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch(
+                    "tui.orchestrator.load_firebase_status",
+                    return_value=FirebaseStatus(True, "demo-app"),
+                ),
+                patch("tui.orchestrator.firebase_changes_pending", return_value=True),
+                patch(
+                    "tui.orchestrator.deploy_firebase",
+                    side_effect=[
+                        DeployResult(False, "firestore.rules line 4: unexpected token"),
+                        DeployResult(True, "Deploy complete!"),
+                    ],
+                ) as deploy,
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-6-astra", "medium")
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual(deploy.call_count, 2)
+        repair_prompt = runner.run.call_args.args[0].prompt
+        self.assertIn("Repair the failing Firebase deploy", repair_prompt)
+        self.assertIn("firestore.rules line 4", repair_prompt)
+        self.assertIn("CODING_PROFILE_FOR_FIREBASE_REPAIR", repair_prompt)
+        manager.commit_changes.assert_any_call(
+            context.path,
+            "Daedalus: Build it (Firebase repair 1)",
+        )
+
+    def test_exhausted_firebase_deploy_fails_with_each_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", 0, "done")
+            orchestrator, manager, _ = self._firebase_orchestrator(
+                repository, runner, task_verification_attempt_limit=2
+            )
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch(
+                    "tui.orchestrator.load_firebase_status",
+                    return_value=FirebaseStatus(True, "demo-app"),
+                ),
+                patch("tui.orchestrator.firebase_changes_pending", return_value=True),
+                patch(
+                    "tui.orchestrator.deploy_firebase",
+                    return_value=DeployResult(False, "permission denied"),
+                ),
+            ):
+                result = orchestrator.run("Build it", "codex", "gpt-6-astra", "medium")
+
+        self.assertFalse(result.succeeded)
+        self.assertIn("Firebase deploy failed after 2 attempts", result.error)
+        self.assertIn("permission denied", result.error)
 
     def test_integration_resume_does_not_push_migrations(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -899,3 +1292,274 @@ class OrchestratorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InterruptionTests(unittest.TestCase):
+    def test_interrupted_agent_preserves_worktree_and_reports_interrupted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("codex", -15, "", stopped_reason="interrupted")
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda phase, message, channel: events.append((phase, message, channel)),
+            )
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager):
+                from tui.agent_runner import AgentControl
+
+                control = AgentControl()
+                control.request_interrupt()
+                result = orchestrator.run("Build it", "codex", "gpt-5.6-luna", "medium", control=control)
+
+        self.assertFalse(result.succeeded)
+        self.assertTrue(result.interrupted)
+        self.assertFalse(result.cancelled)
+        self.assertIs(result.context, context)
+        manager.remove_cancelled.assert_not_called()
+        manager.remove_successful.assert_not_called()
+        self.assertTrue(any(phase == "interrupted" for phase, _, _ in events))
+        self.assertFalse(any(channel == "error" for _, _, channel in events))
+
+    def test_interruption_is_checked_before_promotion_and_gate_receives_a_stop_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "new-commit"
+            manager.capture_primary.return_value = "base"
+            gate_calls = []
+
+            def gate(sequence, operation, stop_check=None):
+                gate_calls.append(stop_check)
+                operation()
+
+            from tui.agent_runner import AgentControl
+
+            control = AgentControl()
+
+            def integrate(*_args, **_kwargs):
+                # The user presses Ctrl+C after integration but before promotion.
+                control.request_interrupt()
+
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda _phase, _message, _channel: None,
+                integration_gate=gate,
+            )
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager), patch.object(
+                orchestrator, "run_agent", return_value=AgentResult("codex", 0, "done")
+            ), patch.object(orchestrator, "verify_with_repairs"), patch.object(
+                orchestrator, "push_migrations_with_repairs"
+            ), patch.object(orchestrator, "deploy_firebase_with_repairs"), patch.object(
+                orchestrator, "integrate", side_effect=integrate
+            ):
+                result = orchestrator.run("Build it", "codex", "luna", "medium", control=control)
+
+        self.assertTrue(result.interrupted)
+        manager.promote.assert_not_called()
+        manager.remove_successful.assert_not_called()
+        self.assertEqual(len(gate_calls), 1)
+        self.assertIsNotNone(gate_calls[0])
+        self.assertEqual(gate_calls[0](), "interrupted")
+
+    def test_two_argument_gates_remain_supported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            calls = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                Mock(),
+                OrchestrationSettings(),
+                lambda *_: None,
+                integration_gate=lambda sequence, operation: calls.append(sequence) or operation(),
+            )
+            ran = []
+            orchestrator._run_integration_gate(7, lambda: ran.append(True), None)
+        self.assertEqual((calls, ran), ([7], [True]))
+
+
+class OrchestrateModeOrchestratorTests(unittest.TestCase):
+    """Role changes for Orchestrate Mode: planner runs, resolver override, card hooks."""
+
+    def test_orchestrate_plan_resets_the_worktree_and_returns_the_raw_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult(
+                "claude", 0, "BEGIN_DAEDALUS_ORCHESTRATION {} END_DAEDALUS_ORCHESTRATION", tokens_consumed=9
+            )
+            context = WorktreeContext(repository, "orc", "base", "agent/task-orc", repository / "worktree")
+            (context.path / ".agents" / "profiles").mkdir(parents=True)
+            (context.path / ".agents" / "profiles" / "planning.md").write_text("PLANNING_PROFILE", encoding="utf-8")
+            manager = Mock()
+            manager.create.return_value = context
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository, runner, OrchestrationSettings(), lambda phase, message, kind: events.append((phase, kind))
+            )
+            built = []
+
+            def prompt_builder(profile_text, topic_text):
+                built.append((profile_text, topic_text))
+                return "PLANNER_PROMPT_SENTINEL"
+
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager):
+                result = orchestrator.run(
+                    "Build everything",
+                    "claude",
+                    "claude-fable-5-1",
+                    "high",
+                    mode="orchestrate-plan",
+                    prompt_builder=prompt_builder,
+                )
+
+        self.assertTrue(result.succeeded)
+        self.assertTrue(result.awaiting_plan)
+        self.assertEqual(result.planner_output, "BEGIN_DAEDALUS_ORCHESTRATION {} END_DAEDALUS_ORCHESTRATION")
+        self.assertEqual(result.tokens_consumed, 9)
+        self.assertEqual(built, [("PLANNING_PROFILE", None)])
+        self.assertEqual(runner.run.call_args.args[0].prompt, "PLANNER_PROMPT_SENTINEL")
+        manager.reset_task_to_base.assert_called_once_with(context)
+        manager.discard_graphify_changes.assert_called_once_with(context.path)
+        manager.commit_changes.assert_not_called()
+        manager.remove_successful.assert_not_called()
+        self.assertIn(("planning", "status"), events)
+
+    def test_orchestrate_plan_without_a_builder_uses_the_bundled_planner_prompt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "plan")
+            context = WorktreeContext(repository, "orc", "base", "agent/task-orc", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            orchestrator = LocalOrchestrator(repository, runner, OrchestrationSettings(), lambda *_: None)
+            with patch("tui.orchestrator.GitWorktreeManager", return_value=manager):
+                result = orchestrator.run("Build everything", "claude", "claude-fable-5-1", "high", mode="orchestrate-plan")
+        self.assertEqual(result.planner_output, "plan")
+        prompt = runner.run.call_args.args[0].prompt
+        self.assertTrue(prompt.startswith("TASK_MODE: orchestrate-plan"))
+        self.assertIn("Build everything", prompt)
+        self.assertIn("BEGIN_DAEDALUS_ORCHESTRATION", prompt)
+
+    def test_resolver_runs_with_the_resolver_selection_and_sees_the_card(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            events = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(verification_commands=(("true",),), resolver_attempt_limit=2),
+                lambda phase, message, channel: events.append((phase, message)),
+                resolver_selection=("claude", "claude-fable-5-1", "high"),
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            manager.has_unmerged_paths.return_value = False
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+            ):
+                manager.merge_primary_into_task.side_effect = GitWorktreeError("merge conflict")
+                result = orchestrator.run(
+                    "OPERATOR_PROMPT_SENTINEL",
+                    "claude",
+                    "claude-opus-5",
+                    "high",
+                    orchestrate_card="# t1 — Card\n\n## Goal\nCARD_SENTINEL\n\n## Checklist\n- [ ] one\n\n## Verify\npytest\n",
+                )
+
+        self.assertTrue(result.succeeded)
+        requests = [call_args.args[0] for call_args in runner.run.call_args_list]
+        self.assertEqual([request.model for request in requests], ["claude-opus-5", "claude-fable-5-1"])
+        self.assertIn("CARD_SENTINEL", requests[0].prompt)
+        self.assertNotIn("OPERATOR_PROMPT_SENTINEL", requests[0].prompt)
+        self.assertTrue(requests[1].prompt.startswith("TASK_MODE: integrating"))
+        self.assertIn("CARD_SENTINEL", requests[1].prompt)
+        self.assertNotIn("OPERATOR_PROMPT_SENTINEL", requests[1].prompt)
+        self.assertTrue(any(phase == "resolving" and "claude-fable-5-1" in message for phase, message in events))
+
+    def test_repair_agents_for_a_worker_see_the_card_not_the_prompt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "done")
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(verification_commands=(("true",),)),
+                lambda *_: None,
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch(
+                    "tui.orchestrator.run_verification",
+                    side_effect=[VerificationResult(False, "boom"), VerificationResult(True, ""), VerificationResult(True, "")],
+                ),
+            ):
+                result = orchestrator.run(
+                    "OPERATOR_PROMPT_SENTINEL",
+                    "claude",
+                    "claude-opus-5",
+                    "high",
+                    orchestrate_card="# t1 — Card\n\n## Goal\nCARD_SENTINEL\n\n## Checklist\n- [ ] one\n",
+                )
+
+        self.assertTrue(result.succeeded)
+        repair_prompt = runner.run.call_args_list[1].args[0].prompt
+        self.assertIn("Repair the failing verification suite", repair_prompt)
+        self.assertIn("CARD_SENTINEL", repair_prompt)
+        self.assertNotIn("OPERATOR_PROMPT_SENTINEL", repair_prompt)
+
+    def test_before_and_after_agent_hooks_receive_the_worktree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            runner = Mock()
+            runner.run.return_value = AgentResult("claude", 0, "WORKER_OUTPUT")
+            calls = []
+            orchestrator = LocalOrchestrator(
+                repository,
+                runner,
+                OrchestrationSettings(),
+                lambda *_: None,
+                before_agent=lambda context: calls.append(("before", context.path)),
+                after_agent=lambda context, result: calls.append(("after", context.path, result.output)),
+            )
+            context = WorktreeContext(repository, "task", "base", "agent/task-task", repository / "worktree")
+            context.path.mkdir()
+            manager = Mock()
+            manager.create.return_value = context
+            manager.head.return_value = "changed"
+            with (
+                patch("tui.orchestrator.GitWorktreeManager", return_value=manager),
+                patch("tui.orchestrator.run_verification", return_value=VerificationResult(True, "")),
+                patch("tui.orchestrator.migrations_pending", return_value=False),
+                patch("tui.orchestrator.load_firebase_status", return_value=FirebaseStatus(False, None)),
+            ):
+                result = orchestrator.run("Build it", "claude", "claude-opus-5", "high", orchestrate_card="# t1 — Card\n")
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual(calls, [("before", context.path), ("after", context.path, "WORKER_OUTPUT")])
+        # The card was read before the commit, so its ticks reflect the worker's run.
+        self.assertLess(
+            manager.method_calls.index(call.commit_changes(context.path, "Daedalus: Build it")),
+            len(manager.method_calls),
+        )

@@ -14,7 +14,8 @@ class ProjectConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
             (repository / ".daedalus").write_text(
-                '[worktree]\ninstall_command = ["npm", "ci"]\nreadonly_paths = ["food-data"]\n',
+                '[worktree]\ninstall_command = ["npm", "ci"]\nreadonly_paths = ["food-data"]\n'
+                'environment_files = ["fstore/.env"]\n',
                 encoding="utf-8",
             )
 
@@ -22,6 +23,7 @@ class ProjectConfigTests(unittest.TestCase):
 
         self.assertEqual(settings.install_command, ("npm", "ci"))
         self.assertEqual(settings.readonly_paths, ("food-data",))
+        self.assertEqual(settings.environment_files, ("fstore/.env",))
         self.assertTrue(settings.configured)
 
     def test_rejects_absolute_or_parent_readonly_paths(self):
@@ -35,6 +37,27 @@ class ProjectConfigTests(unittest.TestCase):
 
                 with self.assertRaises(ValueError):
                     load_project_worktree_settings(repository)
+
+    def test_rejects_environment_file_outside_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / ".daedalus").write_text(
+                '[worktree]\nenvironment_files = ["../secrets.env"]\n', encoding="utf-8"
+            )
+            with self.assertRaises(ValueError):
+                load_project_worktree_settings(repository)
+
+    def test_loads_project_claude_permissions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / ".daedalus").write_text(
+                '[claude]\nsettings_file = "orchestrator/permissions.json"\n'
+                'allowed_tools = ["Bash(python3:*)", "WebFetch"]\n',
+                encoding="utf-8",
+            )
+            settings = load_project_worktree_settings(repository)
+        self.assertEqual(settings.claude_settings_file, "orchestrator/permissions.json")
+        self.assertEqual(settings.claude_allowed_tools, ("Bash(python3:*)", "WebFetch"))
 
 
 if __name__ == "__main__":

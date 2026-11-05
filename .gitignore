@@ -4,3 +4,7 @@ __pycache__/
 *.egg-info/
 .daedalus-memory.json
 call-graph-out/
+.daedalus-debug.log
+.daedalus-debug.log.*
+/prompts/
+/errors/

@@ -86,6 +86,15 @@ to the project.
   the dashboard Session pooler connection string for networks that cannot use IPv6.
 - **Deliberate linking**: Confirmation warns about scaffold + Activate prerequisites;
   the Activate action stays disabled until the exact project name is entered.
+- **File-only register**: Writes durable project files only. Does not call the Supabase
+  Management API or `supabase db push` at register time.
+- **Post-init-only registration**: New Project does not register personal Supabase.
+  The task-bar Register Backend action is available for existing Daedalus projects.
+- **Existing-project action**: The task-bar Register Backend dialog runs the same helper
+  against the selected project root (schema = project slug) when Supabase is chosen, and
+  the control disables once the project is registered for a backend.
+- **One backend per project**: The `.daedalus` marker records either a Supabase schema or
+  a Firebase project id, so the TUI can tell which backend a project targets.
 - **Agent teaching**: Idempotently appends a Personal Supabase Schema section to
   `.agents/profiles/coding.md` and `architecture.md` (no Cursor skill file).
 - **Canonical environment**: The Daedalus TUI root `.env` owns Supabase connection
@@ -165,11 +174,18 @@ to the project.
 - `parameter_files/daedalus-tui-personal-supabase.toml`: Env keys, confirmation and
   wizard copy, activate commit message, and preflight timeout.
 - `tests/test_personal_supabase.py`, `tests/test_app.py`, `tests/test_environment.py`: Coverage.
+- `tui/personal_supabase.py`: Registration helper, marker I/O, env/profile/migration scaffolding.
+- `tui/personal_supabase.py`: Registration helper used by existing-project setup.
+- `tui/app.py`: Task-bar Register Backend dialog and activation flow.
+- `feature_files/daedalus-tui-firebase.md`: The sibling backend registration feature.
+- `parameter_files/daedalus-tui-personal-supabase.toml`: Snippet version, env key names, migration filename.
+- `tests/test_personal_supabase.py`, `tests/test_app.py`, `tests/test_project_initializer.py`: Coverage.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-11-05: Documented the confirmed post-init-only Supabase registration policy alongside the existing activation and security lifecycle.
 2026-11-04: Made hosted schema exposure errors identify the exact Daedalus TUI `.env` path required for `SUPABASE_ACCESS_TOKEN`, and routed canonical env loading through that path helper.
 2026-11-04: Personal Supabase exposure failures now show a popup with the redacted underlying explanation, keep the issue in the on-screen error log, and recommend retrying exposure instead of Activate after network failures.
 2026-11-04: Personal Supabase cleanup now recognizes the generated manual-exposure guidance comment and removes an otherwise-empty `.env.example`.
@@ -213,7 +229,8 @@ HACKING
 - 2026-09-14: Renamed the progress modal's activation-state flag to avoid colliding with Textual's internal message-pump lifecycle field, restoring modal composition and completion rendering.
 - 2026-09-14: Redesigned personal Supabase into Phase 1 scaffold plus Phase 2 Activate with operating-branch Git gate, live preflight, activated-only launch push, and F4 retry; removed New Project opt-in.
 - 2026-09-13: Added launch-root canonical environment synchronization and idempotent bootstrap preparation for all discovered registered projects.
-- 2026-09-13: Added file-only personal Supabase schema registration with New Project checkbox, task-bar button, profile guidance, and target `.env.example` placeholders.
+- 2026-09-15: Kept personal Supabase registration post-init-only while adding Firebase to New Project and the existing-project backend selector.
+- 2026-09-13: Added file-only personal Supabase schema registration for existing projects, profile guidance, and target `.env.example` placeholders.
 - 2026-09-13: Added an exact-project-name confirmation gate to both registration entry points so shared-Supabase linking is always deliberate.
 - 2026-09-14: Moved existing-project schema registration from the task bar to the `F4` shortcut.
 - 2026-09-14: Added a non-dismissible-during-work activation progress modal with scaffold, Git, environment, connectivity, migration, completion, blocked, and already-activated states.

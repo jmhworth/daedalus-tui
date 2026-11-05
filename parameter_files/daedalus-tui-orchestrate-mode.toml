@@ -1,0 +1,64 @@
+# Orchestrate Mode: one Planner agent decomposes the operator's prompt into
+# small task cards and delegates them to several Worker agents. Every value
+# below is tuned by hand here; Orchestrate Mode never reads command-line flags.
+
+# Which agent plays each role by default. The Planner reads the repository and
+# returns a JSON plan (it never edits files); Workers run the resulting cards
+# as ordinary coding tasks. Either role may use any provider the settings bar
+# offers: `claude` (Claude Code), `codex` (ChatGPT / Codex CLI), or `cursor`
+# (Cursor CLI). Models and reasoning levels come from the matching catalogue in
+# `daedalus-tui.toml`; Cursor has one fixed model (`cursor`) and no reasoning
+# scale. The orchestrate view lets the operator override all of these per
+# session. The planner defaults to medium effort because decomposition is a
+# reading task and high effort made the first round slow.
+[roles]
+planner_provider = "claude"
+planner_model = "claude-fable-5-1"
+planner_reasoning = "medium"
+worker_provider = "claude"
+worker_model = "claude-opus-5"
+worker_reasoning = "high"
+
+# Caps that keep a session bounded. The planner decides how many rounds the
+# work needs and ends the session by declaring it done; a round that adds no
+# runnable card and does not finish fails the session, and each card may be
+# re-issued only so many times. `planner_round_limit` is an optional safety
+# cap on top of that: 0 (the default) means no cap. The character budgets are
+# what keeps a worker's context small: a worker sees one card, and the planner
+# sees a bounded digest instead of worker transcripts. The repository map is a
+# bounded `git ls-files` listing sent with the first planner turn so the
+# planner can name read_first paths without spending tool calls on exploring.
+[limits]
+default_max_workers = 3         # workers preselected in the max-workers control
+max_workers_limit = 8           # upper bound the UI control allows
+planner_round_limit = 0         # optional cap on planner rounds; 0 = planner decides
+task_reissue_limit = 2          # times one card may be re-issued after failure
+planner_digest_budget_chars = 12000
+worker_report_budget_chars = 4000
+worker_card_budget_chars = 6000
+planner_repository_map_chars = 8000
+planner_context_chars = 12000   # characters of the context file sent with the first planner turn
+
+# Where session artifacts live. Session files (plan, cards, reports, digests)
+# are written under the TUI storage root; the card the worker actually ticks is
+# written into its worktree under the runtime-artifact directory, which Git
+# never stages because it is registered as one of Daedalus' own runtime files.
+#
+# `context_filename` is the one session artifact that does reach the
+# repository: after every accepted planner round (and when a session ends)
+# Daedalus writes every session's prompt, summary, cards, and outcomes to this
+# path on the operating branch, commits it, and pushes it immediately when
+# `promotion_push_enabled` is on in the orchestration parameter file. The next
+# session's planner receives it inline, so "continue what you planned" works
+# across sessions, restarts, and machines. Set it to "" to disable the file.
+[files]
+session_dirname = "orchestrate"
+card_filename = "task.md"
+runtime_artifact_dirname = ".daedalus-orchestration"
+context_filename = "DAEDALUS_CONTEXT.md"
+
+# Orchestrate view dimensions: the board's Title column width and how many
+# lines of planner output the log keeps before discarding the oldest.
+[ui]
+board_title_width = 28
+planner_log_lines = 400

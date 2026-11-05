@@ -11,6 +11,33 @@ The standalone Daedalus TUI is an installable Textual application that runs from
   provider-only choice with model and reasoning disabled. The settings bar also
   exposes a per-project
   Branch Select for the operating branch used by new task worktrees.
+- **Provider controls**: Codex exposes Astra, Luna, Terra, and Sol with light,
+  medium, high, and extra-high reasoning; Claude Code exposes Opus 5, Sonnet 5,
+  Fable 5.1, and Haiku 4.5 with its own effort scale that adds `max`; Cursor CLI
+  is a provider-only choice with model and reasoning disabled. One cascade in
+  `TuiSettings.models_for`/`reasoning_for` drives both the wide settings row and
+  the compact picker, and a provider whose selection is illegal for the new
+  provider falls back to that provider's first option instead of raising. The
+  settings bar also exposes a per-project Branch Select for the operating branch
+  used by new task worktrees, with an operator Push control that publishes that
+  branch to `origin`; successful pushed commit tips are recorded in launch-root
+  memory and are browsable from the Push log view or Ctrl+H.
+- **Account sign-in**: `auth.mode = "account"` removes each provider's API-key
+  variables from the agent subprocess environment so the CLI runs on the
+  operator's signed-in plan rather than API credit, and a local `.env` cannot
+  reintroduce a removed key. The parameter file lists variable *names* only. A
+  task-bar Sign In control reports the selected provider's status and hands over
+  its login command; the TUI never hosts the interactive login itself, because a
+  child CLI that takes over this terminal makes the Textual app appear to vanish.
+- **Project backends**: New Project scaffolds Firebase files by default; the
+  task-bar Register Backend control supports Firebase or personal Supabase on
+  existing projects. Personal Supabase is post-init-only. Registration writes
+  files only; orchestration owns every remote apply.
+- **Launch-root breadth**: Project discovery lists Daedalus-formatted children
+  first and, per the `[projects]` parameter table, also plain Git checkouts
+  (default) or every immediate child directory. Formatting still orders the
+  selector, but it is not written into the label: every option shows the plain
+  directory name so the list stays readable.
 - **Responsive layouts**: Terminal resize events switch narrow screens to a
   vertical workspace with a compact full-width task inbox and stacked project
   selector. The wide task and settings bars are measured after layout, so the
@@ -39,17 +66,23 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Incremental Vim input**: The prompt uses a modal VimTextArea with a practical command subset; additional Vim commands can be added as they become useful instead of implementing the entire Vim language up front.
 - **Prompt submission**: Pressing Enter in the prompt submits the task, Shift+Enter inserts a newline while composing, and Ctrl+Enter remains available as a global shortcut.
 - **Project selection**: Launching from a root directory discovers only immediate child directories with `feature_files` folders; nested descendants are excluded, and the launch root is used only as a fallback when no eligible child exists. The task toolbar selects the project for new submissions, editable prompt drafts survive project switches, and focusing an inbox row synchronizes the active project without mixing transcripts or worktrees. Each project's remembered operating branch is restored independently when focus returns.
-- **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
+- **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, may register Firebase files, then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
 - **Project heading task entry**: Selecting a project heading in the task updates sidebar switches to that project and opens a blank, editable task composer.
 - **Stable task inbox layout**: Both workspaces use fixed, parameterized task-ID and status widths with visible ellipses so long values do not horizontally scroll the compact sidebar. The vertical workspace keeps the same compact columns while the agent output uses the available width.
+- **Project selection**: Launching from a root directory discovers only immediate child directories with `feature_files` folders; nested descendants are excluded, and the launch root is used only as a fallback when no eligible child exists. A trailing `Open directory…` entry in the selector takes one path and adds that directory as a project under its own name, so projects outside the launch root are reachable without relaunching the TUI and without listing unopened directories. The task toolbar selects the project for new submissions, editable prompt drafts survive project switches, and focusing an inbox row synchronizes the active project without mixing transcripts or worktrees. Each project's remembered operating branch is restored independently when focus returns.
+- **Project initialization**: New Project materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, may register Firebase files, then refreshes discovery onto the new project.
+- **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
+- **Task deletion**: Focus a sidebar row and press `dd` to remove an inactive task and its durable snapshot; active runs remain protected until they stop. See `feature_files/daedalus-tui-task-deletion.md`.
+- **Stable task inbox layout**: The task inbox uses fixed, parameterized marker/project/task/status widths and visible ellipses so background update markers cannot resize or horizontally scroll the sidebar.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
 - **Command Menu**: `Ctrl+K` opens a discoverable action menu for New Task, Create Topic, Activate/remove personal Supabase, and Sync to GitHub (pull then push by default; merge conflicts can launch plan-mode recovery). New Task also remains available through `Ctrl+T`; the menu links to the full keyboard-shortcut reference, while New Project remains available through `Ctrl+Shift+N` and coding statistics remains on `Ctrl+U`.
 - **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a taller task inbox and a three-column settings grid below the output and above the composer, giving several task rows room while retaining independent scrolling inside each widget.
+- **Conversations and prompting**: Tasks are conversations with generated titles, verbatim prompt archives, autosaved drafts, non-destructive `Ctrl+C`/Cancel, follow-up turns, an optional right-third Markdown viewer, local `errors/` diagnostics, and a bottom-left usage bar; see `feature_files/daedalus-tui-prompting.md`.
 
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
@@ -57,23 +90,38 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - `tui/transcript.py`: Selectable transcript and red inline task-error rendering, wrapping, and compact file-reference annotation.
 - `tui/config.py`: Read-only provider and responsive-layout configuration models and loaders.
 - `tui/git_worktree.py`: Local Git helpers including operating-branch pull-then-push sync for the Command Menu action.
+- `tui/git_worktree.py`: Local Git helpers including operating-branch push for
+  the operator Push control and user-facing pushed-commit notices.
+- `tui/memory.py`: Shared local pushed-commit history alongside task snapshots.
 - `tui/prompts.py`: Task, repair, and resolver prompt wrappers, including plan-mode recommended-option instructions.
 - `tui/topics.py`: Optional topic discovery, load, and prompt embedding.
 - `tui/plan.py`: Agent plan parsing plus UI-owned custom-answer encoding, clarification prompts, and prompt formatting.
-- `tui/vim_text_area.py`: Incremental modal Vim prompt adapter and system clipboard integration.
-- `tui/agent_runner.py`: Independent Codex and Cursor subprocess adapter.
+- `tui/vim_text_area.py`: Completed modal Vim prompt adapter (line-aware register, visual modes, system-register commands, interrupt routing).
+- `tui/output_viewer.py`, `tui/prompt_store.py`, `tui/local_storage.py`, `tui/usage_monitor.py`: Viewer, prompt archives, storage root, and usage bar (owned by `daedalus-tui-prompting.md`).
+- `tui/agent_runner.py`: Independent Codex, Claude Code, and Cursor subprocess
+  adapter, including the account-login API-key stripping policy.
+- `tui/provider_auth.py`: Provider sign-in status checks and operator guidance.
+- `tui/environment.py`: Local `.env` loading and per-provider subprocess environments.
+- `tui/projects.py`: Launch-root discovery breadth and project labelling.
+- `tui/firebase.py`: Firebase registration and the orchestration deploy wrapper.
 - `tui/task_coordinator.py`: Concurrent task executor, serialized integration gate, and plan-question clarification workers.
 - `parameter_files/daedalus-tui.toml`: Provider, model, reasoning, and default UI settings.
 - `tests/test_config.py`, `tests/test_app.py`: Configuration validation, responsive layout/compact-selection, and task inbox project-heading selection coverage.
+- `parameter_files/daedalus-tui.toml`: Provider, model, reasoning, sign-in mode,
+  project-discovery breadth, and default UI settings.
+- `feature_files/daedalus-tui-firebase.md`: Firebase backend registration and deploy.
+- `tests/test_config.py`, `tests/test_app.py`: Configuration validation and responsive layout/compact-selection coverage.
 - `feature_files/daedalus-tui-orchestration.md`: Local orchestration ownership boundary.
 - `feature_files/daedalus-tui-topics.md`: Optional topic umbrellas and shared State Log memory.
 - `feature_files/daedalus-tui-project-initialization.md`: Launch-root project scaffolding.
+- `feature_files/daedalus-tui-task-deletion.md`: Sidebar task deletion behavior and safety boundary.
 - `tests/test_plan.py`, `tests/test_app.py`, `tests/test_task_coordinator.py`: Coverage for custom-answer rendering, validation, and follow-up handoff.
 
 ## Dev Mode
 HACKING
 
 ## State Log
+- 2026-11-05: Aligned project, provider, statistics, push, and orchestration documentation with the merged TUI behavior.
 - 2026-11-05: Kept task inbox columns at their configured widths in the vertical workspace so the agent output retains the available width.
 - 2026-11-05: Synchronized the project selector when inbox focus switches projects and corrected a task selection regression assertion to account for grouped heading rows.
 - 2026-11-05: Let the vertical workspace's full-width task inbox expand its task and status columns, since stacked output no longer competes for horizontal space.
@@ -101,6 +149,23 @@ HACKING
 - 2026-09-19: Sync to GitHub can recover pull/merge conflicts via plan-mode recovery in an isolated sync worktree, then auto-resolve and push.
 - 2026-09-19: Command Menu GitHub action defaults to pull-then-push sync for active operating branches.
 - 2026-09-14: Relabeled Ctrl+Shift+S as activate personal Supabase after the scaffold+Activate redesign.
+- 2026-09-21: Ignored empty provider, project, and branch selector events and stopped rendering queued task events after unmount to avoid Textual lifecycle crashes.
+- 2026-09-16: Switched the startup defaults from Codex with GPT-6 Astra to
+  Claude Code with Claude Opus 5; the cascade still falls back to each other
+  provider's first model, so selecting Codex preselects GPT-6 Astra.
+- 2026-09-16: Added `[claude] allowed_tools` so the agent runner passes `--allowedTools` to `claude --print`, letting Claude agents run test commands that acceptEdits alone auto-denies.
+- 2026-09-16: Preserved sidebar cursor position after task deletion, added
+  Claude rate-limit usage bars, and made successful pushed commit tips visible
+  and browsable from launch-root push history (with a configured storage fallback).
+- 2026-09-16: Added Vim-style `dd` deletion for inactive tasks selected in the cross-project sidebar, including coordinator cleanup and durable snapshot removal.
+- 2026-09-16: Dropped the `(external)` and `(unformatted)` markers from project selector labels so every option shows the plain directory name; the flags still order discovery and drive behavior.
+- 2026-09-15: Reworked prompting around conversations: composer drafts, verbatim archives, `Ctrl+C`/Cancel interruption that restores the prompt, follow-up turns, generated titles with an All tasks filter, the right-third Markdown viewer, `errors/` diagnostics, completed Vim clipboard commands, and a usage bar (details in `daedalus-tui-prompting.md`).
+- 2026-09-15: Added an `Open directory…` entry to the project selector that opens any directory by path, labels it `(external)`, remembers it in `.daedalus-memory.json` for later launches, and forgets it once the directory is gone.
+- 2026-09-15: Added launch-root discovery of plain Git checkouts and, optionally, every immediate child directory, labelling non-Daedalus folders `(unformatted)` so the TUI is not limited to already-converted projects.
+- 2026-09-15: Added Firebase registration to New Project and an existing-project backend dialog; personal Supabase remains post-init-only.
+- 2026-09-15: Added an account sign-in mode that strips provider API-key variables from agent subprocesses so runs bill the operator's plan, plus a Sign In control that reports status and hands over each provider's login command.
+- 2026-09-15: Added Claude Code as a provider with its own models and effort scale, and generalized the model/reasoning cascade so the wide row and compact picker share one source with a legal-value fallback.
+- 2026-09-15: Added GPT-6 Astra to the Codex model list and made it the default model.
 - 2026-09-13: Removed the per-project task-count suffix from the Project Select labels so options show only the project name.
 - 2026-09-13: Adjusted the default readable selector floor to 13 cells to
   account for Textual's fractional-width rounding, allowing the wide settings
@@ -194,7 +259,7 @@ HACKING
 - 2026-09-05: Stopped remounting stale plan Select values after follow-up option ids change, avoiding InvalidSelectValueError crashes like illegal `'replace'`.
 - 2026-09-05: Limited project discovery and selector refreshes to immediate launch-root children, using directory basenames and excluding nested project paths.
 - 2026-09-05: Removed the blank option from the project selector so direct-child labels are the only displayed project choices.
-- 2026-09-13: Added opt-in personal shared-Supabase schema registration from New Project and the project task bar (file scaffolding only).
+- 2026-09-13: Added file-only personal shared-Supabase schema registration for existing projects.
 - 2026-09-13: Repaired Textual 8.2 compatibility for responsive styling and compact selector cascades, including delayed event filtering and Scalar-aware resize assertions.
 - 2026-09-14: Replaced low-frequency project-toolbar actions with keyboard shortcuts, moved coding statistics to `Ctrl+U`, and kept only the `Ctrl+K` shortcut-reference binding visible in the footer.
 - 2026-09-14: Repaired Textual 8 binding compatibility and priority handling so global shortcuts import cleanly and remain active while the prompt editor has focus.
@@ -212,3 +277,4 @@ HACKING
 - 2026-09-16: Restored Ctrl+T as a direct New Task binding while retaining the Command Menu entry.
 - 2026-09-19: Hardened plan JSON extraction to prefer the latest valid BEGIN/END block, escape raw control characters inside strings, and retry contiguous message joins so multi-draft soft-wrapped planning output still renders answerable questions.
 - 2026-11-04: Repaired the task inbox UI test to assert its configured fixed column widths of 12 and 5 cells.
+- 2026-09-18: Installed `SIGINT`/`SIGTERM`/`SIGHUP` handlers before the Textual loop starts (`install_signal_guards`): a stray `SIGINT` used to be caught by asyncio's default handler, which cancelled the event loop and closed the TUI with no return code, no unmount, and no log line; it is now handled like `Ctrl+C`, and the other two exit gracefully with agents paused, all logged with the terminal's signal state.

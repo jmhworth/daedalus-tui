@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Callable
 
+from .firebase import register_firebase
 
 TUI_ROOT = Path(__file__).resolve().parents[1]
 PARAMETER_PATH = TUI_ROOT / "parameter_files" / "daedalus-tui-project-initialization.toml"
@@ -17,6 +18,9 @@ TEMPLATE_ROOT = Path(__file__).resolve().parent / "templates" / "project-initial
 REQUEST_MARKER = "daedalus-initialization-request-id"
 DIAGNOSTIC_LIMIT = 8_000
 PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+# Backends a new project can be registered for. Registration writes files
+# only; orchestration owns every remote apply.
+BACKENDS = ("none", "firebase")
 ProgressCallback = Callable[[dict], None]
 
 
@@ -38,6 +42,32 @@ def validate_project_name(project_name: object, maximum_length: int) -> str:
     if "/" in normalized or "\\" in normalized or not PROJECT_NAME_PATTERN.fullmatch(normalized):
         raise ValueError("Use lowercase letters, numbers, and internal hyphens only.")
     return normalized
+
+
+def resolve_backend(request: dict) -> str:
+    """Return the requested New Project backend.
+
+    The legacy Supabase flag remains accepted when false; registration is
+    available through the existing-project flow after initialization.
+    """
+    backend = request.get("backend")
+    if backend is None:
+        register_personal = request.get("registerPersonalSupabase", False)
+        if not isinstance(register_personal, bool):
+            raise ValueError("registerPersonalSupabase must be a boolean.")
+        if register_personal:
+            raise ValueError("Personal Supabase registration is available after project initialization.")
+        return "none"
+    if not isinstance(backend, str) or backend not in BACKENDS:
+        raise ValueError(f"backend must be one of {', '.join(BACKENDS)}.")
+    return backend
+
+
+def register_backend(backend: str, project_root: Path, project_name: str):
+    """Scaffold the chosen backend's files into a freshly materialized project."""
+    if backend == "firebase":
+        return register_firebase(project_root, project_id=project_name)
+    raise ValueError(f"Unsupported backend: {backend}")
 
 
 def resolve_destination(execution_root: Path, project_name: str) -> Path:
@@ -197,6 +227,7 @@ def initialize_project(
     create_github = request.get("createGitHubRepository", False)
     if not isinstance(create_github, bool):
         raise ValueError("createGitHubRepository must be a boolean.")
+    backend = resolve_backend(request)
 
     root = (execution_root or Path.cwd()).resolve()
     destination = resolve_destination(root, project_name)
@@ -215,6 +246,7 @@ def initialize_project(
             "--remote=origin", "--push",
         ]))
     base_result = result_shape(request_id, project_name, destination, "running", steps)
+    base_result["backend"] = backend
 
     required = [("git", "Git"), ("graphify", "Graphify")]
     if create_github:
@@ -249,6 +281,15 @@ def initialize_project(
     if not local_complete:
         try:
             materialize_templates(temporary, project_name, settings)
+            if backend != "none":
+                registration = register_backend(backend, temporary, project_name)
+                if registration.status != "success":
+                    safe_cleanup_temporary(root, temporary, project_name)
+                    base_result["status"] = "failed"
+                    base_result["error"] = (
+                        registration.message or f"{backend.capitalize()} registration failed."
+                    )
+                    return base_result
             for current_step in steps:
                 if current_step["name"] == "github-auth-status":
                     continue

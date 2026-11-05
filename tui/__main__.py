@@ -1,9 +1,13 @@
-from .app import DaedalusTuiApp
+from .app import DaedalusTuiApp, install_signal_guards
 from .debug_log import LOGGER, log_exception
 
 
 def main() -> None:
     app = DaedalusTuiApp()
+    # Before app.run(): asyncio.run only installs its task-cancelling SIGINT
+    # handler when it finds the default one, and that handler is what turned
+    # a stray SIGINT into a silent exit with no return code and no unmount.
+    install_signal_guards(app)
     try:
         app.run()
     except BaseException as error:

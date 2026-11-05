@@ -11,6 +11,8 @@ The TUI can initialize a new Daedalus-compatible project under the launch root b
 - **Recoverable requests**: A `.git/daedalus-initialization-request-id` marker lets retries recognize initializer-owned projects without overwriting unrelated directories.
 - **Local by default**: Graphify install and Git init/commit always run; GitHub creation is optional and private.
 - **Personal Supabase**: Not part of New Project. After init, operators activate personal Supabase on existing Daedalus-format projects from the Command Menu (`Ctrl+K`; see personal-supabase feature).
+- **Firebase registration**: New Project may scaffold Firebase files only, using the parameterized default backend. Personal Supabase remains post-init-only through its existing-project flow.
+- **Compatible request shape**: The initializer accepts Firebase registration requests while retaining legacy request handling; registration is file-only and remote deployment stays with orchestration.
 - **Discovery refresh**: After success, the TUI rediscovers `feature_files` projects and switches to the new project.
 
 ## Relevant Files
@@ -25,10 +27,11 @@ The TUI can initialize a new Daedalus-compatible project under the launch root b
 HACKING
 
 ## State Log
+- 2026-11-05: Limited New Project backend registration to Firebase while preserving post-init personal Supabase setup.
 - 2026-09-16: New Project no longer copies a launch-root `.env`; project credentials remain isolated and are configured from the new project's `.env.example`.
 - 2026-09-14: Removed New Project personal-Supabase opt-in; Activate is post-init only via the personal-supabase feature.
 - 2026-09-13: Updated initialization guidance so registered projects inherit shared Supabase connection details from the launch-root environment at launch.
-- 2026-09-13: New Project can optionally register a personal shared-Supabase schema (file scaffolding only) before the initial commit.
+- 2026-09-15: Added Firebase registration to New Project while keeping personal Supabase post-init-only.
 - 2026-08-24: New Project templates now include an empty `topic_files/` directory for optional Topics.
 - 2026-08-24: New Project template materialization now includes a scaffold `.daedalus` TOML with empty worktree install/readonly settings.
 - 2026-08-23: Ported daemon project initialization into the standalone TUI with bundled templates and a New Project modal under the launch root.

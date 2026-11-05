@@ -5,8 +5,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from tui.agent_runner import AgentControl, AgentLogEvent, AgentRequest, AgentRunner
-from tui.environment import read_env_file
+from tui.agent_runner import (
+    AgentControl,
+    AgentLogEvent,
+    AgentRequest,
+    AgentRunner,
+    ProviderAuthPolicy,
+)
+from tui.environment import agent_environment, read_env_file
 
 
 class FakeStream:
@@ -85,6 +91,34 @@ class AgentRunnerTests(unittest.TestCase):
             AgentRunner().command_for(self.request("cursor", "cursor", "")),
             ["agent", "-p", "--output-format", "stream-json", "--force", "Inspect this project"],
         )
+
+    def test_claude_command_uses_project_settings(self):
+        request = self.request("claude", "claude-opus-5", "high")
+        request = AgentRequest(
+            request.prompt, request.directory, request.provider, request.model,
+            request.reasoning, settings_file=Path("/repo/permissions.json"),
+            allowed_tools=("Bash(python3:*)",),
+        )
+        command = AgentRunner().command_for(request)
+        self.assertEqual(command[command.index("--settings") + 1], "/repo/permissions.json")
+        self.assertIn("Bash(python3:*)", command)
+
+    def test_claude_receives_project_environment_without_worktree_secret_file(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            primary = Path(directory) / "primary"
+            worktree = Path(directory) / "worktree"
+            primary.mkdir()
+            worktree.mkdir()
+            secret_file = primary / "fstore.env"
+            secret_file.write_text("R2_BUCKET=research\nANTHROPIC_API_KEY=wrong-auth\n", encoding="utf-8")
+            with patch.dict("tui.environment.os.environ", {"PATH": "/usr/bin"}, clear=True):
+                environment = agent_environment(
+                    "claude", worktree, (secret_file,), ("ANTHROPIC_API_KEY",)
+                )
+            self.assertEqual(environment["R2_BUCKET"], "research")
+            self.assertNotIn("ANTHROPIC_API_KEY", environment)
+            self.assertFalse((worktree / "fstore.env").exists())
 
     @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/codex")
     @patch("tui.agent_runner.subprocess.Popen")
@@ -230,11 +264,14 @@ class AgentRunnerTests(unittest.TestCase):
 
     @patch("tui.agent_runner.with_agent_credential_fallbacks", side_effect=lambda env, _files: env)
     @patch("tui.agent_runner.cursor_environment", return_value={"CURSOR_API_KEY": "from-env-file"})
+    @patch("tui.agent_runner.agent_environment", return_value={"CURSOR_API_KEY": "from-env-file"})
     @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/agent")
     @patch("tui.agent_runner.subprocess.Popen")
     def test_passes_cursor_api_key_to_subprocess(self, popen, _which, _environment, _fallbacks):
         popen.return_value = FakeProcess([json.dumps({"result": "done"})], [])
-        AgentRunner().run(self.request("cursor", "cursor", ""), lambda *_: None)
+        AgentRunner(auth_policy=ProviderAuthPolicy(account_login=False)).run(
+            self.request("cursor", "cursor", ""), lambda *_: None
+        )
 
         self.assertEqual(popen.call_args.kwargs["env"]["CURSOR_API_KEY"], "from-env-file")
 
@@ -266,6 +303,182 @@ class AgentRunnerTests(unittest.TestCase):
                     AgentRunner().run(request, lambda *_: None)
 
         self.assertEqual(popen.call_args.kwargs["env"]["CURSOR_API_KEY"], "from-launch-root")
+    def test_builds_claude_command_with_model_effort_and_permission_mode(self):
+        self.assertEqual(
+            AgentRunner().command_for(self.request("claude", "claude-opus-5", "extra-high")),
+            [
+                "claude", "--print", "--output-format", "stream-json", "--verbose",
+                "--model", "claude-opus-5", "--effort", "xhigh",
+                "--permission-mode", "acceptEdits", "Inspect this project",
+            ],
+        )
+
+    def test_claude_command_allowlists_configured_and_per_run_tools(self):
+        """`claude --print` cannot prompt, so verification commands must be pre-approved."""
+        runner = AgentRunner(claude_allowed_tools=("Bash(git status:*)", "Bash(npm test:*)"))
+        request = AgentRequest(
+            "Inspect this project",
+            Path("/workspace/project"),
+            "claude",
+            "claude-opus-5",
+            "high",
+            (Path("/workspace/project"),),
+            allowed_tools=("Bash(npm test:*)", "Bash(python3 -m pytest:*)"),
+        )
+        command = runner.command_for(request)
+
+        start = command.index("--allowedTools")
+        self.assertEqual(
+            command[start + 1 : start + 4],
+            ["Bash(git status:*)", "Bash(npm test:*)", "Bash(python3 -m pytest:*)"],
+        )
+        # --allowedTools is variadic: a single-argument option must follow it
+        # so the trailing prompt is never absorbed into the list.
+        self.assertEqual(command[start + 4], "--model")
+        self.assertEqual(command[-1], "Inspect this project")
+
+    def test_claude_command_omits_allowlist_when_nothing_is_allowed(self):
+        command = AgentRunner().command_for(self.request("claude", "claude-opus-5", "high"))
+        self.assertNotIn("--allowedTools", command)
+
+    def test_claude_command_keeps_the_prompt_after_a_single_argument_option(self):
+        """--add-dir is variadic, so the prompt must never follow it directly."""
+        request = AgentRequest(
+            "Inspect this project",
+            Path("/workspace/project"),
+            "claude",
+            "claude-sonnet-5",
+            "high",
+            (Path("/workspace/project"), Path("/workspace/shared")),
+        )
+        command = AgentRunner().command_for(request)
+
+        self.assertEqual(command[-1], "Inspect this project")
+        self.assertEqual(command[command.index("--add-dir") + 1], "/workspace/shared")
+        self.assertTrue(command[command.index("--add-dir") + 2].startswith("--"))
+        # The worktree is already the working directory and is not re-added.
+        self.assertEqual(command.count("--add-dir"), 1)
+
+    def test_claude_permission_mode_is_configurable(self):
+        runner = AgentRunner(claude_permission_mode="bypassPermissions")
+        command = runner.command_for(self.request("claude", "claude-opus-5", "high"))
+        self.assertEqual(command[command.index("--permission-mode") + 1], "bypassPermissions")
+
+    def test_claude_reasoning_supports_max_effort(self):
+        command = AgentRunner().command_for(self.request("claude", "claude-opus-5", "max"))
+        self.assertEqual(command[command.index("--effort") + 1], "max")
+
+    @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/claude")
+    @patch("tui.agent_runner.subprocess.Popen")
+    def test_streams_claude_assistant_blocks_as_separate_messages(self, popen, _which):
+        events = [
+            {"type": "system", "subtype": "init", "session_id": "abc"},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "Reading the feature file."}],
+                },
+            },
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "tool_use", "name": "Edit", "input": {}}],
+                },
+            },
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "Updated tui/config.py."}],
+                },
+            },
+            {
+                "type": "result",
+                "subtype": "success",
+                "result": "Updated tui/config.py.",
+                "usage": {
+                    "input_tokens": 12,
+                    "output_tokens": 30,
+                    "cache_read_input_tokens": 900,
+                    "cache_creation_input_tokens": 58,
+                },
+            },
+        ]
+        popen.return_value = FakeProcess([*(json.dumps(event) + "\n" for event in events)])
+        output = []
+
+        result = AgentRunner().run(self.request("claude", "claude-opus-5", "high"), output.append)
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual(
+            [event.text for event in output],
+            ["Reading the feature file.", "Updated tui/config.py."],
+        )
+        # Whole blocks, not deltas: the transcript keeps them separate.
+        self.assertEqual(result.output, "Reading the feature file.\n\nUpdated tui/config.py.")
+        self.assertTrue(result.output_streamed)
+        self.assertEqual(result.tokens_consumed, 1000)
+
+    @patch("tui.agent_runner.shutil.which", return_value=None)
+    def test_reports_missing_claude_cli(self, _which):
+        result = AgentRunner().run(self.request("claude", "claude-opus-5", "high"), lambda *_: None)
+        self.assertFalse(result.succeeded)
+        self.assertIn("Claude Code CLI is unavailable", result.error)
+        self.assertIn("`claude` is on PATH", result.error)
+
+    @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/claude")
+    @patch("tui.agent_runner.subprocess.Popen")
+    def test_account_login_removes_provider_api_keys_from_the_subprocess(self, popen, _which):
+        popen.return_value = FakeProcess([], [])
+        policy = ProviderAuthPolicy(
+            account_login=True,
+            api_key_variables={"claude": ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")},
+        )
+        with patch.dict(
+            "os.environ",
+            {"ANTHROPIC_API_KEY": "sk-test", "ANTHROPIC_AUTH_TOKEN": "tok", "PATH": "/usr/bin"},
+            clear=True,
+        ):
+            AgentRunner(auth_policy=policy).run(
+                self.request("claude", "claude-opus-5", "high"), lambda *_: None
+            )
+
+        environment = popen.call_args.kwargs["env"]
+        self.assertNotIn("ANTHROPIC_API_KEY", environment)
+        self.assertNotIn("ANTHROPIC_AUTH_TOKEN", environment)
+        self.assertEqual(environment["PATH"], "/usr/bin")
+
+    @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/claude")
+    @patch("tui.agent_runner.subprocess.Popen")
+    def test_api_key_mode_leaves_the_environment_inherited(self, popen, _which):
+        popen.return_value = FakeProcess([], [])
+        policy = ProviderAuthPolicy(
+            account_login=False,
+            api_key_variables={"claude": ("ANTHROPIC_API_KEY",)},
+        )
+        AgentRunner(auth_policy=policy).run(
+            self.request("claude", "claude-opus-5", "high"), lambda *_: None
+        )
+
+        self.assertNotIn("env", popen.call_args.kwargs)
+
+    @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/claude")
+    @patch("tui.agent_runner.subprocess.Popen")
+    def test_claude_failure_suggests_signing_in_when_account_login_is_active(self, popen, _which):
+        popen.return_value = FakeProcess([], ["Invalid API key\n"], returncode=1)
+        policy = ProviderAuthPolicy(
+            account_login=True, api_key_variables={"claude": ("ANTHROPIC_API_KEY",)}
+        )
+
+        result = AgentRunner(auth_policy=policy).run(
+            self.request("claude", "claude-opus-5", "high"), lambda *_: None
+        )
+
+        self.assertFalse(result.succeeded)
+        self.assertIn("Claude Code CLI failed with exit code 1", result.error)
+        self.assertIn("claude auth login", result.error)
 
     @patch("tui.agent_runner.shutil.which", return_value=None)
     def test_reports_missing_cli(self, _which):
@@ -402,3 +615,40 @@ class AgentRunnerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InterruptSignalTests(unittest.TestCase):
+    @patch("tui.agent_runner.shutil.which", return_value="/usr/local/bin/codex")
+    @patch("tui.agent_runner.subprocess.Popen")
+    def test_interrupt_terminates_the_process_and_reports_the_reason(self, popen, _which):
+        process = InterruptibleProcess()
+        popen.return_value = process
+        control = AgentControl()
+        control.request_interrupt()
+        request = AgentRequest(
+            "Inspect this project",
+            Path("/workspace/project"),
+            "codex",
+            "gpt-5.6-luna",
+            "medium",
+            (Path("/workspace/project"),),
+            control=control,
+        )
+
+        result = AgentRunner().run(request, lambda _event: None)
+
+        self.assertEqual(result.stopped_reason, "interrupted")
+        self.assertTrue(process.terminated)
+        self.assertIsNone(result.error)
+
+    def test_stop_reason_precedence_and_clearing(self):
+        control = AgentControl()
+        self.assertIsNone(control.stop_reason)
+        control.request_pause()
+        control.request_interrupt()
+        self.assertEqual(control.stop_reason, "interrupted")
+        control.request_cancel()
+        self.assertEqual(control.stop_reason, "cancelled")
+        control.clear_interrupt()
+        control.clear_pause()
+        self.assertEqual(control.stop_reason, "cancelled")

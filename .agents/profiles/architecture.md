@@ -31,3 +31,14 @@ put API keys in parameter files.
 
 The four stages are HACKING, TESTING, PRODUCTION-READY, and DEBUGGING. Do not
 autonomously change a feature's stage.
+
+## Personal Supabase Schema
+
+This project uses a dedicated Postgres schema `daedalus-tui` on the operator's shared personal Supabase database. Do **not** use the default `public` schema for application tables or migrations.
+
+- Read the schema name from `SUPABASE_SCHEMA` in `.env` (expected value: `daedalus-tui`).
+- Qualify SQL, migrations, RLS policies, and client/API configuration for `daedalus-tui`.
+- Never assume PostgREST or Supabase clients default to `public` for this app.
+- Auth is shared across apps on this Supabase project; reuse the existing auth setup.
+- Agents must not run `supabase db push`; orchestration owns remote migration apply after verification when `supabase/migrations/` changes.
+- After the first remote apply, the operator must allow-list this schema in the Supabase Dashboard Data API / PostgREST exposed-schemas settings.

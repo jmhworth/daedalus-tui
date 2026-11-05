@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import unittest.mock
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from tui.project_initializer import (
     REQUEST_MARKER,
     initialize_project,
     normalize_github_url,
+    resolve_backend,
     resolve_destination,
     validate_project_name,
 )
@@ -35,6 +37,73 @@ class ProjectInitializerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.assertEqual(resolve_destination(root, "example"), root.resolve() / "example")
+
+    def test_resolves_firebase_and_rejects_new_project_supabase_registration(self):
+        self.assertEqual(resolve_backend({"backend": "firebase"}), "firebase")
+        self.assertEqual(resolve_backend({"backend": "none"}), "none")
+        self.assertEqual(resolve_backend({}), "none")
+        with self.assertRaisesRegex(ValueError, "available after project initialization"):
+            resolve_backend({"registerPersonalSupabase": True})
+        with self.assertRaises(ValueError):
+            resolve_backend({"backend": "dynamo"})
+        with self.assertRaises(ValueError):
+            resolve_backend({"registerPersonalSupabase": "yes"})
+
+    def test_initializes_a_firebase_backed_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def fake_run(command, cwd, capture_output, text, shell):
+                if command[:2] == ["git", "init"]:
+                    (Path(cwd) / ".git").mkdir()
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            result = initialize_project(
+                {
+                    "requestId": str(uuid.uuid4()),
+                    "projectName": "example",
+                    "createGitHubRepository": False,
+                    "backend": "firebase",
+                },
+                execution_root=root,
+                run_process=fake_run,
+                find_executable=lambda executable: executable,
+            )
+
+            self.assertEqual(result["status"], "success")
+            self.assertEqual(result["backend"], "firebase")
+            project = root / "example"
+            self.assertTrue((project / "firebase.json").is_file())
+            self.assertTrue((project / "firestore.rules").is_file())
+            self.assertIn("[firebase]", (project / ".daedalus").read_text(encoding="utf-8"))
+            self.assertFalse((project / "supabase").exists())
+
+    def test_backend_registration_failure_removes_the_partial_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def fake_run(command, cwd, capture_output, text, shell):
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            with unittest.mock.patch(
+                "tui.project_initializer.register_firebase",
+                return_value=SimpleNamespace(status="failed", message="firebase scaffold failed"),
+            ):
+                result = initialize_project(
+                    {
+                        "requestId": str(uuid.uuid4()),
+                        "projectName": "example",
+                        "createGitHubRepository": False,
+                        "backend": "firebase",
+                    },
+                    execution_root=root,
+                    run_process=fake_run,
+                    find_executable=lambda executable: executable,
+                )
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["error"], "firebase scaffold failed")
+            self.assertFalse((root / "example").exists())
 
     def test_preflight_failure_does_not_create_content(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -5,3 +5,7 @@ generate_gitignore = true
 generate_daedalus = true
 template_version = 1
 maximum_project_name_length = 100
+
+# Backend preselected in the New Project dialog: "firebase" or "none".
+# Personal Supabase registration is available after initialization.
+default_backend = "firebase"
