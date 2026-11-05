@@ -42,7 +42,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
-- **Stable task inbox layout**: The task inbox uses fixed, parameterized task-ID and status widths with visible ellipses so long IDs and statuses do not horizontally scroll the 33-cell sidebar.
+- **Stable task inbox layout**: The task inbox uses fixed, parameterized task-ID and status widths with visible ellipses so long IDs and statuses do not horizontally scroll the 25-cell sidebar.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -73,8 +73,8 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
-- 2026-11-04: Aligned task inbox width defaults and prompt selection styling with the active narrow-sidebar layout.
-- 2026-11-04: Narrowed the task updates sidebar to 33 cells and resized its Task and Status columns to fit.
+- 2026-11-04: Kept the task updates sidebar at three-quarters of its prior width, resized its fixed columns to fit, and applied prompt selection colors through Textual CSS instead of the read-only selection_style property.
+- 2026-11-04: Narrowed the task updates sidebar to 25 cells and resized its Task and Status columns to fit.
 - 2026-11-04: Updated task inbox UI regression assertions to account for grouped project headings and the two fixed-width task ID/status columns.
 - 2026-11-04: Grouped task updates by alphabetically sorted project headings and replaced prompt summaries with task IDs and statuses.
 - 2026-11-04: Marked completed and answer-waiting plan tasks with an orange inbox circle to signal they need user input or consideration.

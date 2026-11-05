@@ -1799,9 +1799,6 @@ class DaedalusTuiApp(App[None]):
         self._install_exit_diagnostics()
         self._accept_task_events = True
         prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
-        prompt.selection_style = self.screen.get_component_rich_style(
-            "screen--selection"
-        )
         self.query_one("#output", TranscriptLog).styles.width = self.settings.output_width
         self._apply_provider_selection(str(self.query_one("#provider-select", Select).value))
         self._refresh_target_branch_select()
@@ -2120,9 +2117,6 @@ class DaedalusTuiApp(App[None]):
             return
         self.selected_theme = theme_name
         self.theme = f"daedalus-{theme_name}"
-        self.query_one(
-            "#prompt-input", DaedalusVimTextArea
-        ).selection_style = self.screen.get_component_rich_style("screen--selection")
         self.query_one("#screen", VerticalScroll).set_class(
             theme_name == "clown", "clown-theme"
         )
