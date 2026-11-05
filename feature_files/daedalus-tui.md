@@ -43,7 +43,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
 - **Project heading task entry**: Selecting a project heading in the task updates sidebar switches to that project and opens a blank, editable task composer.
-- **Stable task inbox layout**: The task inbox uses fixed, parameterized task-ID and status widths with visible ellipses so long IDs and statuses do not horizontally scroll the 25-cell sidebar.
+- **Stable task inbox layout**: The horizontal workspace uses fixed, parameterized task-ID and status widths with visible ellipses so long values do not horizontally scroll the compact sidebar. In the vertical workspace, the inbox fills the terminal width and expands its columns because it no longer competes with agent output horizontally.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -75,6 +75,7 @@ HACKING
 
 ## State Log
 - 2026-11-05: Synchronized the project selector when inbox focus switches projects and corrected a task selection regression assertion to account for grouped heading rows.
+- 2026-11-05: Let the vertical workspace's full-width task inbox expand its task and status columns, since stacked output no longer competes for horizontal space.
 - 2026-11-05: Made task inbox project headings open a fresh prompt in the selected project and added an app regression case for cross-project task entry.
 - 2026-11-05: Compacted transcript file links to a glyph, basename, and optional line number so full paths do not consume output width.
 - 2026-11-04: Kept the task updates sidebar at three-quarters of its prior width, resized its fixed columns to fit, and applied prompt selection colors through Textual CSS instead of the read-only selection_style property.

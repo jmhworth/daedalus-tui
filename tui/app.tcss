@@ -434,6 +434,11 @@ Screen {
     padding: 1;
 }
 
+#screen.compact-width #task-list {
+    width: 1fr;
+    min-width: 0;
+}
+
 #screen.compact-width #project-main {
     width: 1fr;
     height: auto;

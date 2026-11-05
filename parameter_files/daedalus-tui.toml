@@ -55,8 +55,8 @@ compact_task_sidebar_height = 14
 compact_prompt_height = 8
 compact_output_height = 16
 
-# Fixed content widths for task IDs and statuses in the grouped task inbox.
-# Together with DataTable cell padding, these fit the fixed 25-cell sidebar.
+# Baseline content widths for task IDs and statuses in the grouped task inbox.
+# Compact vertical layout expands these columns to use its full-width inbox.
 [task_inbox]
 task_width = 12
 status_width = 5
