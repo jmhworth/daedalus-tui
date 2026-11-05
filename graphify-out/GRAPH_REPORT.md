@@ -1,7 +1,7 @@
 # Graph Report - daedalus-tui  (2026-11-04)
 
 ## Corpus Check
-- 100 files · ~100,090 words
+- 100 files · ~100,063 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6e34bc03`
+- Built from commit: `0f92dd94`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -290,7 +290,7 @@ Nodes (17): Popen, Protocol, VerificationTests, discover_commands(), format_proc
 
 ### Community 43 - "._rebuild_plan_questions"
 Cohesion: 0.07
-Nodes (21): FakeCoordinator, FakeRunner, settings(), PersonalSupabaseActivationProgressScreen, PersonalSupabaseSetupWizardScreen, Display a topic markdown file without allowing edits., Finish a queued modal update only if its screen is still mounted., Guide scaffold completion and manual project env setup before Activate. (+13 more)
+Nodes (21): FakeCoordinator, FakeRunner, settings(), KeyboardShortcutsScreen, PersonalSupabaseActivationProgressScreen, PersonalSupabaseSetupWizardScreen, Finish a queued modal update only if its screen is still mounted., Modal reference for the app and prompt editor keyboard shortcuts. (+13 more)
 
 ### Community 44 - "CandidateFeatureGroup"
 Cohesion: 0.05
@@ -305,8 +305,8 @@ Cohesion: 0.16
 Nodes (7): Key, Route visual-line mode and mirror new yanks to the host clipboard., Add Daedalus prompt commands that the dependency does not provide., Select the current line and enter Vim visual-line mode., Select every character in the lines between the start and cursor., Handle movement and operators while whole lines are selected., Expose operator-pending so the caret can become an underline.
 
 ### Community 48 - "._persist_task"
-Cohesion: 0.18
-Nodes (6): Log, Show animated activity or a concise terminal task outcome., Selectable transcript rendering with semantic assistant-message emphasis., A selectable log that can emphasize a task's final assistant message.      ``Log, Return the tone assigned to each rendered transcript line., TranscriptLog
+Cohesion: 0.14
+Nodes (9): Enable Push only when an origin remote and operating branch are available., Sync the Branch Select value for the active project with origin., Launch plan-mode recovery against the preserved Sync conflict worktree., Choose a built-in app-wide color theme., ThemePickerScreen, GitWorktreeError, RuntimeError, Raised when an operator Sync pull/merge leaves unmerged paths.      The conflict (+1 more)
 
 ### Community 49 - "._rebuild_plan_questions"
 Cohesion: 0.83
@@ -402,7 +402,7 @@ Nodes (14): EnvironmentTests, apply_process_supabase_overrides(), cursor_environ
 
 ### Community 82 - "TranscriptLog"
 Cohesion: 0.04
-Nodes (49): Binding, Mount, Select, Theme, CodingStatisticsScreen, CommandMenuScreen, CompactSettingsSelect, _format_codex_usage() (+41 more)
+Nodes (45): Binding, Log, Mount, Select, Theme, CodingStatisticsScreen, CommandMenuScreen, CompactSettingsSelect (+37 more)
 
 ### Community 84 - "RegistrationResult"
 Cohesion: 0.07
@@ -417,8 +417,8 @@ Cohesion: 0.11
 Nodes (19): main(), Child-process probe for Daedalus TUI Supabase env key presence.  Invoke as ``pyt, _ensure_profile_guidance(), _first_filled_env_value(), _key_or_aliases_label(), load_personal_supabase_settings(), personal_supabase_environment_settings(), personal_supabase_scaffold_relative_paths() (+11 more)
 
 ### Community 91 - "._apply_task_event"
-Cohesion: 0.09
-Nodes (14): RowSelected, Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive., Surface Sync conflict recovery progress in the status bar., Promote only events that need the user's attention in the inbox., Render actionable history and tasks created during this session., Keep failures, active work, and all tasks submitted in this launch., Keep inbox cells within their fixed width with a visible ellipsis. (+6 more)
+Cohesion: 0.08
+Nodes (15): RowSelected, Focus a task from the cross-project update inbox., Apply only the newest event per task to keep the UI responsive., Surface Sync conflict recovery progress in the status bar., Promote only events that need the user's attention in the inbox., Render actionable history and tasks created during this session., Keep failures, active work, and all tasks submitted in this launch., Keep inbox cells within their fixed width with a visible ellipsis. (+7 more)
 
 ### Community 92 - "PersonalSupabaseSetupWizardScreen"
 Cohesion: 0.14
@@ -438,9 +438,9 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `AgentRunner`, `log_exception`, `._on_personal_supabase_activation_progress`, `.on_mount`, `KeyboardShortcutsScreen`, `._rebuild_plan_questions`, `bootstrap_personal_supabase`, `CandidateFeatureGroup`, `._persist_task`, `TranscriptLog`, `RegistrationResult`, `DescriptorEmbedder`, `._apply_task_event`, `calculate_token_usage`?**
   _High betweenness centrality (0.137) - this node is a cross-community bridge._
-- **Why does `TaskCoordinator` connect `AgentRunner` to `DaedalusVimTextArea`, `KeyboardShortcutsScreen`, `._on_personal_supabase_activation_progress`, `._rebuild_plan_questions`, `CandidateFeatureGroup`, `TranscriptLog`, `CodingStatisticsScreen`, `._shutdown_coordinators`, `DescriptorEmbedder`, `.provider_split`, `CodingStatisticsScreen`, `calculate_token_usage`?**
+- **Why does `TaskCoordinator` connect `AgentRunner` to `DaedalusVimTextArea`, `KeyboardShortcutsScreen`, `._on_personal_supabase_activation_progress`, `._rebuild_plan_questions`, `CandidateFeatureGroup`, `._persist_task`, `TranscriptLog`, `CodingStatisticsScreen`, `._shutdown_coordinators`, `DescriptorEmbedder`, `.provider_split`, `CodingStatisticsScreen`, `calculate_token_usage`?**
   _High betweenness centrality (0.050) - this node is a cross-community bridge._
-- **Why does `AgentRunner` connect `CandidateFeatureGroup` to `DaedalusVimTextArea`, `AgentRunner`, `._set_status`, `KeyboardShortcutsScreen`, `._rebuild_plan_questions`, `TranscriptLog`, `DescriptorEmbedder`, `.provider_split`, `._apply_task_event`, `CodingStatisticsScreen`?**
+- **Why does `AgentRunner` connect `CandidateFeatureGroup` to `DaedalusVimTextArea`, `AgentRunner`, `._set_status`, `KeyboardShortcutsScreen`, `._rebuild_plan_questions`, `._persist_task`, `TranscriptLog`, `DescriptorEmbedder`, `.provider_split`, `._apply_task_event`, `CodingStatisticsScreen`?**
   _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **Are the 22 inferred relationships involving `DaedalusTuiApp` (e.g. with `FakeCoordinator` and `FakeRunner`) actually correct?**
   _`DaedalusTuiApp` has 22 INFERRED edges - model-reasoned connections that need verification._
