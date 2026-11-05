@@ -12,8 +12,31 @@ from textual.strip import Strip
 from textual.widgets import Log
 
 _BRACKETED_FILE_MARKER = re.compile(
-    r"\[([^\]\n]*[/\\][^\]\n]+|[^\]\n]+\.[A-Za-z0-9]{1,12})\]"
+    r"\[([^\]\n]*[/\\][^\]\n]+|[^\]\n]+\.[A-Za-z0-9]{1,12}(?::\d+(?::\d+)?)?)\]"
 )
+_MARKDOWN_LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]+)\)")
+_LINE_SUFFIX = re.compile(r":(\d+)(?::\d+)?$")
+
+
+def _looks_like_file(value: str) -> bool:
+    """Return whether a link label or target resembles a file reference."""
+    path = value.strip().replace("\\", "/")
+    path = _LINE_SUFFIX.sub("", path)
+    name = path.rsplit("/", 1)[-1]
+    return bool(re.search(r"\.[A-Za-z0-9]{1,12}$", name))
+
+
+def _file_name_and_line(value: str) -> str:
+    """Return a file basename with an optional source line number."""
+    path = value.strip().replace("\\", "/")
+    if path.startswith("📄 "):
+        path = path[2:]
+    line_match = _LINE_SUFFIX.search(path)
+    line_number = line_match.group(1) if line_match else None
+    if line_match:
+        path = path[:line_match.start()]
+    name = path.rstrip("/").rsplit("/", 1)[-1]
+    return f"{name}:{line_number}" if line_number else name
 
 
 class TranscriptLog(Log):
@@ -199,9 +222,21 @@ class TranscriptLog(Log):
 
     @staticmethod
     def _annotate_file_markers(line: str) -> str:
-        """Add a file glyph to bracketed paths and filenames in agent text."""
+        """Compact file references and add a glyph in agent text."""
+        def compact_link(match: re.Match[str]) -> str:
+            label, target = match.groups()
+            target_path = target.split("?", 1)[0].split("#", 1)[0]
+            candidate = target_path if _looks_like_file(target_path) else label
+            if not _looks_like_file(candidate):
+                return match.group(0)
+            return f"[📄 {_file_name_and_line(candidate)}]"
+
+        line = _MARKDOWN_LINK.sub(compact_link, line)
         return _BRACKETED_FILE_MARKER.sub(
-            lambda match: f"[📄 {match.group(1)}]", line
+            lambda match: match.group(0)
+            if match.group(1).startswith("📄 ")
+            else f"[📄 {_file_name_and_line(match.group(1))}]",
+            line,
         )
 
     @staticmethod

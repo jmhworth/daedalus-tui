@@ -145,8 +145,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
-    "mtime": 1793855246.307861,
-    "ast_hash": "f37f1a8b68963053f31c2163bccf9b00",
+    "mtime": 1793855871.9948378,
+    "ast_hash": "aed8b3f8e447c25289b128b09f22129a",
     "semantic_hash": ""
   },
   "requirements.txt": {
@@ -200,8 +200,8 @@
     "semantic_hash": ""
   },
   "tui/transcript.py": {
-    "mtime": 1793848489.6770897,
-    "ast_hash": "cdefa192b475c7b3bee91aee41a93905",
+    "mtime": 1793855872.0157242,
+    "ast_hash": "4389f9d74d7d8aa24393fefdaa98ddfc",
     "semantic_hash": ""
   },
   "tests/test_token_usage.py": {
