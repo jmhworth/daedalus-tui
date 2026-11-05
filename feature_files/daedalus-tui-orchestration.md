@@ -7,6 +7,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Worktree isolation**: Each task receives an `agent/task-<id>` branch and a sibling `.daedalus-worktrees` directory.
 - **Project worktree provisioning**: An optional target-project `.daedalus` file can run one install command inside each task worktree and symlink declared repository-relative shared paths from the primary checkout.
 - **Restart recovery**: Persisted failed tasks are restored with Retry available, while tasks active during shutdown are restored as paused tasks with their existing worktree context.
+- **Conversation follow-ups**: Completed and failed tasks can start a separately numbered linked task that carries earlier user prompts and assistant outputs as agent context; Retry continues to rerun a failed task independently.
 - **Plan proposal status**: Confirmed plan-mode tasks persist as `proposed`, keeping plan review distinct from completed coding while enabling the Implement handoff.
 - **Verification repair**: Failed task checks launch repair attempts in the same worktree up to the configured limit.
 - **Verification diagnostics**: When every verification attempt fails, each attempt's failure output is written to the task error panel and included in the final failure message.
@@ -36,6 +37,8 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 ## Relevant Files
 - `tui/orchestrator.py`: Single-task lifecycle, verification repair, migration push repair, integration, and resolver loops.
 - `tui/task_coordinator.py`: Concurrent task records, executor limit, and serialized integration gate.
+- `tui/transcript.py`: Selectable numbered task turns, italic submitted prompts, and reflowing task dividers.
+- `tui/app.py`: Task selection, prompt editing, and Follow Up controls.
 - `tui/token_usage.py`: Completed coding and proposed planning task usage records.
 - `tui/git_worktree.py`: Git validation, worktree, branch listing, operator pull-then-push sync helper, merge, and cleanup operations.
 - `tui/project_config.py`: Target-project `.daedalus` worktree provisioning settings.
@@ -51,6 +54,9 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-11-04: Corrected selectable transcript regression coordinates to target the assistant row after numbered task headers were added.
+- 2026-11-04: Updated app regression expectations for numbered transcript turns and blank editable prompts on selected tasks.
+- 2026-11-04: Added linked task follow-ups with persisted conversation context and numbered selectable transcript turns.
 - 2026-11-04: Confirmed plan tasks now persist as `proposed`, with task review, implementation handoff, and token usage recognizing the new state.
 - 2026-10-06: Coding tasks that finish with no worktree commit now complete as a successful no-op instead of failing with "Agent finished without creating a commit."
 - 2026-10-03: Repaired regression coverage for dirty target auto-commit at integration capture without weakening the TUI-root Supabase environment contract.

@@ -1660,7 +1660,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             prompt.insert("Submitted task prompt")
             app.action_submit_prompt()
             await pilot.pause()
-            self.assertTrue(prompt.read_only)
+            self.assertFalse(prompt.read_only)
+            self.assertEqual(prompt.text, "")
 
             app.query_one("#project-select", Select).value = str(second)
             await pilot.pause()
@@ -1709,7 +1710,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("cannot be empty", "\n".join(app.query_one("#output", Log)._lines))
             self.assertFalse(app.query_one("#send-button", Button).disabled)
 
-    async def test_submitted_prompt_is_visible_and_immutable(self):
+    async def test_submitted_prompt_is_rendered_in_transcript(self):
         app, coordinator = self.make_app()
         async with app.run_test() as pilot:
             prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
@@ -1717,10 +1718,12 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_submit_prompt()
             await pilot.pause()
 
-            self.assertEqual(prompt.text, "Keep this prompt available")
-            self.assertTrue(prompt.read_only)
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
-            self.assertEqual(coordinator.records[0].prompt, prompt.text)
+            self.assertEqual(prompt.text, "")
+            self.assertFalse(prompt.read_only)
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
+            self.assertEqual(coordinator.records[0].prompt, "Keep this prompt available")
+            output = app.query_one("#output", Log)
+            self.assertTrue(any("Keep this prompt available" in line for line in output._lines))
 
     async def test_submitted_task_becomes_selected_for_every_mode(self):
         app, coordinator = self.make_app()
@@ -1764,7 +1767,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(app.query_one("#send-button", Button).disabled)
             self.assertEqual(app.query("#phase").nodes, [])
 
-    async def test_failed_task_selection_restores_its_prompt(self):
+    async def test_failed_task_selection_leaves_editor_blank_and_shows_prompt_in_transcript(self):
         app, coordinator = self.make_app()
         async with app.run_test() as pilot:
             prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
@@ -1781,9 +1784,10 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             task_list.action_select_cursor()
             await pilot.pause()
 
-            self.assertEqual(prompt.text, "A task that will fail")
-            self.assertTrue(prompt.read_only)
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
+            self.assertEqual(prompt.text, "")
+            self.assertFalse(prompt.read_only)
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
+            self.assertTrue(any("A task that will fail" in line for line in app.query_one("#output", Log)._lines))
 
     async def test_failed_task_exposes_retry_action(self):
         app, coordinator = self.make_app()
@@ -2696,8 +2700,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             output = app.query_one("#output", Log)
             self.assertTrue(output.allow_select)
+            assistant_line = output._lines.index("Selectable assistant transcript line.")
             selected = output.get_selection(
-                ScreenSelection.from_offsets(Offset(0, 0), Offset(10, 0))
+                ScreenSelection.from_offsets(Offset(0, assistant_line), Offset(10, assistant_line))
             )
             self.assertIsNotNone(selected)
             self.assertEqual(selected[0], "Selectable")
@@ -2737,11 +2742,12 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             output = app.query_one("#output", Log)
-            self.assertEqual(output._lines[:3], [
-                "Deciphering things",
-                "",
-                "Deciphering more things",
+            first_message = output._lines.index("Deciphering things")
+            self.assertEqual(output._lines[first_message:first_message + 3], [
+                "Deciphering things", "", "Deciphering more things",
             ])
+            self.assertEqual(output._lines[0], "Task 1")
+            self.assertEqual(output._lines[2], "Show progress")
             self.assertGreater(len(output._lines), 5)
             self.assertTrue(all(len(line) <= output.size.width for line in output._lines))
 
@@ -2795,7 +2801,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             output = app.query_one("#output", Log)
             output._render_line_strip(2, output.rich_style)
 
-    async def test_submitted_prompt_uses_faded_read_only_text_style(self):
+    async def test_selected_task_prompt_editor_remains_blank_and_editable(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
             prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
@@ -2803,8 +2809,9 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_submit_prompt()
             await pilot.pause()
 
-            self.assertTrue(prompt.read_only)
-            self.assertTrue(prompt.has_class("-read-only"))
+            self.assertEqual(prompt.text, "")
+            self.assertFalse(prompt.read_only)
+            self.assertFalse(prompt.has_class("-read-only"))
 
     async def test_output_selection_uses_prompt_selection_colors(self):
         app, _ = self.make_app()
@@ -2847,7 +2854,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             app.action_submit_prompt()
             second = coordinator.records[1]
 
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
+            self.assertFalse(app.query_one("#send-button", Button).disabled)
             self.assertFalse(prompt.disabled)
             self.assertEqual((first.model, first.reasoning), ("gpt-6-luna", "medium"))
             self.assertEqual((second.model, second.reasoning), ("gpt-5.6-terra", "high"))

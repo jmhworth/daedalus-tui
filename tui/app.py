@@ -1647,6 +1647,7 @@ class DaedalusTuiApp(App[None]):
                         yield Button("Resume", id="resume-button", disabled=True)
                         yield Button("Cancel", id="cancel-button", disabled=True, variant="error")
                         yield Button("Retry", id="retry-button", disabled=True)
+                        yield Button("Follow Up", id="follow-up-button", disabled=True)
                         yield Static("Idle", id="status")
         yield Footer()
 
@@ -2067,6 +2068,9 @@ class DaedalusTuiApp(App[None]):
     def action_retry_task(self) -> None:
         self._retry_task()
 
+    def action_follow_up_task(self) -> None:
+        self._follow_up_task()
+
     def action_show_shortcuts(self) -> None:
         self.push_screen(KeyboardShortcutsScreen())
 
@@ -2411,6 +2415,10 @@ class DaedalusTuiApp(App[None]):
             self._cancel_task()
         elif event.button.id == "retry-button":
             self._retry_task()
+        elif event.button.id == "follow-up-button":
+            self._follow_up_task()
+        elif event.button.id == "output-toggle-button":
+            self._set_output_view(not self._showing_error_output, focus=True)
         elif event.button.id == "answer-plan-button":
             self._answer_plan()
         elif event.button.id == "implement-button":
@@ -3528,6 +3536,7 @@ class DaedalusTuiApp(App[None]):
             self.query_one("#resume-button", Button).disabled = True
             self.query_one("#cancel-button", Button).disabled = True
             self.query_one("#retry-button", Button).disabled = True
+            self.query_one("#follow-up-button", Button).disabled = True
             self.query_one("#continue-plan-button", Button).disabled = True
             self.query_one("#resume-notes-panel", Vertical).styles.display = "none"
             self.query_one("#plan-review", Vertical).styles.display = "none"
@@ -3537,7 +3546,7 @@ class DaedalusTuiApp(App[None]):
         # color string, and selecting an existing task has made the prompt
         # read-only by this point.
         output.set_final_color(self.screen.rich_style.color)
-        self._set_prompt_text(record.prompt, editable=False)
+        self._set_prompt_text("", editable=True)
         plan_review = self.query_one("#plan-review", Vertical)
         plan_review.styles.display = "block" if record.mode == "plan" else "none"
         self.query_one("#output-panel", Vertical).styles.display = (
@@ -3548,10 +3557,21 @@ class DaedalusTuiApp(App[None]):
             self._render_plan_review(record, plan_review_generation)
         else:
             self._rendered_plan_question_signature = None
-            for index, message in enumerate(record.messages):
-                output.write_message(
-                    message,
-                    final=record.status in {"proposed", "completed"} and index == len(record.messages) - 1,
+            chain_id = record.chain_id or record.task_id
+            chain_records = sorted(
+                (
+                    item for item in self.coordinator.tasks()
+                    if (item.chain_id or item.task_id) == chain_id
+                    and item.submission_sequence <= record.submission_sequence
+                ),
+                key=lambda item: item.submission_sequence,
+            ) or [record]
+            for turn in chain_records:
+                output.write_task_turn(
+                    turn.submission_sequence,
+                    turn.prompt,
+                    turn.messages,
+                    final=turn.status in {"proposed", "completed"},
                 )
         worktree = str(record.worktree_path) if record.worktree_path else "—"
         branch = record.branch_name or "—"
@@ -3574,6 +3594,7 @@ class DaedalusTuiApp(App[None]):
         self.query_one("#resume-button", Button).disabled = record.status != "paused"
         self.query_one("#cancel-button", Button).disabled = not active and record.status != "questioning"
         self.query_one("#retry-button", Button).disabled = record.status != "failed"
+        self.query_one("#follow-up-button", Button).disabled = record.status not in {"completed", "failed"}
         self.query_one("#continue-plan-button", Button).disabled = record.status != "questioning"
         self.query_one("#resume-notes-panel", Vertical).styles.display = (
             "block" if record.status in {"paused", "questioning"} else "none"
@@ -4133,6 +4154,24 @@ class DaedalusTuiApp(App[None]):
             return
         self._mark_task_current_session(record)
         self._set_status("Retrying")
+
+    def _follow_up_task(self) -> None:
+        record = self.coordinator.get(self._selected_task_id or "")
+        follow_up = getattr(self.coordinator, "follow_up", None)
+        prompt = self.query_one("#prompt-input", TextArea).text.strip()
+        if record is None or follow_up is None or not prompt:
+            self._set_status("Enter a follow-up prompt")
+            return
+        try:
+            next_record = follow_up(record.task_id, prompt)
+        except (RuntimeError, ValueError) as error:
+            self._set_error(str(error))
+            self._set_status("Error")
+            return
+        if next_record is None:
+            self._set_status("Follow Up unavailable")
+            return
+        self._focus_submitted_task(next_record, "task follow-up")
 
     def _set_status(self, status: str) -> None:
         self.query_one("#status", Static).update(status)
