@@ -35,6 +35,7 @@ The Command Menu makes infrequent but important project actions discoverable as 
 HACKING
 
 ## State Log
+- 2026-11-04: Hid the Clown checkerboard outside its theme so flat palettes do not gain scrollable decorative content.
 - 2026-11-04: Added Technical and Appearance Command Menu tabs with five app-wide color themes and persistent user selection.
 - 2026-11-04: Made Rainbow a section-based spectrum theme with distinct task, output, and prompt surfaces and colored panel borders.
 - 2026-11-04: Renamed Rainbow to Clown, added a low-contrast checkerboard, and softened the RGB panel fills with transparency while preserving existing saved selections.
