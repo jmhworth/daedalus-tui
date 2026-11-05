@@ -1450,6 +1450,45 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertNotIsInstance(app.screen, KeyboardShortcutsScreen)
 
+    async def test_command_menu_theme_picker_changes_and_persists_theme(self):
+        with tempfile.TemporaryDirectory() as directory:
+            preferences_path = Path(directory) / "preferences.json"
+            app = DaedalusTuiApp(
+                runner=FakeRunner(),
+                directory=Path("/workspace/project"),
+                settings=settings(),
+                coordinator=FakeCoordinator(),
+                theme_preferences_path=preferences_path,
+            )
+            async with app.run_test() as pilot:
+                await pilot.press("ctrl+k")
+                await pilot.pause()
+                self.assertEqual(app.screen.query_one("#command-menu-tabs").active, "technical-tab")
+                self.assertIsInstance(app.screen.query_one("#command-pick-theme-button", Button), Button)
+
+                app.screen.query_one("#command-menu-tabs").active = "appearance-tab"
+                await pilot.pause()
+                app.screen.query_one("#command-pick-theme-button", Button).press()
+                await pilot.pause()
+                for theme_name in ("rainbow", "jet_blue", "ember", "forest", "violet"):
+                    self.assertIsInstance(
+                        app.screen.query_one(f"#theme-{theme_name}-button", Button), Button
+                    )
+                app.screen.query_one("#theme-jet_blue-button", Button).press()
+                await pilot.pause()
+                self.assertEqual(app.selected_theme, "jet_blue")
+                self.assertEqual(app.theme, "daedalus-jet_blue")
+
+            self.assertEqual(json.loads(preferences_path.read_text()), {"theme": "jet_blue"})
+            reloaded = DaedalusTuiApp(
+                runner=FakeRunner(),
+                directory=Path("/workspace/project"),
+                settings=settings(),
+                coordinator=FakeCoordinator(),
+                theme_preferences_path=preferences_path,
+            )
+            self.assertEqual(reloaded.selected_theme, "jet_blue")
+
     async def test_ctrl_t_starts_a_new_task(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 from dataclasses import replace
 from pathlib import Path
 import sys
+import tempfile
 import threading
 import uuid
 
@@ -30,6 +33,8 @@ from textual.widgets import (
     Static,
     TextArea,
 )
+from textual.theme import Theme
+from textual.widgets import TabbedContent, TabPane
 from textual.widgets.select import InvalidSelectValueError
 from .agent_runner import AgentRunner
 from .clipboard import copy_to_system_clipboard, paste_from_system_clipboard
@@ -116,6 +121,91 @@ def _redact_supabase_diagnostic(message: str, environment: dict[str, str] | None
 _THREAD_EXIT_APPS: dict[int, "DaedalusTuiApp"] = {}
 _THREAD_EXIT_APPS_LOCK = threading.Lock()
 _THREAD_EXIT_HOOK_REGISTERED = False
+
+
+THEMES: dict[str, dict[str, str | bool]] = {
+    "rainbow": {
+        "label": "Rainbow",
+        "primary": "#ff4fa3", "secondary": "#ff9f1c", "accent": "#ffe14a",
+        "success": "#42e695", "warning": "#48d8ff", "error": "#ff5263",
+        "foreground": "#fff6fb", "background": "#17111c", "surface": "#24182a",
+        "panel": "#312039", "boost": "#452b4d", "dark": True,
+        "text-muted": "#c8aacb", "text-accent": "#ffe14a",
+    },
+    "jet_blue": {
+        "label": "Jet Black & Light Blue",
+        "primary": "#59c7ff", "secondary": "#9ae1ff", "accent": "#b9eaff",
+        "success": "#54d6a0", "warning": "#ffc857", "error": "#ff6b72",
+        "foreground": "#d8f3ff", "background": "#05090f", "surface": "#0b1420",
+        "panel": "#111e2c", "boost": "#1a2d40", "dark": True,
+        "text-muted": "#79a9c4", "text-accent": "#9ae1ff",
+    },
+    "ember": {
+        "label": "Ember",
+        "primary": "#ff7043", "secondary": "#f4a261", "accent": "#ffd166",
+        "success": "#8bd450", "warning": "#ffd166", "error": "#ff4d5a",
+        "foreground": "#fff0df", "background": "#1c1110", "surface": "#2a1916",
+        "panel": "#38211c", "boost": "#4a2b22", "dark": True,
+        "text-muted": "#c49a85", "text-accent": "#ffd166",
+    },
+    "forest": {
+        "label": "Forest",
+        "primary": "#45c486", "secondary": "#82d9a6", "accent": "#c6e86b",
+        "success": "#82d9a6", "warning": "#f0c75e", "error": "#f36f6f",
+        "foreground": "#e4f6e9", "background": "#0d1712", "surface": "#14231a",
+        "panel": "#1d3023", "boost": "#294332", "dark": True,
+        "text-muted": "#91b69b", "text-accent": "#c6e86b",
+    },
+    "violet": {
+        "label": "Violet",
+        "primary": "#b58cff", "secondary": "#dbb5ff", "accent": "#ff9ed8",
+        "success": "#69d5b1", "warning": "#ffd166", "error": "#ff6b89",
+        "foreground": "#f1e9ff", "background": "#130f1c", "surface": "#20182d",
+        "panel": "#2b2040", "boost": "#392a55", "dark": True,
+        "text-muted": "#b4a1ce", "text-accent": "#dbb5ff",
+    },
+}
+
+
+def _theme_preferences_path() -> Path:
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return config_home / "daedalus-tui" / "preferences.json"
+
+
+def _load_saved_theme(path: Path) -> str:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8")).get("theme")
+    except (OSError, ValueError, AttributeError):
+        return "violet"
+    return value if isinstance(value, str) and value in THEMES else "violet"
+
+
+def _save_theme(path: Path, theme_name: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".preferences-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as destination:
+            json.dump({"theme": theme_name}, destination)
+            destination.write("\n")
+        os.replace(temporary_name, path)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
+def _textual_theme(name: str) -> Theme:
+    values = THEMES[name]
+    color_names = (
+        "primary", "secondary", "warning", "error", "success", "accent",
+        "foreground", "background", "surface", "panel", "boost",
+    )
+    variables = {key: str(value) for key, value in values.items() if key.startswith("text-")}
+    return Theme(
+        name=f"daedalus-{name}",
+        dark=bool(values["dark"]),
+        **{key: str(values[key]) for key in color_names},
+        variables=variables,
+    )
 
 
 def _shutdown_apps_before_thread_join() -> None:
@@ -402,37 +492,34 @@ class CommandMenuScreen(ModalScreen[str | None]):
                 self.settings.subtitle,
                 id="command-menu-subtitle",
             )
-            yield Button(
-                self.settings.new_task_label,
-                id="command-new-task-button",
-                variant="primary",
-            )
-            yield Button(
-                self.settings.new_project_label,
-                id="command-new-project-button",
-            )
-            yield Button(self.settings.create_topic_label, id="command-create-topic-button")
-            yield Button(
-                self.settings.personal_supabase_label,
-                id="command-register-supabase-button",
-            )
-            yield Button(
-                self.settings.remove_personal_supabase_label,
-                id="command-remove-supabase-button",
-                variant="error",
-            )
-            yield Button(
-                self.settings.push_branch_label,
-                id="command-push-branch-button",
-            )
-            yield Button(
-                self._auto_sync_label(),
-                id="command-auto-sync-button",
-            )
-            yield Button(
-                self.settings.keyboard_shortcuts_label,
-                id="command-show-shortcuts-button",
-            )
+            with TabbedContent(initial="technical-tab", id="command-menu-tabs"):
+                with TabPane("Technical", id="technical-tab"):
+                    with VerticalScroll(classes="command-actions"):
+                        yield Button(
+                            self.settings.new_task_label,
+                            id="command-new-task-button",
+                            variant="primary",
+                        )
+                        yield Button(self.settings.new_project_label, id="command-new-project-button")
+                        yield Button(self.settings.create_topic_label, id="command-create-topic-button")
+                        yield Button(
+                            self.settings.personal_supabase_label,
+                            id="command-register-supabase-button",
+                        )
+                        yield Button(
+                            self.settings.remove_personal_supabase_label,
+                            id="command-remove-supabase-button",
+                            variant="error",
+                        )
+                        yield Button(self.settings.push_branch_label, id="command-push-branch-button")
+                        yield Button(self._auto_sync_label(), id="command-auto-sync-button")
+                        yield Button(
+                            self.settings.keyboard_shortcuts_label,
+                            id="command-show-shortcuts-button",
+                        )
+                with TabPane("Appearance", id="appearance-tab"):
+                    yield Static("Make every screen feel like yours.", classes="appearance-copy")
+                    yield Button("Pick Theme", id="command-pick-theme-button", variant="primary")
 
     def on_mount(self) -> None:
         self.app._refresh_push_button()
@@ -452,6 +539,7 @@ class CommandMenuScreen(ModalScreen[str | None]):
             "command-push-branch-button": "push_branch",
             "command-auto-sync-button": "toggle_auto_sync",
             "command-show-shortcuts-button": "show_shortcuts",
+            "command-pick-theme-button": "pick_theme",
         }
         action = actions.get(event.button.id)
         if action is not None:
@@ -462,6 +550,32 @@ class CommandMenuScreen(ModalScreen[str | None]):
             self.dismiss(action)
 
     def action_close_command_menu(self) -> None:
+        self.dismiss(None)
+
+
+class ThemePickerScreen(ModalScreen[str | None]):
+    """Choose a built-in app-wide color theme."""
+
+    BINDINGS = [
+        ("escape", "close_theme_picker", "Back"),
+        ("ctrl+k", "close_theme_picker", "Back"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="theme-picker-dialog"):
+            yield Static("Pick Theme", id="theme-picker-title")
+            yield Static("Color across every screen", id="theme-picker-subtitle")
+            for theme_name, values in THEMES.items():
+                yield Button(str(values["label"]), id=f"theme-{theme_name}-button")
+
+    def on_mount(self) -> None:
+        self.query_one(f"#theme-{self.app.selected_theme}-button", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id and event.button.id.startswith("theme-"):
+            self.dismiss(event.button.id.removeprefix("theme-").removesuffix("-button"))
+
+    def action_close_theme_picker(self) -> None:
         self.dismiss(None)
 
 
@@ -1340,8 +1454,14 @@ class DaedalusTuiApp(App[None]):
         statistics_settings: CodingStatisticsSettings | None = None,
         codex_usage_settings: CodexUsageSettings | None = None,
         codex_usage_reader=None,
+        theme_preferences_path: Path | None = None,
     ) -> None:
         super().__init__()
+        self._theme_preferences_path = theme_preferences_path or _theme_preferences_path()
+        for theme_name in THEMES:
+            self.register_theme(_textual_theme(theme_name))
+        self.selected_theme = _load_saved_theme(self._theme_preferences_path)
+        self.theme = f"daedalus-{self.selected_theme}"
         self._initial_directory_path = (
             directory.expanduser().absolute() if directory is not None else None
         )
@@ -1968,10 +2088,25 @@ class DaedalusTuiApp(App[None]):
             "remove_personal_supabase": self.action_remove_personal_supabase,
             "push_branch": self._push_selected_branch,
             "show_shortcuts": self.action_show_shortcuts,
+            "pick_theme": self.action_pick_theme,
         }
         handler = handlers.get(action)
         if handler is not None:
             self.call_after_refresh(handler)
+
+    def action_pick_theme(self) -> None:
+        self.push_screen(ThemePickerScreen(), self._on_theme_picked)
+
+    def _on_theme_picked(self, theme_name: str | None) -> None:
+        if theme_name not in THEMES:
+            return
+        self.selected_theme = theme_name
+        self.theme = f"daedalus-{theme_name}"
+        try:
+            _save_theme(self._theme_preferences_path, theme_name)
+        except OSError as error:
+            LOGGER.warning("Could not save selected theme preference: %s", error)
+        self._set_status(f"Theme changed to {THEMES[theme_name]['label']}")
 
     def _toggle_auto_sync_after_tasks(self) -> None:
         self.auto_sync_after_completed_tasks = not self.auto_sync_after_completed_tasks

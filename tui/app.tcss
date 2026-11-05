@@ -902,11 +902,55 @@ TopicViewerScreen {
 }
 
 #command-menu-dialog {
+    width: 58;
+    height: 80%;
+    max-height: 34;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#command-menu-tabs {
+    height: 1fr;
+}
+
+#command-menu-tabs TabPane {
+    padding: 1 0 0 0;
+}
+
+.command-actions {
+    height: 1fr;
+}
+
+.appearance-copy {
+    color: $text-muted;
+    height: 2;
+    margin-bottom: 1;
+}
+
+#theme-picker-dialog {
     width: 48;
     height: auto;
     border: round $primary;
     background: $surface;
     padding: 1 2;
+}
+
+#theme-picker-dialog Button {
+    width: 1fr;
+    margin-bottom: 1;
+}
+
+#theme-picker-title {
+    color: $text-accent;
+    text-style: bold;
+    height: 2;
+}
+
+#theme-picker-subtitle {
+    color: $text-muted;
+    height: 1;
+    margin-bottom: 1;
 }
 
 #command-menu-title {
