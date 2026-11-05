@@ -42,7 +42,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
-- **Stable task inbox layout**: The task inbox uses fixed, parameterized task-ID and status widths with visible ellipses so long IDs and statuses do not horizontally scroll the sidebar.
+- **Stable task inbox layout**: The task inbox uses fixed, parameterized task-ID and status widths with visible ellipses so long IDs and statuses do not horizontally scroll the 25-cell sidebar.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -74,6 +74,8 @@ HACKING
 
 ## State Log
 - 2026-11-05: Compacted transcript file links to a glyph, basename, and optional line number so full paths do not consume output width.
+- 2026-11-04: Kept the task updates sidebar at three-quarters of its prior width, resized its fixed columns to fit, and applied prompt selection colors through Textual CSS instead of the read-only selection_style property.
+- 2026-11-04: Narrowed the task updates sidebar to 25 cells and resized its Task and Status columns to fit.
 - 2026-11-04: Kept proposed plans and answer-waiting tasks visibly orange in the output outcome while preserving green completed and red failed markers.
 - 2026-11-04: Updated task inbox UI regression assertions to account for grouped project headings and the two fixed-width task ID/status columns.
 - 2026-11-04: Grouped task updates by alphabetically sorted project headings and replaced prompt summaries with task IDs and statuses.
@@ -204,3 +206,4 @@ HACKING
 - 2026-09-16: Added local personal-Supabase cleanup from the Command Menu and hardened its software-owned commits against deletions and concurrent file changes.
 - 2026-09-16: Restored Ctrl+T as a direct New Task binding while retaining the Command Menu entry.
 - 2026-09-19: Hardened plan JSON extraction to prefer the latest valid BEGIN/END block, escape raw control characters inside strings, and retry contiguous message joins so multi-draft soft-wrapped planning output still renders answerable questions.
+- 2026-11-04: Repaired the task inbox UI test to assert its configured fixed column widths of 12 and 5 cells.

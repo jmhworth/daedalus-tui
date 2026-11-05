@@ -58,7 +58,7 @@ class TuiSettings:
     )
     output_width: str = "95%"
     # Content widths for task IDs and statuses, excluding DataTable padding.
-    task_inbox_widths: tuple[int, int] = (23, 11)
+    task_inbox_widths: tuple[int, int] = (12, 5)
     layout: LayoutSettings = LayoutSettings()
 
 
@@ -112,8 +112,8 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
     task_inbox_widths = tuple(
         int(task_inbox.get(name, default))
         for name, default in (
-            ("task_width", 23),
-            ("status_width", 11),
+            ("task_width", 12),
+            ("status_width", 5),
         )
     )
     if any(width < 1 for width in task_inbox_widths):
