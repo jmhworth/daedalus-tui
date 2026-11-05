@@ -34,7 +34,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Plan recommended defaults**: Plan and follow-up prompts require every multiple-choice question to mark exactly one option with ` (Recommended)` so a safe default is always visible when the user does not care which answer to pick.
 - **Filtered logs and copying**: The output pane uses Textual's selectable `Log` widget for completed assistant messages; Vim yank commands copy selected transcript or diagnostic text to the system clipboard.
 - **Agent activity and outcomes**: The output toolbar animates a spinner while a task is active, highlights completion/failure/input-needed states, and prefixes bracketed file paths and filenames in transcript messages with a file glyph.
-- **Full-size output toggle**: Agent transcript and task diagnostics share one full-height output panel; a toggle shows either log at the same readable size while preserving selection and copying.
+- **Inline task errors**: Agent messages and task errors appear together in one selectable output panel, with errors rendered in red. The task context shows only the task branch and worktree, while Codex plan usage stays visible above it; phase remains available in the status line.
 - **Readable streamed output**: Assistant messages are separated by a blank line, transcript lines reflow at word boundaries with hyphenation only for overlong words, and the output pane keeps a small width buffer so long responses remain visible.
 - **Incremental Vim input**: The prompt uses a modal VimTextArea with a practical command subset; additional Vim commands can be added as they become useful instead of implementing the entire Vim language up front.
 - **Prompt submission**: Pressing Enter in the prompt submits the task, Shift+Enter inserts a newline while composing, and Ctrl+Enter remains available as a global shortcut.
@@ -42,6 +42,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Stable task inbox layout**: The task inbox uses fixed, parameterized marker/project/task/status widths and visible ellipses so background update markers cannot resize or horizontally scroll the sidebar.
+- **Task outcome icons**: The inbox's marker column shows a red cross for failed tasks, a green checkmark for completed coding tasks, and an orange circle for plan tasks ready to implement or awaiting answers; other nonterminal tasks retain the exclamation mark for unseen updates.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -52,7 +53,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
 - `tui/app.tcss`: Shared full-height output-panel layout and readable transcript/diagnostic styling.
-- `tui/transcript.py`: Selectable transcript wrapping and bracketed file-marker annotation.
+- `tui/transcript.py`: Selectable transcript and red inline task-error rendering, wrapping, and bracketed file-marker annotation.
 - `tui/config.py`: Read-only provider and responsive-layout configuration models and loaders.
 - `tui/git_worktree.py`: Local Git helpers including operating-branch pull-then-push sync for the Command Menu action.
 - `tui/prompts.py`: Task, repair, and resolver prompt wrappers, including plan-mode recommended-option instructions.
@@ -72,6 +73,9 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-04: Marked completed and answer-waiting plan tasks with an orange inbox circle to signal they need user input or consideration.
+- 2026-11-04: Simplified the task context and gave the selectable agent output more space by removing redundant metadata and the error-view toggle; task errors now appear inline in red.
+- 2026-11-04: Replaced task inbox update markers with colored failure and completion icons for terminal task outcomes.
 - 2026-10-24: Moved the agent output above the settings and prompt so the input and options sit at the bottom of the workspace.
 - 2026-10-24: Added animated active-task feedback, colored terminal outcomes above the transcript, and file glyphs for bracketed paths and filenames.
 - 2026-10-24: Moved the prompt editor below the settings controls and kept submission/task actions after the output panel at the bottom of the workspace.
