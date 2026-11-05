@@ -10,7 +10,7 @@ The Command Menu makes infrequent but important project actions discoverable as 
 - New Task remains directly available with `Ctrl+T`, and New Project with
   `Ctrl+Shift+N`; both are also discoverable through the menu.
 - The full keyboard-shortcut reference remains available from the Command Menu.
-- The Appearance tab opens a theme picker with Rainbow, Jet Black & Light Blue, Ember, Forest, and Violet palettes; each theme changes Textual colors for text, surfaces, outlines, and status states.
+- The Appearance tab opens a theme picker with Rainbow, Jet Black & Light Blue, Ember, Forest, and Violet palettes; each theme changes Textual colors for text, surfaces, outlines, and status states. Rainbow additionally assigns spectrum colors to workspace sections and uses red, green, and blue tinted task inbox, output, and prompt surfaces with vivid panel borders.
 - The selected theme is stored in the user's XDG config directory (`daedalus-tui/preferences.json`) and restored on later launches.
 - Sync/Push is enabled only when the selected operating branch and an `origin` remote are available.
 - By default the GitHub action pulls remote commits into the operating branch
@@ -36,6 +36,7 @@ HACKING
 
 ## State Log
 - 2026-11-04: Added Technical and Appearance Command Menu tabs with five app-wide color themes and persistent user selection.
+- 2026-11-04: Made Rainbow a section-based spectrum theme with distinct task, output, and prompt surfaces and colored panel borders.
 - 2026-09-19: Added Sync conflict recovery tunables and UI hooks that launch plan-mode recovery, disable Sync while active, and auto-finish resolve+push.
 - 2026-09-19: Hotwired Command Menu Push into a default pull-then-push sync, with `pull_before_push` and a Sync to GitHub label.
 - 2026-09-16: Added a Ctrl+K Command Menu for low-frequency task, topic, Supabase, and GitHub Push actions while retaining shortcut-reference access.

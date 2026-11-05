@@ -329,6 +329,71 @@ Screen {
     color: $text-muted;
 }
 
+/* The Rainbow theme gives each main workspace region its own spectrum color. */
+#screen.rainbow-theme #task-sidebar {
+    background: #351016;
+    border: round #ff334f;
+}
+
+#screen.rainbow-theme #task-label,
+#screen.rainbow-theme #title {
+    color: #ff4d5a;
+}
+
+#screen.rainbow-theme #project-label,
+#screen.rainbow-theme #project-select {
+    color: #ff9e24;
+}
+
+#screen.rainbow-theme #project-select {
+    background: #30200d;
+}
+
+#screen.rainbow-theme #task-bar {
+    border-bottom: solid #ff9e24;
+}
+
+#screen.rainbow-theme #codex-usage {
+    color: #ffd43b;
+}
+
+#screen.rainbow-theme #task-context,
+#screen.rainbow-theme #agent-state-row {
+    color: #52dc76;
+}
+
+#screen.rainbow-theme #output-view-label,
+#screen.rainbow-theme #agent-spinner {
+    color: #39c5ff;
+}
+
+#screen.rainbow-theme #output-toolbar {
+    border-bottom: solid #39c5ff;
+}
+
+#screen.rainbow-theme #output {
+    background: #0c2b1b;
+    border: round #39d98a;
+}
+
+#screen.rainbow-theme #prompt-input,
+#screen.rainbow-theme #resume-notes {
+    background: #101d3b;
+    border: round #4d72ff;
+}
+
+#screen.rainbow-theme #plan-review {
+    border: round #b35cff;
+}
+
+#screen.rainbow-theme #resume-notes-panel {
+    border-left: solid #ff4d5a;
+}
+
+#screen.rainbow-theme #settings {
+    border-bottom: solid #ffd43b;
+}
+
 /* Narrow terminals use a scrollable vertical workspace and a three-column settings grid. */
 #screen.compact-width {
     padding: 1;

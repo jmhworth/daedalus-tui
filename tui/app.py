@@ -1542,7 +1542,10 @@ class DaedalusTuiApp(App[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with VerticalScroll(id="screen"):
+        with VerticalScroll(
+            id="screen",
+            classes="rainbow-theme" if self.selected_theme == "rainbow" else "",
+        ):
             with Horizontal(id="workspace"):
                 with Vertical(id="task-sidebar"):
                     yield Static("Task updates", id="task-label")
@@ -2106,6 +2109,9 @@ class DaedalusTuiApp(App[None]):
             return
         self.selected_theme = theme_name
         self.theme = f"daedalus-{theme_name}"
+        self.query_one("#screen", VerticalScroll).set_class(
+            theme_name == "rainbow", "rainbow-theme"
+        )
         try:
             _save_theme(self._theme_preferences_path, theme_name)
         except OSError as error:
