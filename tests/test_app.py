@@ -2670,7 +2670,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(output.allow_select)
             assistant_line = output._lines.index("Selectable assistant transcript line.")
             selected = output.get_selection(
-                ScreenSelection.from_offsets(Offset(assistant_line, 0), Offset(assistant_line, 10))
+                ScreenSelection.from_offsets(Offset(0, assistant_line), Offset(10, assistant_line))
             )
             self.assertIsNotNone(selected)
             self.assertEqual(selected[0], "Selectable")
