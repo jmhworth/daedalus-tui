@@ -1393,7 +1393,6 @@ class DaedalusTuiApp(App[None]):
         self._updated_task_rows: set[str] = set()
         self._new_task_mode = True
         self._vim_pending_g = False
-        self._showing_error_output = False
         self._plan_review_generation = 0
         self._accept_task_events = False
         self._task_event_lock = threading.Lock()
@@ -1441,9 +1440,7 @@ class DaedalusTuiApp(App[None]):
                             allow_blank=False,
                             id="project-select",
                         )
-                    yield Static(self._directory_text(), id="directory")
                     yield Static("Codex plan usage: Loading…", id="codex-usage")
-                    yield Static("Phase: Idle", id="phase")
                     yield Static("Task branch: —    Worktree: —", id="task-context")
                     with Horizontal(id="agent-state-row"):
                         yield LoadingIndicator(id="agent-spinner")
@@ -1451,11 +1448,6 @@ class DaedalusTuiApp(App[None]):
                     with Vertical(id="output-panel"):
                         with Horizontal(id="output-toolbar"):
                             yield Static("Agent output", id="output-view-label")
-                            yield Button("Show errors", id="output-toggle-button")
-                        # Keep diagnostics on the same selectable Log surface
-                        # as the transcript so mouse selection, y, and Ctrl+C
-                        # all use Textual's screen-selection clipboard path.
-                        yield Log(id="task-error", auto_scroll=False)
                         # Log supports Textual click-drag selection; RichLog does not.
                         yield TranscriptLog(id="output", auto_scroll=True)
                     with Horizontal(id="settings"):
@@ -2747,7 +2739,7 @@ class DaedalusTuiApp(App[None]):
                     self._update_sync_recovery_status(record, phase)
             if is_selected:
                 self._render_selected_task_safely(f"task event phase={phase}")
-            if phase.lower() == "completed" and record.provider == "codex":
+            if phase.lower() in {"proposed", "completed"} and record.provider == "codex":
                 self._start_codex_usage_refresh()
         except Exception as error:
             log_exception(f"Could not render task event task={record.task_id} phase={phase}", error)
@@ -2793,7 +2785,7 @@ class DaedalusTuiApp(App[None]):
     def _should_promote_task_update(record: TaskRecord, phase: str) -> bool:
         """Promote only events that need the user's attention in the inbox."""
         normalized_phase = phase.lower()
-        if normalized_phase in {"completed", "failed"}:
+        if normalized_phase in {"proposed", "completed", "failed"}:
             return True
         return record.mode == "plan" and normalized_phase in {"questions", "clarification"}
 
@@ -3127,7 +3119,6 @@ class DaedalusTuiApp(App[None]):
         self._updated_task_rows = {
             row_key for row_key in self._updated_task_rows if row_key in self._task_rows
         }
-        self.query_one("#directory", Static).update(self._directory_text())
         self._refresh_target_branch_select()
         self._refresh_topic_select()
         self._refresh_task_list()
@@ -3177,8 +3168,6 @@ class DaedalusTuiApp(App[None]):
             target = preferred.resolve()
             if target != self._active_project_path:
                 self._switch_project(target)
-            else:
-                self.query_one("#directory", Static).update(self._directory_text())
             self.query_one("#project-select", Select).value = self._project_select_value()
 
     def _refresh_project_selector(self) -> None:
@@ -3216,9 +3205,6 @@ class DaedalusTuiApp(App[None]):
         if selector_projects:
             return str(selector_projects[0].path)
         return str(self._active_project_path)
-
-    def _directory_text(self) -> str:
-        return f"Launch root: {self.launch_root}    Active project: {self.directory}"
 
     def _start_codex_usage_refresh(self) -> None:
         """Refresh the account usage line without blocking the TUI event loop."""
@@ -3302,7 +3288,14 @@ class DaedalusTuiApp(App[None]):
             )
             summary = " ".join(record.prompt.split())
             summary = self._fit_task_cell(summary, task_width)
-            marker = "!" if row_key in self._updated_task_rows else ""
+            if record.status == "failed":
+                marker = Text("✗", style="bold red")
+            elif record.mode == "plan" and record.status in {"completed", "awaiting_answers"}:
+                marker = Text("●", style="bold orange1")
+            elif record.status == "completed":
+                marker = Text("✓", style="bold green")
+            else:
+                marker = "!" if row_key in self._updated_task_rows else ""
             status = self._fit_task_cell(record.status, status_width)
             task_list.add_row(marker, project_name, summary, status, key=row_key)
 
@@ -3360,7 +3353,6 @@ class DaedalusTuiApp(App[None]):
         self._new_task_mode = False
         self._clear_task_update(self._task_row_key(project_path, task_id))
         self.query_one("#project-select", Select).value = self._project_select_value()
-        self.query_one("#directory", Static).update(self._directory_text())
         self._refresh_task_list()
         self._render_selected_task_safely("task selection")
 
@@ -3397,13 +3389,12 @@ class DaedalusTuiApp(App[None]):
         plan_review_generation = self._plan_review_generation
         output = self.query_one("#output", TranscriptLog)
         output.clear()
+        self._displayed_error = ""
         if record is None:
             self._rendered_plan_question_signature = None
             self._set_prompt_text("", editable=True)
             self.query_one("#output-panel", Vertical).styles.display = "block"
-            self._set_output_view(self._showing_error_output)
             self.query_one("#task-context", Static).update("Task branch: —    Worktree: —")
-            self.query_one("#phase", Static).update("Phase: Idle")
             self._update_agent_outcome(None)
             self._set_error("")
             self.query_one("#pause-button", Button).disabled = True
@@ -3426,7 +3417,7 @@ class DaedalusTuiApp(App[None]):
         self.query_one("#output-panel", Vertical).styles.display = (
             "none" if record.mode == "plan" else "block"
         )
-        self._set_output_view(self._showing_error_output, visible=record.mode != "plan")
+        output.styles.display = "block" if record.mode != "plan" else "none"
         if record.mode == "plan":
             self._render_plan_review(record, plan_review_generation)
         else:
@@ -3445,16 +3436,13 @@ class DaedalusTuiApp(App[None]):
                     turn.submission_sequence,
                     turn.prompt,
                     turn.messages,
-                    final=turn.status == "completed",
+                    final=turn.status in {"proposed", "completed"},
                 )
         worktree = str(record.worktree_path) if record.worktree_path else "—"
         branch = record.branch_name or "—"
-        reasoning = record.reasoning or "not applicable"
         self.query_one("#task-context", Static).update(
-            f"Mode: {record.mode} · Provider: {record.provider} · Model: {record.model} · Thinking: {reasoning}\n"
             f"Task branch: {branch}    Worktree: {worktree}"
         )
-        self.query_one("#phase", Static).update(f"Phase: {record.phase}")
         self._update_agent_outcome(record)
         self._set_error(record.error or "")
         self._set_status(record.status.capitalize())
@@ -3500,6 +3488,10 @@ class DaedalusTuiApp(App[None]):
                 "resolving": "Resolving…",
             }[record.status]
             outcome.update(activity)
+        elif record.status == "proposed":
+            spinner.styles.display = "none"
+            outcome.add_class("outcome-success")
+            outcome.update("✓ Plan proposed")
         elif record.status == "completed":
             spinner.styles.display = "none"
             outcome.add_class("outcome-success")
@@ -3618,7 +3610,7 @@ class DaedalusTuiApp(App[None]):
         )
         answer_nodes.first().disabled = not (
             bool(record.plan_questions)
-            and record.status in {"completed", "awaiting_answers"}
+            and record.status in {"proposed", "completed", "awaiting_answers"}
             and len(selected) == len(record.plan_questions)
             and all_answered
             and not record.plan_confirmed
@@ -3929,7 +3921,7 @@ class DaedalusTuiApp(App[None]):
             self._set_status("Insert")
 
     def _scroll_output(self, direction: str) -> None:
-        output = self.query_one("#task-error" if self._showing_error_output else "#output", Log)
+        output = self.query_one("#output", TranscriptLog)
         output.focus()
         scroll_methods = {
             "up": output.scroll_up,
@@ -3944,28 +3936,6 @@ class DaedalusTuiApp(App[None]):
         else:
             scroll_methods[direction](animate=False, immediate=True)
         self._set_status(f"Output {direction.replace('_', ' ')}")
-
-    def _set_output_view(
-        self,
-        show_errors: bool,
-        *,
-        focus: bool = False,
-        visible: bool = True,
-    ) -> None:
-        """Show either the full-size transcript or the full-size diagnostics log."""
-        self._showing_error_output = show_errors
-        error_widget = self.query_one("#task-error", Log)
-        output_widget = self.query_one("#output", TranscriptLog)
-        error_widget.styles.display = "block" if visible and show_errors else "none"
-        output_widget.styles.display = "block" if visible and not show_errors else "none"
-        self.query_one("#output-view-label", Static).update(
-            "Error output" if show_errors else "Agent output"
-        )
-        self.query_one("#output-toggle-button", Button).label = (
-            "Show agent output" if show_errors else "Show errors"
-        )
-        if focus:
-            (error_widget if show_errors else output_widget).focus()
 
     def _paste_into_prompt(self) -> None:
         text = paste_from_system_clipboard()
@@ -4075,8 +4045,8 @@ class DaedalusTuiApp(App[None]):
         error = truncate_diagnostic(error) if error else ""
         if error == self._displayed_error:
             return
-        error_widget = self.query_one("#task-error", Log)
-        error_widget.clear()
+        output = self.query_one("#output", TranscriptLog)
+        output.clear_errors()
         if error:
-            error_widget.write(error)
+            output.write_error(error)
         self._displayed_error = error

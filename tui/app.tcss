@@ -94,14 +94,10 @@ Screen {
     margin-right: 1;
 }
 
-#directory, #codex-usage, #phase, #title, #task-context, #status,
+#codex-usage, #title, #task-context, #status,
 #resume-notes-label {
     color: $text-muted;
     pointer: text;
-}
-
-#directory, #codex-usage, #phase {
-    height: 1;
 }
 
 #codex-usage {
@@ -111,7 +107,7 @@ Screen {
 
 #task-context {
     color: $text-muted;
-    height: 2;
+    height: 1;
 }
 
 #agent-state-row {
@@ -125,7 +121,7 @@ Screen {
 }
 
 #output-toolbar {
-    height: 3;
+    height: 1;
     align: left middle;
 }
 
@@ -162,21 +158,11 @@ Screen {
     color: $warning;
 }
 
-#output-toggle-button {
-    width: 21;
-}
-
-#task-error, #output {
+#output {
     height: 1fr;
     min-height: 1;
     border: round $primary;
     padding: 1;
-}
-
-#task-error {
-    display: none;
-    color: $error;
-    border: round $error;
 }
 
 #output {
@@ -422,7 +408,6 @@ Screen {
     height: 1;
 }
 
-#screen.short-height #output-toolbar,
 #screen.short-height #actions,
 #screen.short-height #plan-actions {
     height: 2;
@@ -437,7 +422,6 @@ Screen {
 }
 
 #screen.short-height #actions Button,
-#screen.short-height #output-toggle-button,
 #screen.short-height #plan-actions Button {
     height: 2;
 }

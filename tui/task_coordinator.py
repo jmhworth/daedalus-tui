@@ -44,6 +44,7 @@ TASK_STATUSES = (
     "ready",
     "integrating",
     "resolving",
+    "proposed",
     "completed",
     "failed",
     "blocked",
@@ -104,6 +105,7 @@ def _snapshot_sequence(snapshot: dict[str, object], task_id: str) -> int:
 def _phase_for_status(status: str) -> str:
     return {
         "awaiting_answers": "Questions",
+        "proposed": "Proposed",
         "completed": "Completed",
         "failed": "Failed",
         "paused": "Paused",
@@ -286,7 +288,7 @@ class TaskCoordinator:
             return self._has_active_sync_recovery_locked(branch)
 
     def _has_active_sync_recovery_locked(self, branch: str | None = None) -> bool:
-        terminal = {"completed", "failed", "cancelled", "blocked"}
+        terminal = {"proposed", "completed", "failed", "cancelled", "blocked"}
         for record in self._tasks.values():
             if not record.sync_recovery or record.status in terminal:
                 continue
@@ -404,7 +406,7 @@ class TaskCoordinator:
                 record is None
                 or record.mode != "plan"
                 or record.plan_confirmed
-                or record.status not in {"completed", "awaiting_answers"}
+                or record.status not in {"proposed", "completed", "awaiting_answers"}
             ):
                 return False
             question_ids = {question.question_id for question in record.plan_questions}
@@ -456,7 +458,7 @@ class TaskCoordinator:
             if (
                 record is None
                 or record.mode != "plan"
-                or record.status not in {"awaiting_answers", "completed", "questioning"}
+                or record.status not in {"awaiting_answers", "proposed", "completed", "questioning"}
             ):
                 return False
             question = next(
@@ -489,7 +491,7 @@ class TaskCoordinator:
             if (
                 record is None
                 or record.mode != "plan"
-                or record.status != "completed"
+                or record.status not in {"proposed", "completed"}
                 or not record.plan_confirmed
                 or record.plan_implemented
                 or record.sync_recovery
@@ -587,7 +589,7 @@ class TaskCoordinator:
 
     def pause(self, task_id: str) -> bool:
         record = self.get(task_id)
-        if record is None or record.status in {"completed", "failed", "blocked", "paused", "cancelled"}:
+        if record is None or record.status in {"proposed", "completed", "failed", "blocked", "paused", "cancelled"}:
             return False
         if record.status == "questioning":
             return False
@@ -735,11 +737,11 @@ class TaskCoordinator:
             return False
         if (
             record.sync_recovery
-            and record.status == "completed"
+            and record.status in {"proposed", "completed"}
             and not record.plan_implemented
         ):
             return self._cancel_sync_recovery(record)
-        if record.status == "completed":
+        if record.status in {"proposed", "completed"}:
             return False
         if record.sync_recovery and record.status in {
             "paused",
@@ -1020,8 +1022,8 @@ class TaskCoordinator:
             if record.mode == "plan":
                 self._update_plan_state(record, record.messages[message_start:])
             if record.plan_confirmed:
-                record.status = "completed"
-                record.phase = "Completed"
+                record.status = "proposed"
+                record.phase = "Proposed"
             elif record.plan_questions:
                 record.status = "awaiting_answers"
                 record.phase = "Questions"
@@ -1035,13 +1037,13 @@ class TaskCoordinator:
                 record.error = record.plan_error
             self._persist_task(record)
             event_phase = {
-                "completed": "completed",
+                "proposed": "proposed",
                 "awaiting_answers": "questions",
             }.get(record.status, "questioning")
             self._notify(
                 record,
                 event_phase,
-                "Plan ready for review." if record.status != "completed" else "Plan confirmed.",
+                "Plan ready for review." if record.status != "proposed" else "Plan proposed.",
                 "status",
             )
             LOGGER.info("Task worker finished task=%s status=%s", record.task_id, record.status)
@@ -1078,8 +1080,8 @@ class TaskCoordinator:
                     record.status = "questioning"
                     record.phase = "Questioning"
             else:
-                record.status = "completed"
-                record.phase = "Completed"
+                record.status = "proposed" if record.mode == "plan" else "completed"
+                record.phase = "Proposed" if record.mode == "plan" else "Completed"
                 record.resume_from = None
                 if record.sync_recovery and record.mode == "coding":
                     record.context = None
@@ -1092,7 +1094,7 @@ class TaskCoordinator:
         self._notify(
             record,
             "questions" if result.succeeded and record.mode == "plan" and record.plan_questions and not record.plan_confirmed else
-            ("completed" if result.succeeded else "failed"),
+            ("proposed" if result.succeeded and record.mode == "plan" else "completed" if result.succeeded else "failed"),
             "",
             "status",
         )
@@ -1212,6 +1214,7 @@ class TaskCoordinator:
             "ready": "ready",
             "integration": "integrating",
             "resolving": "resolving",
+            "proposed": "proposed",
             "completed": "completed",
             "failed": "failed",
             "paused": "paused",
@@ -1319,7 +1322,7 @@ class TaskCoordinator:
                 status = "paused"
                 error = error or "Daedalus was closed while this task was active; resume to continue."
             sync_recovery = bool(snapshot.get("sync_recovery"))
-            if sync_recovery and status not in {"completed", "failed", "cancelled", "blocked"}:
+            if sync_recovery and status not in {"proposed", "completed", "failed", "cancelled", "blocked"}:
                 # Cross-session auto-resume of mid-merge sync worktrees is out of scope.
                 status = "failed"
                 error = (

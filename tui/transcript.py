@@ -29,7 +29,7 @@ class TranscriptLog(Log):
         super().__init__(*args, **kwargs)
         self._line_tones: dict[int, str] = {}
         self._final_color = None
-        self._messages: list[tuple[str, str]] = []
+        self._messages: list[tuple[str, bool, str]] = []
         self._wrapped_width: int | None = None
 
     @property
@@ -68,19 +68,34 @@ class TranscriptLog(Log):
         """Append one assistant message and assign its semantic tone."""
         if not message:
             return self
-        self._messages.append((message, "final" if final else "generic"))
+        self._messages.append((message, final, "final" if final else "generic"))
+        self._rebuild_lines(scroll_end=self.auto_scroll)
+        return self
+
+    def write_error(self, message: str) -> "TranscriptLog":
+        """Append a selectable error block with the dedicated error tone."""
+        if not message:
+            return self
+        self._messages.append((message, False, "error"))
+        self._rebuild_lines(scroll_end=self.auto_scroll)
+        return self
+
+    def clear_errors(self) -> "TranscriptLog":
+        """Remove rendered errors while preserving the agent transcript."""
+        self._messages = [entry for entry in self._messages if entry[2] != "error"]
         self._rebuild_lines(scroll_end=self.auto_scroll)
         return self
 
     def write_task_turn(self, number: int, prompt: str, messages: list[str], *, final: bool = False) -> None:
         """Append a numbered task turn with a selectable italic prompt."""
         if self._messages:
-            self._messages.append(("", "divider"))
-        self._messages.append((f"Task {number}", "task"))
-        self._messages.append((prompt, "prompt"))
+            self._messages.append(("", False, "divider"))
+        self._messages.append((f"Task {number}", False, "task"))
+        self._messages.append((prompt, False, "prompt"))
         for index, message in enumerate(messages):
             if message:
-                self._messages.append((message, "final" if final and index == len(messages) - 1 else "generic"))
+                is_final = final and index == len(messages) - 1
+                self._messages.append((message, is_final, "final" if is_final else "generic"))
         self._rebuild_lines(scroll_end=self.auto_scroll)
 
     def _rebuild_lines(self, *, scroll_end: bool) -> None:
@@ -91,7 +106,7 @@ class TranscriptLog(Log):
         width = max(0, content_width - 1)
         rendered_lines: list[str] = []
         tones: list[str] = []
-        for message, tone in self._messages:
+        for message, _final, tone in self._messages:
             if tone not in {"divider", "task"} and rendered_lines:
                 rendered_lines.append("")
                 tones.append("generic")
@@ -219,6 +234,8 @@ class TranscriptLog(Log):
             line_text.stylize(Style(bold=True))
         elif self._line_tones.get(y) == "divider":
             line_text.stylize(Style(color="white"))
+        elif self._line_tones.get(y) == "error":
+            line_text.stylize(Style(color="red"))
 
         if self.highlight:
             line_text = self.highlighter(line_text)
