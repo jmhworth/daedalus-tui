@@ -42,6 +42,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Stable task inbox layout**: The task inbox uses fixed, parameterized marker/project/task/status widths and visible ellipses so background update markers cannot resize or horizontally scroll the sidebar.
+- **Task outcome icons**: The inbox's marker column shows a red cross for failed tasks and a green checkmark for completed tasks; nonterminal tasks retain the exclamation mark for unseen updates.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -72,6 +73,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-04: Replaced task inbox update markers with colored failure and completion icons for terminal task outcomes.
 - 2026-10-24: Moved the agent output above the settings and prompt so the input and options sit at the bottom of the workspace.
 - 2026-10-24: Added animated active-task feedback, colored terminal outcomes above the transcript, and file glyphs for bracketed paths and filenames.
 - 2026-10-24: Moved the prompt editor below the settings controls and kept submission/task actions after the output panel at the bottom of the workspace.
