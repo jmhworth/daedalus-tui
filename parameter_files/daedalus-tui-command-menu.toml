@@ -11,8 +11,8 @@ pull_before_push = true
 sync_conflict_recovery_enabled = true
 # Bounded coding attempts when conflict resolutions still leave unmerged paths.
 sync_conflict_attempt_limit = 3
-# Auto-sync is an in-session preference, initially off each time the TUI starts.
-auto_sync_after_completed_tasks = false
+# Auto-sync is enabled by default and remains an in-session preference.
+auto_sync_after_completed_tasks = true
 
 [labels]
 new_task = "New Task"
