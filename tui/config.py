@@ -112,8 +112,8 @@ def load_tui_settings(parameter_path: Path | None = None) -> TuiSettings:
     task_inbox_widths = tuple(
         int(task_inbox.get(name, default))
         for name, default in (
-            ("task_width", 23),
-            ("status_width", 11),
+            ("task_width", 17),
+            ("status_width", 8),
         )
     )
     if any(width < 1 for width in task_inbox_widths):
