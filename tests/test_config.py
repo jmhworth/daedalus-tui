@@ -81,6 +81,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(command_menu.remove_personal_supabase_label, "Remove personal Supabase")
         self.assertEqual(command_menu.push_branch_label, "Sync to GitHub")
         self.assertTrue(command_menu.pull_before_push)
+        self.assertTrue(command_menu.auto_sync_after_completed_tasks)
         self.assertTrue(command_menu.sync_conflict_recovery_enabled)
         self.assertEqual(command_menu.sync_conflict_attempt_limit, 3)
 

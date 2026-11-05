@@ -89,7 +89,7 @@ class CommandMenuSettings:
     auto_sync_label: str = "Auto-sync after completed tasks"
     keyboard_shortcuts_label: str = "Keyboard Shortcuts"
     pull_before_push: bool = True
-    auto_sync_after_completed_tasks: bool = False
+    auto_sync_after_completed_tasks: bool = True
     sync_conflict_recovery_enabled: bool = True
     sync_conflict_attempt_limit: int = 3
 
@@ -259,7 +259,7 @@ def load_command_menu_settings(parameter_path: Path | None = None) -> CommandMen
         auto_sync_label=str(labels.get("auto_sync", "Auto-sync after completed tasks")),
         keyboard_shortcuts_label=str(labels.get("keyboard_shortcuts", "Keyboard Shortcuts")),
         pull_before_push=bool(values.get("pull_before_push", True)),
-        auto_sync_after_completed_tasks=bool(values.get("auto_sync_after_completed_tasks", False)),
+        auto_sync_after_completed_tasks=bool(values.get("auto_sync_after_completed_tasks", True)),
         sync_conflict_recovery_enabled=bool(values.get("sync_conflict_recovery_enabled", True)),
         sync_conflict_attempt_limit=attempt_limit,
     )

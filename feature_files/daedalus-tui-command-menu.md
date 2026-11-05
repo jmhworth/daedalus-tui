@@ -16,7 +16,7 @@ The Command Menu makes infrequent but important project actions discoverable as 
 - By default the GitHub action pulls remote commits into the operating branch
   before pushing (`pull_before_push`); set that parameter false for push-only.
 - Auto-sync after completed coding tasks is available as an in-session
-  Command Menu toggle and defaults to off on each TUI launch. It uses the
+  Command Menu toggle and defaults to on each TUI launch. It uses the
   existing sync action for the active project and operating branch.
 - Sync pull/merge conflicts (when `sync_conflict_recovery_enabled`) launch an
   operator-owned plan→auto-resolve→push recovery in an isolated sync worktree;
@@ -35,6 +35,7 @@ The Command Menu makes infrequent but important project actions discoverable as 
 HACKING
 
 ## State Log
+- 2026-11-05: Enabled GitHub auto-sync by default after completed coding tasks.
 - 2026-11-04: Hid the Clown checkerboard outside its theme so flat palettes do not gain scrollable decorative content.
 - 2026-11-04: Added Technical and Appearance Command Menu tabs with five app-wide color themes and persistent user selection.
 - 2026-11-04: Made Rainbow a section-based spectrum theme with distinct task, output, and prompt surfaces and colored panel borders.
