@@ -9,7 +9,7 @@ Screen {
 }
 
 #screen {
-    layers: checkerboard, content;
+    layers: checkerboard content;
     height: 1fr;
     padding: 1 2;
     overflow-x: hidden;

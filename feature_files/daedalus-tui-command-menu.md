@@ -38,6 +38,7 @@ HACKING
 - 2026-11-04: Added Technical and Appearance Command Menu tabs with five app-wide color themes and persistent user selection.
 - 2026-11-04: Made Rainbow a section-based spectrum theme with distinct task, output, and prompt surfaces and colored panel borders.
 - 2026-11-04: Renamed Rainbow to Clown, added a low-contrast checkerboard, and softened the RGB panel fills with transparency while preserving existing saved selections.
+- 2026-11-04: Corrected the Clown theme's Textual layer declaration to use whitespace-separated layer names so the application stylesheet parses.
 - 2026-09-19: Added Sync conflict recovery tunables and UI hooks that launch plan-mode recovery, disable Sync while active, and auto-finish resolve+push.
 - 2026-09-19: Hotwired Command Menu Push into a default pull-then-push sync, with `pull_before_push` and a Sync to GitHub label.
 - 2026-09-16: Added a Ctrl+K Command Menu for low-frequency task, topic, Supabase, and GitHub Push actions while retaining shortcut-reference access.
