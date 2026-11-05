@@ -2898,7 +2898,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             coordinator.finish(first, "Implemented the first task.")
             task_list = app.query_one("#task-list", DataTable)
             first_row = app._task_row_key(app._active_project_path, first.task_id)
-            task_list.move_cursor(row=list(app._task_rows).index(first_row), column=0)
+            task_list.move_cursor(row=app._task_row_indices[first_row], column=0)
             task_list.action_select_cursor()
             await pilot.pause()
 
@@ -2906,7 +2906,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             coordinator.emit(first, "failed", first.error, "error")
 
             second_row = app._task_row_key(app._active_project_path, second.task_id)
-            task_list.move_cursor(row=list(app._task_rows).index(second_row), column=0)
+            task_list.move_cursor(row=app._task_row_indices[second_row], column=0)
             task_list.action_select_cursor()
             await pilot.pause()
             task_context = app.query_one("#task-context", Static).render().plain

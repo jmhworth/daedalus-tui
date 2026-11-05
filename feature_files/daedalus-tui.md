@@ -74,6 +74,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-05: Synchronized the project selector when inbox focus switches projects and corrected a task selection regression assertion to account for grouped heading rows.
 - 2026-11-05: Made task inbox project headings open a fresh prompt in the selected project and added an app regression case for cross-project task entry.
 - 2026-11-04: Kept the task updates sidebar at three-quarters of its prior width, resized its fixed columns to fit, and applied prompt selection colors through Textual CSS instead of the read-only selection_style property.
 - 2026-11-04: Narrowed the task updates sidebar to 25 cells and resized its Task and Status columns to fit.

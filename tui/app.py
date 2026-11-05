@@ -3265,6 +3265,7 @@ class DaedalusTuiApp(App[None]):
             draft = None
         self._active_project_path = project_path
         self.directory = project_path
+        self.query_one("#project-select", Select).value = self._project_select_value()
         # Persist after the active focus changes so the marker mirrors the
         # project that is currently visible in the TUI.
         self._remember_project(project_path)
