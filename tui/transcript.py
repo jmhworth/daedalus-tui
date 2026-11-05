@@ -29,7 +29,7 @@ class TranscriptLog(Log):
         super().__init__(*args, **kwargs)
         self._line_tones: dict[int, str] = {}
         self._final_color = None
-        self._messages: list[tuple[str, bool]] = []
+        self._messages: list[tuple[str, bool, str]] = []
         self._wrapped_width: int | None = None
 
     @property
@@ -68,7 +68,21 @@ class TranscriptLog(Log):
         """Append one assistant message and assign its semantic tone."""
         if not message:
             return self
-        self._messages.append((message, final))
+        self._messages.append((message, final, "final" if final else "generic"))
+        self._rebuild_lines(scroll_end=self.auto_scroll)
+        return self
+
+    def write_error(self, message: str) -> "TranscriptLog":
+        """Append a selectable error block with the dedicated error tone."""
+        if not message:
+            return self
+        self._messages.append((message, False, "error"))
+        self._rebuild_lines(scroll_end=self.auto_scroll)
+        return self
+
+    def clear_errors(self) -> "TranscriptLog":
+        """Remove rendered errors while preserving the agent transcript."""
+        self._messages = [entry for entry in self._messages if entry[2] != "error"]
         self._rebuild_lines(scroll_end=self.auto_scroll)
         return self
 
@@ -80,13 +94,12 @@ class TranscriptLog(Log):
         width = max(0, content_width - 1)
         rendered_lines: list[str] = []
         tones: list[str] = []
-        for message_index, (message, final) in enumerate(self._messages):
+        for message_index, (message, _final, tone) in enumerate(self._messages):
             if message_index:
                 # Keep one complete blank line between streamed messages.
                 rendered_lines.append("")
                 tones.append("generic")
 
-            tone = "final" if final else "generic"
             for source_line in message.split("\n"):
                 wrapped_lines = self._wrap_line(
                     source_line, width, allow_right_edge_buffer=False
@@ -203,6 +216,8 @@ class TranscriptLog(Log):
         line_text.stylize(rich_style)
         if self._line_tones.get(y) == "final" and self._final_color is not None:
             line_text.stylize(Style(color=self._final_color))
+        elif self._line_tones.get(y) == "error":
+            line_text.stylize(Style(color="red"))
 
         if self.highlight:
             line_text = self.highlighter(line_text)
