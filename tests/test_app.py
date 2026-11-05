@@ -1031,6 +1031,42 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 ]
                 self.assertEqual(refreshed_labels, ["daedalus", "other-project"])
 
+    @patch("tui.app.discover_projects")
+    async def test_project_heading_opens_a_fresh_task_for_that_project(self, discover):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "daedalus-tui"
+            second = root / "medley"
+            discover.return_value = (
+                DaedalusProject(first, root),
+                DaedalusProject(second, root),
+            )
+            first_coordinator = FakeCoordinator()
+            second_coordinator = FakeCoordinator()
+            second_coordinator.submit("Existing task", "codex", "model", "medium")
+            app = DaedalusTuiApp(
+                runner=FakeRunner(),
+                directory=root,
+                settings=settings(),
+                coordinator=first_coordinator,
+            )
+            app._coordinators[second.resolve()] = second_coordinator
+
+            async with app.run_test() as pilot:
+                prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+                prompt.insert("Draft for the current project")
+                row_key = f"project::{second.resolve()}"
+                app.on_data_table_row_selected(
+                    SimpleNamespace(row_key=SimpleNamespace(value=row_key))
+                )
+                await pilot.pause()
+
+                self.assertEqual(app._active_project_path, second.resolve())
+                self.assertEqual(app.query_one("#project-select", Select).value, str(second))
+                self.assertTrue(app._new_task_mode)
+                self.assertEqual(prompt.text, "")
+                self.assertFalse(prompt.read_only)
+
     @patch("tui.app.TaskCoordinator")
     @patch("tui.app.list_local_branches")
     @patch("tui.app.discover_projects")

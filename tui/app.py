@@ -1511,6 +1511,7 @@ class DaedalusTuiApp(App[None]):
         # The task inbox spans all discovered projects. Row keys include the
         # project path because task IDs are only unique within a coordinator.
         self._task_rows: dict[str, tuple[Path, str]] = {}
+        self._project_rows: dict[str, Path] = {}
         self._task_row_indices: dict[str, int] = {}
         self._session_task_rows: set[str] = set()
         self._updated_task_rows: set[str] = set()
@@ -2799,8 +2800,13 @@ class DaedalusTuiApp(App[None]):
         self._set_status(f"Creating topic: {topic['slug']}")
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        """Focus a task from the cross-project update inbox."""
+        """Open a fresh project task or focus a task from the update inbox."""
         row_key = str(event.row_key.value)
+        project_path = self._project_rows.get(row_key)
+        if project_path is not None:
+            self._switch_project(project_path)
+            self._start_new_task()
+            return
         task_target = self._task_rows.get(row_key)
         if task_target is None:
             return
@@ -3397,6 +3403,7 @@ class DaedalusTuiApp(App[None]):
             # sidebar without introducing horizontal scrolling.
             task_list.add_column(label, width=width)
         self._task_rows.clear()
+        self._project_rows.clear()
         self._task_row_indices.clear()
 
         project_names = {
@@ -3428,7 +3435,13 @@ class DaedalusTuiApp(App[None]):
         for project_path, record in rows:
             if project_path != previous_project:
                 project_name = project_names.get(project_path, project_path.name)
-                task_list.add_row(Text(project_name, style="bold cyan"), "", key=f"project::{project_path}")
+                project_row_key = f"project::{project_path}"
+                self._project_rows[project_row_key] = project_path
+                task_list.add_row(
+                    Text(project_name, style="bold cyan underline"),
+                    "",
+                    key=project_row_key,
+                )
                 row_index += 1
                 previous_project = project_path
             row_key = self._task_row_key(project_path, record.task_id)

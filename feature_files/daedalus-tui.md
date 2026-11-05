@@ -42,6 +42,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Project initialization**: `Ctrl+Shift+N` opens New Project, which materializes bundled Daedalus templates (including a scaffold `.daedalus` TOML) under the launch root, runs Graphify/Git setup, optionally creates a private GitHub repo, optionally registers a personal shared-Supabase schema (files only), then refreshes discovery onto the new project.
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
+- **Project heading task entry**: Selecting a project heading in the task updates sidebar switches to that project and opens a blank, editable task composer.
 - **Stable task inbox layout**: The task inbox uses fixed, parameterized task-ID and status widths with visible ellipses so long IDs and statuses do not horizontally scroll the 25-cell sidebar.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
@@ -63,7 +64,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - `tui/agent_runner.py`: Independent Codex and Cursor subprocess adapter.
 - `tui/task_coordinator.py`: Concurrent task executor, serialized integration gate, and plan-question clarification workers.
 - `parameter_files/daedalus-tui.toml`: Provider, model, reasoning, and default UI settings.
-- `tests/test_config.py`, `tests/test_app.py`: Configuration validation and responsive layout/compact-selection coverage.
+- `tests/test_config.py`, `tests/test_app.py`: Configuration validation, responsive layout/compact-selection, and task inbox project-heading selection coverage.
 - `feature_files/daedalus-tui-orchestration.md`: Local orchestration ownership boundary.
 - `feature_files/daedalus-tui-topics.md`: Optional topic umbrellas and shared State Log memory.
 - `feature_files/daedalus-tui-project-initialization.md`: Launch-root project scaffolding.
@@ -73,6 +74,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-05: Made task inbox project headings open a fresh prompt in the selected project and added an app regression case for cross-project task entry.
 - 2026-11-04: Kept the task updates sidebar at three-quarters of its prior width, resized its fixed columns to fit, and applied prompt selection colors through Textual CSS instead of the read-only selection_style property.
 - 2026-11-04: Narrowed the task updates sidebar to 25 cells and resized its Task and Status columns to fit.
 - 2026-11-04: Kept proposed plans and answer-waiting tasks visibly orange in the output outcome while preserving green completed and red failed markers.
