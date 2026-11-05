@@ -85,10 +85,18 @@
   "83": ".nav_word_end",
   "84": "RegistrationResult",
   "85": "expose_personal_supabase_schema",
+  "86": "CodingStatisticsScreen",
   "87": ".__init__",
+  "88": "IntegrationCoordinator",
   "89": "IntegrationCoordinator",
   "90": "remove_personal_supabase",
   "91": "._apply_task_event",
   "92": "PersonalSupabaseSetupWizardScreen",
+  "93": "._render_line_strip",
+  "94": ".__init__",
+  "95": "._run_clarification",
+  "96": "._apply_measured_responsive_layout",
+  "97": ".has_active_sync_recovery",
+  "98": ".test_push_conflict_launches_sync_recovery",
   "101": "._on_personal_supabase_activation_progress"
 }
