@@ -1256,8 +1256,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_app",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "test_app.py"
     },
     {
@@ -1355,8 +1355,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "tests_test_app_fakecoordinator_emit",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".emit()"
     },
     {
@@ -1366,8 +1366,8 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "tests_test_app_fakecoordinator_finish",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".finish()"
     },
     {
@@ -2048,8 +2048,8 @@
       "source_location": "L1756",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_failed_task_exposes_retry_action",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_failed_task_exposes_retry_action()"
     },
     {
@@ -2191,8 +2191,8 @@
       "source_location": "L1980",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_questioning_plan_is_selectable_and_can_continue",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_questioning_plan_is_selectable_and_can_continue()"
     },
     {
@@ -2213,8 +2213,8 @@
       "source_location": "L2049",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_plan_review_renders_last_output_when_structured_state_is_missing",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_plan_review_renders_last_output_when_structured_state_is_missing()"
     },
     {
@@ -2268,8 +2268,8 @@
       "source_location": "L2215",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_plan_review_accepts_a_ui_owned_custom_answer",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": ".test_plan_review_accepts_a_ui_owned_custom_answer()"
     },
     {
@@ -2290,8 +2290,8 @@
       "source_location": "L2282",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_revised_plan_options_do_not_remount_stale_select_values",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_revised_plan_options_do_not_remount_stale_select_values()"
     },
     {
@@ -2389,8 +2389,8 @@
       "source_location": "L2598",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_paused_task_exposes_optional_resume_notes",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_paused_task_exposes_optional_resume_notes()"
     },
     {
@@ -2433,8 +2433,8 @@
       "source_location": "L2657",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_output_log_supports_textual_selection",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_output_log_supports_textual_selection()"
     },
     {
@@ -2444,8 +2444,8 @@
       "source_location": "L2673",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_final_assistant_message_uses_brighter_transcript_tone",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_final_assistant_message_uses_brighter_transcript_tone()"
     },
     {
@@ -2455,8 +2455,8 @@
       "source_location": "L2689",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_output_messages_are_separated_and_wrapped",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_output_messages_are_separated_and_wrapped()"
     },
     {
@@ -2477,8 +2477,8 @@
       "source_location": "L2730",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_output_rewraps_messages_when_the_content_width_changes",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_output_rewraps_messages_when_the_content_width_changes()"
     },
     {
@@ -2488,8 +2488,8 @@
       "source_location": "L2751",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_final_assistant_message_renders_with_resolved_theme_color",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_final_assistant_message_renders_with_resolved_theme_color()"
     },
     {
@@ -2532,8 +2532,8 @@
       "source_location": "L2803",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_multiple_tasks_keep_independent_snapshots_and_transcripts",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_multiple_tasks_keep_independent_snapshots_and_transcripts()"
     },
     {
@@ -2543,8 +2543,8 @@
       "source_location": "L2839",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_background_progress_does_not_promote_an_unselected_task",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_background_progress_does_not_promote_an_unselected_task()"
     },
     {
@@ -2554,8 +2554,8 @@
       "source_location": "L2860",
       "_origin": "ast",
       "id": "tests_test_app_tuiapptests_test_background_completion_promotes_an_unselected_task",
-      "community": 76,
-      "community_name": "bootstrap_personal_supabase",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": ".test_background_completion_promotes_an_unselected_task()"
     },
     {
@@ -2587,8 +2587,8 @@
       "source_location": "L2283",
       "_origin": "ast",
       "id": "tests_test_app_rationale_2283",
-      "community": 41,
-      "community_name": "KeyboardShortcutsScreen",
+      "community": 27,
+      "community_name": ".on_mount",
       "norm_label": "follow-up questions must not crash when old option ids linger on widgets."
     },
     {
@@ -4369,8 +4369,8 @@
       "source_location": "L219",
       "_origin": "ast",
       "id": "tests_test_personal_supabase_personalsupabasetests_test_profile_guidance_mentions_schema_and_anti_public_rules",
-      "community": 59,
-      "community_name": "PlanClarification",
+      "community": 80,
+      "community_name": "PersonalSupabaseConfirmationScreen",
       "norm_label": ".test_profile_guidance_mentions_schema_and_anti_public_rules()"
     },
     {
@@ -4446,8 +4446,8 @@
       "source_location": "L398",
       "_origin": "ast",
       "id": "tests_test_personal_supabase_personalsupabasetests_test_management_api_exposure_preserves_existing_schemas_and_is_idempotent",
-      "community": 83,
-      "community_name": "discover_projects",
+      "community": 90,
+      "community_name": "remove_personal_supabase",
       "norm_label": ".test_management_api_exposure_preserves_existing_schemas_and_is_idempotent()"
     },
     {
@@ -4633,8 +4633,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_plan",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "test_plan.py"
     },
     {
@@ -4732,8 +4732,8 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "tests_test_plan_plantests_test_followup_and_implementation_prompts_include_review_context",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": ".test_followup_and_implementation_prompts_include_review_context()"
     },
     {
@@ -4743,8 +4743,8 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "tests_test_plan_plantests_test_custom_answer_is_added_by_the_ui_and_formatted_for_followups",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": ".test_custom_answer_is_added_by_the_ui_and_formatted_for_followups()"
     },
     {
@@ -4754,8 +4754,8 @@
       "source_location": "L180",
       "_origin": "ast",
       "id": "tests_test_plan_plantests_test_clarification_prompt_includes_plan_prompt_and_one_question",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": ".test_clarification_prompt_includes_plan_prompt_and_one_question()"
     },
     {
@@ -5293,8 +5293,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_task_coordinator",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "test_task_coordinator.py"
     },
     {
@@ -5304,8 +5304,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_fakeorchestrator",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "fakeorchestrator"
     },
     {
@@ -5315,8 +5315,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_fakeorchestrator_init",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".__init__()"
     },
     {
@@ -5337,8 +5337,8 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "taskcoordinatortests"
     },
     {
@@ -5348,8 +5348,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_setup",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".setup()"
     },
     {
@@ -5359,8 +5359,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_executor_limits_concurrent_agent_tasks_and_snapshots_settings",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_executor_limits_concurrent_agent_tasks_and_snapshots_settings()"
     },
     {
@@ -5370,8 +5370,8 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_plan_task_stays_questioning_until_started_as_coding",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_plan_task_stays_questioning_until_started_as_coding()"
     },
     {
@@ -5381,8 +5381,8 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_multi_block_soft_wrapped_plan_reaches_awaiting_answers",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_multi_block_soft_wrapped_plan_reaches_awaiting_answers()"
     },
     {
@@ -5392,8 +5392,8 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_cursor_final_plan_result_overrides_fragmented_streamed_output",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_cursor_final_plan_result_overrides_fragmented_streamed_output()"
     },
     {
@@ -5403,8 +5403,8 @@
       "source_location": "L205",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_first_ready_integration_is_serialized",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_first_ready_integration_is_serialized()"
     },
     {
@@ -5414,8 +5414,8 @@
       "source_location": "L232",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_shutdown_pauses_an_active_worker_without_waiting_indefinitely",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_shutdown_pauses_an_active_worker_without_waiting_indefinitely()"
     },
     {
@@ -5425,8 +5425,8 @@
       "source_location": "L258",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_failed_task_does_not_block_later_task",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_failed_task_does_not_block_later_task()"
     },
     {
@@ -5436,8 +5436,8 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_persists_task_details_for_failed_and_completed_tasks",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_persists_task_details_for_failed_and_completed_tasks()"
     },
     {
@@ -5447,8 +5447,8 @@
       "source_location": "L335",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_rehydrates_failed_and_interrupted_tasks_with_worktree_context",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_rehydrates_failed_and_interrupted_tasks_with_worktree_context()"
     },
     {
@@ -5458,8 +5458,8 @@
       "source_location": "L405",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_rehydrates_plan_review_from_last_persisted_output",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_rehydrates_plan_review_from_last_persisted_output()"
     },
     {
@@ -5469,8 +5469,8 @@
       "source_location": "L444",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_failed_agent_can_be_retried_with_the_same_request",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_failed_agent_can_be_retried_with_the_same_request()"
     },
     {
@@ -5480,8 +5480,8 @@
       "source_location": "L481",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_repeated_retries_replace_previous_output_context_instead_of_duplicating_it",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_repeated_retries_replace_previous_output_context_instead_of_duplicating_it()"
     },
     {
@@ -5491,8 +5491,8 @@
       "source_location": "L519",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_persists_null_model_and_reasoning_for_cursor_task",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_persists_null_model_and_reasoning_for_cursor_task()"
     },
     {
@@ -5502,8 +5502,8 @@
       "source_location": "L561",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_pause_preserves_context_and_resume_reuses_same_worktree",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_pause_preserves_context_and_resume_reuses_same_worktree()"
     },
     {
@@ -5513,8 +5513,8 @@
       "source_location": "L605",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_retry_after_integration_failure_resumes_from_integration",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_retry_after_integration_failure_resumes_from_integration()"
     },
     {
@@ -5524,8 +5524,8 @@
       "source_location": "L664",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_cancel_paused_task_removes_preserved_worktree",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_cancel_paused_task_removes_preserved_worktree()"
     },
     {
@@ -5535,8 +5535,8 @@
       "source_location": "L679",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_plan_answers_require_agent_confirmation_before_implementation",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_plan_answers_require_agent_confirmation_before_implementation()"
     },
     {
@@ -5546,8 +5546,8 @@
       "source_location": "L730",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_plan_answers_accept_ui_owned_custom_text",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_plan_answers_accept_ui_owned_custom_text()"
     },
     {
@@ -5557,8 +5557,8 @@
       "source_location": "L766",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_invalid_confirmation_preserves_answers_for_a_safe_retry",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_invalid_confirmation_preserves_answers_for_a_safe_retry()"
     },
     {
@@ -5568,8 +5568,8 @@
       "source_location": "L802",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_revised_question_drops_only_its_invalid_saved_answer",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_revised_question_drops_only_its_invalid_saved_answer()"
     },
     {
@@ -5579,8 +5579,8 @@
       "source_location": "L832",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_implementation_discards_the_clean_planning_worktree",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_implementation_discards_the_clean_planning_worktree()"
     },
     {
@@ -5590,8 +5590,8 @@
       "source_location": "L855",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_plan_clarification_is_separate_from_plan_conversation",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_plan_clarification_is_separate_from_plan_conversation()"
     },
     {
@@ -5601,8 +5601,8 @@
       "source_location": "L908",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_submit_persists_and_restores_topic",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_submit_persists_and_restores_topic()"
     },
     {
@@ -5612,8 +5612,8 @@
       "source_location": "L944",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_implement_plan_and_clarification_inherit_topic",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_implement_plan_and_clarification_inherit_topic()"
     },
     {
@@ -5623,8 +5623,8 @@
       "source_location": "L1008",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_sync_recovery_plan_auto_implements_without_reset_or_stock_implement",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_sync_recovery_plan_auto_implements_without_reset_or_stock_implement()"
     },
     {
@@ -5634,8 +5634,8 @@
       "source_location": "L1108",
       "_origin": "ast",
       "id": "tests_test_task_coordinator_taskcoordinatortests_test_sync_recovery_questions_pause_then_auto_continue",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".test_sync_recovery_questions_pause_then_auto_continue()"
     },
     {
@@ -6173,8 +6173,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_agent_runner",
-      "community": 25,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "agent_runner.py"
     },
     {
@@ -6349,8 +6349,8 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_run",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": ".run()"
     },
     {
@@ -6360,8 +6360,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "outputcallback",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "outputcallback"
     },
     {
@@ -6393,8 +6393,8 @@
       "source_location": "L367",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_stream_stdout",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._stream_stdout()"
     },
     {
@@ -6404,8 +6404,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "thread",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "thread"
     },
     {
@@ -6426,8 +6426,8 @@
       "source_location": "L409",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_stream",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._stream()"
     },
     {
@@ -6459,8 +6459,8 @@
       "source_location": "L462",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_normalize_output",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._normalize_output()"
     },
     {
@@ -6470,8 +6470,8 @@
       "source_location": "L481",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_json_payloads",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._json_payloads()"
     },
     {
@@ -6481,8 +6481,8 @@
       "source_location": "L497",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_extract_token_usage",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._extract_token_usage()"
     },
     {
@@ -6492,8 +6492,8 @@
       "source_location": "L525",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_tokens_from_usage",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._tokens_from_usage()"
     },
     {
@@ -6503,8 +6503,8 @@
       "source_location": "L548",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_first_integer",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._first_integer()"
     },
     {
@@ -6514,8 +6514,8 @@
       "source_location": "L556",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_failure_diagnostics",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._failure_diagnostics()"
     },
     {
@@ -6525,8 +6525,8 @@
       "source_location": "L578",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_codex_failure_diagnostics",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._codex_failure_diagnostics()"
     },
     {
@@ -6536,8 +6536,8 @@
       "source_location": "L588",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_codex_error_messages",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._codex_error_messages()"
     },
     {
@@ -6547,8 +6547,8 @@
       "source_location": "L623",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_format_codex_error_message",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._format_codex_error_message()"
     },
     {
@@ -6558,8 +6558,8 @@
       "source_location": "L644",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_material_codex_stderr",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._material_codex_stderr()"
     },
     {
@@ -6569,8 +6569,8 @@
       "source_location": "L654",
       "_origin": "ast",
       "id": "tui_agent_runner_agentrunner_benign_codex_stderr_line",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "._benign_codex_stderr_line()"
     },
     {
@@ -6580,8 +6580,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tui_agent_runner_rationale_1",
-      "community": 25,
-      "community_name": "._set_status",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "provider-specific subprocess execution with normalized agent messages."
     },
     {
@@ -6635,8 +6635,8 @@
       "source_location": "L579",
       "_origin": "ast",
       "id": "tui_agent_runner_rationale_579",
-      "community": 54,
-      "community_name": "TranscriptLog",
+      "community": 44,
+      "community_name": "CandidateFeatureGroup",
       "norm_label": "prefer codex jsonl error events over benign stderr noise."
     },
     {
@@ -6778,8 +6778,8 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "tui_app_plananswerselect",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "plananswerselect"
     },
     {
@@ -6800,8 +6800,8 @@
       "source_location": "L260",
       "_origin": "ast",
       "id": "tui_app_plananswerselect_on_plan_answer_mount",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "._on_plan_answer_mount()"
     },
     {
@@ -6811,8 +6811,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "mount",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "mount"
     },
     {
@@ -6822,8 +6822,8 @@
       "source_location": "L268",
       "_origin": "ast",
       "id": "tui_app_plananswerselect_initialize_after_mount",
-      "community": 25,
-      "community_name": "._set_status",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._initialize_after_mount()"
     },
     {
@@ -6866,8 +6866,8 @@
       "source_location": "L322",
       "_origin": "ast",
       "id": "tui_app_planclarificationscreen",
-      "community": 96,
-      "community_name": "PlanClarificationScreen",
+      "community": 48,
+      "community_name": "._persist_task",
       "norm_label": "planclarificationscreen"
     },
     {
@@ -6877,8 +6877,8 @@
       "source_location": "L329",
       "_origin": "ast",
       "id": "tui_app_planclarificationscreen_init",
-      "community": 96,
-      "community_name": "PlanClarificationScreen",
+      "community": 48,
+      "community_name": "._persist_task",
       "norm_label": ".__init__()"
     },
     {
@@ -6888,8 +6888,8 @@
       "source_location": "L333",
       "_origin": "ast",
       "id": "tui_app_planclarificationscreen_compose",
-      "community": 96,
-      "community_name": "PlanClarificationScreen",
+      "community": 48,
+      "community_name": "._persist_task",
       "norm_label": ".compose()"
     },
     {
@@ -6910,8 +6910,8 @@
       "source_location": "L349",
       "_origin": "ast",
       "id": "tui_app_planclarificationscreen_on_mount",
-      "community": 96,
-      "community_name": "PlanClarificationScreen",
+      "community": 48,
+      "community_name": "._persist_task",
       "norm_label": ".on_mount()"
     },
     {
@@ -6943,8 +6943,8 @@
       "source_location": "L361",
       "_origin": "ast",
       "id": "tui_app_planclarificationscreen_action_cancel_clarification",
-      "community": 96,
-      "community_name": "PlanClarificationScreen",
+      "community": 48,
+      "community_name": "._persist_task",
       "norm_label": ".action_cancel_clarification()"
     },
     {
@@ -6954,8 +6954,8 @@
       "source_location": "L365",
       "_origin": "ast",
       "id": "tui_app_keyboardshortcutsscreen",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "keyboardshortcutsscreen"
     },
     {
@@ -6965,8 +6965,8 @@
       "source_location": "L373",
       "_origin": "ast",
       "id": "tui_app_keyboardshortcutsscreen_compose",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": ".compose()"
     },
     {
@@ -6976,8 +6976,8 @@
       "source_location": "L382",
       "_origin": "ast",
       "id": "tui_app_keyboardshortcutsscreen_action_close_shortcuts",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": ".action_close_shortcuts()"
     },
     {
@@ -7075,8 +7075,8 @@
       "source_location": "L475",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseconfirmationscreen_init",
-      "community": 82,
-      "community_name": "TranscriptLog",
+      "community": 87,
+      "community_name": ".__init__",
       "norm_label": ".__init__()"
     },
     {
@@ -7284,8 +7284,8 @@
       "source_location": "L650",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseremovalconfirmationscreen_init",
-      "community": 57,
-      "community_name": "DescriptorEmbedder",
+      "community": 87,
+      "community_name": ".__init__",
       "norm_label": ".__init__()"
     },
     {
@@ -7372,8 +7372,8 @@
       "source_location": "L716",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "personalsupabaseactivationprogressscreen"
     },
     {
@@ -7383,8 +7383,8 @@
       "source_location": "L733",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_init",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 87,
+      "community_name": ".__init__",
       "norm_label": ".__init__()"
     },
     {
@@ -7394,8 +7394,8 @@
       "source_location": "L745",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_running",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": ".running()"
     },
     {
@@ -7416,8 +7416,8 @@
       "source_location": "L790",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_on_mount",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": ".on_mount()"
     },
     {
@@ -7438,8 +7438,8 @@
       "source_location": "L834",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_finish",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": ".finish()"
     },
     {
@@ -7449,8 +7449,8 @@
       "source_location": "L842",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_apply_finish",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "._apply_finish()"
     },
     {
@@ -7471,8 +7471,8 @@
       "source_location": "L870",
       "_origin": "ast",
       "id": "tui_app_personalsupabaseactivationprogressscreen_action_close_activation_progress",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": ".action_close_activation_progress()"
     },
     {
@@ -7724,8 +7724,8 @@
       "source_location": "L1096",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 96,
+      "community_name": "PlanClarificationScreen",
       "norm_label": "topicviewerscreen"
     },
     {
@@ -7735,8 +7735,8 @@
       "source_location": "L1103",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen_init",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 96,
+      "community_name": "PlanClarificationScreen",
       "norm_label": ".__init__()"
     },
     {
@@ -7757,8 +7757,8 @@
       "source_location": "L1124",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen_on_mount",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 96,
+      "community_name": "PlanClarificationScreen",
       "norm_label": ".on_mount()"
     },
     {
@@ -7779,8 +7779,8 @@
       "source_location": "L1131",
       "_origin": "ast",
       "id": "tui_app_topicviewerscreen_action_close_topic_viewer",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 96,
+      "community_name": "PlanClarificationScreen",
       "norm_label": ".action_close_topic_viewer()"
     },
     {
@@ -8164,8 +8164,8 @@
       "source_location": "L1883",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_log_asyncio_exception",
-      "community": 25,
-      "community_name": "._set_status",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._log_asyncio_exception()"
     },
     {
@@ -8175,8 +8175,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "abstracteventloop",
-      "community": 25,
-      "community_name": "._set_status",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "abstracteventloop"
     },
     {
@@ -8296,8 +8296,8 @@
       "source_location": "L1952",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_action_cancel_task",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 93,
+      "community_name": "._refresh_push_button",
       "norm_label": ".action_cancel_task()"
     },
     {
@@ -8439,8 +8439,8 @@
       "source_location": "L2088",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_open_personal_supabase_setup_wizard",
-      "community": 93,
-      "community_name": "._refresh_push_button",
+      "community": 94,
+      "community_name": "SyncMergeConflictError",
       "norm_label": "._open_personal_supabase_setup_wizard()"
     },
     {
@@ -8450,8 +8450,8 @@
       "source_location": "L2104",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_wizard_finished",
-      "community": 93,
-      "community_name": "._refresh_push_button",
+      "community": 94,
+      "community_name": "SyncMergeConflictError",
       "norm_label": "._on_personal_supabase_wizard_finished()"
     },
     {
@@ -8494,8 +8494,8 @@
       "source_location": "L2218",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_on_personal_supabase_progress_action",
-      "community": 94,
-      "community_name": "SyncMergeConflictError",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._on_personal_supabase_progress_action()"
     },
     {
@@ -8505,8 +8505,8 @@
       "source_location": "L2222",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_start_personal_supabase_exposure",
-      "community": 94,
-      "community_name": "SyncMergeConflictError",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "._start_personal_supabase_exposure()"
     },
     {
@@ -8527,8 +8527,8 @@
       "source_location": "L2249",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_finish_personal_supabase_progress",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "._finish_personal_supabase_progress()"
     },
     {
@@ -9231,8 +9231,8 @@
       "source_location": "L3629",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_plan_answer_select_value",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "._plan_answer_select_value()"
     },
     {
@@ -9495,8 +9495,8 @@
       "source_location": "L4016",
       "_origin": "ast",
       "id": "tui_app_daedalustuiapp_cancel_task",
-      "community": 84,
-      "community_name": "RegistrationResult",
+      "community": 93,
+      "community_name": "._refresh_push_button",
       "norm_label": "._cancel_task()"
     },
     {
@@ -9605,8 +9605,8 @@
       "source_location": "L257",
       "_origin": "ast",
       "id": "tui_app_rationale_257",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "initialize dynamic plan selectors after their nested children mount."
     },
     {
@@ -9616,8 +9616,8 @@
       "source_location": "L269",
       "_origin": "ast",
       "id": "tui_app_rationale_269",
-      "community": 25,
-      "community_name": "._set_status",
+      "community": 84,
+      "community_name": "RegistrationResult",
       "norm_label": "finish select setup without allowing a stale value to exit the tui.          pla"
     },
     {
@@ -9638,8 +9638,8 @@
       "source_location": "L323",
       "_origin": "ast",
       "id": "tui_app_rationale_323",
-      "community": 96,
-      "community_name": "PlanClarificationScreen",
+      "community": 48,
+      "community_name": "._persist_task",
       "norm_label": "collect a clarification about one plan question."
     },
     {
@@ -9649,8 +9649,8 @@
       "source_location": "L366",
       "_origin": "ast",
       "id": "tui_app_rationale_366",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "modal reference for the app and prompt editor keyboard shortcuts."
     },
     {
@@ -9704,8 +9704,8 @@
       "source_location": "L717",
       "_origin": "ast",
       "id": "tui_app_rationale_717",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "show the durable activation phases while the worker runs."
     },
     {
@@ -9715,8 +9715,8 @@
       "source_location": "L746",
       "_origin": "ast",
       "id": "tui_app_rationale_746",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "whether the activation worker still owns this progress surface."
     },
     {
@@ -9726,8 +9726,8 @@
       "source_location": "L791",
       "_origin": "ast",
       "id": "tui_app_rationale_791",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "apply worker results that arrived while this modal was mounting."
     },
     {
@@ -9759,8 +9759,8 @@
       "source_location": "L835",
       "_origin": "ast",
       "id": "tui_app_rationale_835",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "freeze the progress display and allow the operator to close it."
     },
     {
@@ -9770,8 +9770,8 @@
       "source_location": "L843",
       "_origin": "ast",
       "id": "tui_app_rationale_843",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "render a completion state after all modal widgets are mounted."
     },
     {
@@ -9814,8 +9814,8 @@
       "source_location": "L1097",
       "_origin": "ast",
       "id": "tui_app_rationale_1097",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 96,
+      "community_name": "PlanClarificationScreen",
       "norm_label": "display a topic markdown file without allowing edits."
     },
     {
@@ -10023,8 +10023,8 @@
       "source_location": "L2093",
       "_origin": "ast",
       "id": "tui_app_rationale_2093",
-      "community": 93,
-      "community_name": "._refresh_push_button",
+      "community": 94,
+      "community_name": "SyncMergeConflictError",
       "norm_label": "scaffold files, then guide manual project env setup before activate."
     },
     {
@@ -10056,8 +10056,8 @@
       "source_location": "L2254",
       "_origin": "ast",
       "id": "tui_app_rationale_2254",
-      "community": 97,
-      "community_name": "._on_personal_supabase_activation_progress",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "finish a queued modal update only if its screen is still mounted."
     },
     {
@@ -10441,8 +10441,8 @@
       "source_location": "L3632",
       "_origin": "ast",
       "id": "tui_app_rationale_3632",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "resolve a select value that is legal for the current question options."
     },
     {
@@ -11871,8 +11871,8 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "tui_config_codexusagesettings",
-      "community": 79,
-      "community_name": "test_app.py",
+      "community": 87,
+      "community_name": ".__init__",
       "norm_label": "codexusagesettings"
     },
     {
@@ -12333,8 +12333,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "tui_git_worktree_syncmergeconflicterror",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "syncmergeconflicterror"
     },
     {
@@ -12828,8 +12828,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "tui_git_worktree_rationale_18",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "raised when an operator sync pull/merge leaves unmerged paths.      the conflict"
     },
     {
@@ -13455,8 +13455,8 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "tui_orchestrator_orchestrationsettings",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "orchestrationsettings"
     },
     {
@@ -13829,8 +13829,8 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "tui_personal_supabase_personalsupabasebootstrapresult",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "personalsupabasebootstrapresult"
     },
     {
@@ -13895,8 +13895,8 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "tui_personal_supabase_personal_supabase_managed_env_keys",
-      "community": 80,
-      "community_name": "PersonalSupabaseConfirmationScreen",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "personal_supabase_managed_env_keys()"
     },
     {
@@ -13950,8 +13950,8 @@
       "source_location": "L274",
       "_origin": "ast",
       "id": "tui_personal_supabase_expose_personal_supabase_schema",
-      "community": 83,
-      "community_name": "discover_projects",
+      "community": 90,
+      "community_name": "remove_personal_supabase",
       "norm_label": "expose_personal_supabase_schema()"
     },
     {
@@ -14071,8 +14071,8 @@
       "source_location": "L490",
       "_origin": "ast",
       "id": "tui_personal_supabase_without_personal_supabase_env_values",
-      "community": 80,
-      "community_name": "PersonalSupabaseConfirmationScreen",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "_without_personal_supabase_env_values()"
     },
     {
@@ -14126,8 +14126,8 @@
       "source_location": "L592",
       "_origin": "ast",
       "id": "tui_personal_supabase_project_personal_supabase_env_path",
-      "community": 80,
-      "community_name": "PersonalSupabaseConfirmationScreen",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "project_personal_supabase_env_path()"
     },
     {
@@ -14148,8 +14148,8 @@
       "source_location": "L602",
       "_origin": "ast",
       "id": "tui_personal_supabase_load_project_personal_supabase_env_values",
-      "community": 90,
-      "community_name": "remove_personal_supabase",
+      "community": 92,
+      "community_name": "PersonalSupabaseSetupWizardScreen",
       "norm_label": "load_project_personal_supabase_env_values()"
     },
     {
@@ -14159,8 +14159,8 @@
       "source_location": "L607",
       "_origin": "ast",
       "id": "tui_personal_supabase_write_project_personal_supabase_environment",
-      "community": 80,
-      "community_name": "PersonalSupabaseConfirmationScreen",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "write_project_personal_supabase_environment()"
     },
     {
@@ -14214,8 +14214,8 @@
       "source_location": "L778",
       "_origin": "ast",
       "id": "tui_personal_supabase_validate_supabase_scaffold",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "_validate_supabase_scaffold()"
     },
     {
@@ -14321,29 +14321,29 @@
       "label": "profile_guidance_section()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1587",
+      "source_location": "L1590",
       "_origin": "ast",
       "id": "tui_personal_supabase_profile_guidance_section",
-      "community": 59,
-      "community_name": "PlanClarification",
+      "community": 80,
+      "community_name": "PersonalSupabaseConfirmationScreen",
       "norm_label": "profile_guidance_section()"
     },
     {
       "label": "_short_error()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1645",
+      "source_location": "L1648",
       "_origin": "ast",
       "id": "tui_personal_supabase_short_error",
-      "community": 68,
-      "community_name": "task_coordinator.py",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "_short_error()"
     },
     {
       "label": "_path_allowed_for_scaffold()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1652",
+      "source_location": "L1655",
       "_origin": "ast",
       "id": "tui_personal_supabase_path_allowed_for_scaffold",
       "community": 59,
@@ -14354,7 +14354,7 @@
       "label": "_personal_supabase_compat_scaffold_paths()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1669",
+      "source_location": "L1672",
       "_origin": "ast",
       "id": "tui_personal_supabase_personal_supabase_compat_scaffold_paths",
       "community": 59,
@@ -14365,7 +14365,7 @@
       "label": "_read_working_or_head_file()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1717",
+      "source_location": "L1720",
       "_origin": "ast",
       "id": "tui_personal_supabase_read_working_or_head_file",
       "community": 59,
@@ -14376,7 +14376,7 @@
       "label": "_git_output()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1727",
+      "source_location": "L1730",
       "_origin": "ast",
       "id": "tui_personal_supabase_git_output",
       "community": 59,
@@ -14387,7 +14387,7 @@
       "label": "_GitCommandResult",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1743",
+      "source_location": "L1746",
       "_origin": "ast",
       "id": "tui_personal_supabase_gitcommandresult",
       "community": 59,
@@ -14398,7 +14398,7 @@
       "label": "_run_git()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1748",
+      "source_location": "L1751",
       "_origin": "ast",
       "id": "tui_personal_supabase_run_git",
       "community": 59,
@@ -14409,7 +14409,7 @@
       "label": "_git_porcelain_paths()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1766",
+      "source_location": "L1769",
       "_origin": "ast",
       "id": "tui_personal_supabase_git_porcelain_paths",
       "community": 59,
@@ -14420,7 +14420,7 @@
       "label": "_probe_database_url()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1791",
+      "source_location": "L1794",
       "_origin": "ast",
       "id": "tui_personal_supabase_probe_database_url",
       "community": 90,
@@ -14431,7 +14431,7 @@
       "label": "_direct_database_host_project_ref()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1860",
+      "source_location": "L1863",
       "_origin": "ast",
       "id": "tui_personal_supabase_direct_database_host_project_ref",
       "community": 90,
@@ -14442,7 +14442,7 @@
       "label": "_supabase_layout_conflict()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1871",
+      "source_location": "L1874",
       "_origin": "ast",
       "id": "tui_personal_supabase_supabase_layout_conflict",
       "community": 59,
@@ -14453,7 +14453,7 @@
       "label": "_migration_creates_schema()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1893",
+      "source_location": "L1896",
       "_origin": "ast",
       "id": "tui_personal_supabase_migration_creates_schema",
       "community": 59,
@@ -14464,7 +14464,7 @@
       "label": "_ensure_supabase_scaffold()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1905",
+      "source_location": "L1908",
       "_origin": "ast",
       "id": "tui_personal_supabase_ensure_supabase_scaffold",
       "community": 59,
@@ -14475,7 +14475,7 @@
       "label": "_ensure_env_example()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1939",
+      "source_location": "L1942",
       "_origin": "ast",
       "id": "tui_personal_supabase_ensure_env_example",
       "community": 59,
@@ -14486,7 +14486,7 @@
       "label": "_env_example_block()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1984",
+      "source_location": "L1987",
       "_origin": "ast",
       "id": "tui_personal_supabase_env_example_block",
       "community": 59,
@@ -14497,7 +14497,7 @@
       "label": "_shared_env_example_block()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1995",
+      "source_location": "L1998",
       "_origin": "ast",
       "id": "tui_personal_supabase_shared_env_example_block",
       "community": 59,
@@ -14508,7 +14508,7 @@
       "label": "_allow_list_comment()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2026",
+      "source_location": "L2029",
       "_origin": "ast",
       "id": "tui_personal_supabase_allow_list_comment",
       "community": 59,
@@ -14519,18 +14519,18 @@
       "label": "_ensure_profile_guidance()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2032",
+      "source_location": "L2035",
       "_origin": "ast",
       "id": "tui_personal_supabase_ensure_profile_guidance",
-      "community": 59,
-      "community_name": "PlanClarification",
+      "community": 80,
+      "community_name": "PersonalSupabaseConfirmationScreen",
       "norm_label": "_ensure_profile_guidance()"
     },
     {
       "label": "_write_registration_marker()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2063",
+      "source_location": "L2066",
       "_origin": "ast",
       "id": "tui_personal_supabase_write_registration_marker",
       "community": 59,
@@ -14541,7 +14541,7 @@
       "label": "_toml_escape()",
       "file_type": "code",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2098",
+      "source_location": "L2101",
       "_origin": "ast",
       "id": "tui_personal_supabase_toml_escape",
       "community": 59,
@@ -14588,8 +14588,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "tui_personal_supabase_rationale_80",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "redacted result of preparing one registered project for launch use."
     },
     {
@@ -14654,8 +14654,8 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "tui_personal_supabase_rationale_142",
-      "community": 80,
-      "community_name": "PersonalSupabaseConfirmationScreen",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "return every env key this feature may clean up (preferred + aliases)."
     },
     {
@@ -14709,8 +14709,8 @@
       "source_location": "L281",
       "_origin": "ast",
       "id": "tui_personal_supabase_rationale_281",
-      "community": 83,
-      "community_name": "discover_projects",
+      "community": 90,
+      "community_name": "remove_personal_supabase",
       "norm_label": "merge the project schema into the hosted postgrest exposed schema list."
     },
     {
@@ -14797,8 +14797,8 @@
       "source_location": "L491",
       "_origin": "ast",
       "id": "tui_personal_supabase_rationale_491",
-      "community": 80,
-      "community_name": "PersonalSupabaseConfirmationScreen",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "return env text without the configured supabase assignments."
     },
     {
@@ -14852,8 +14852,8 @@
       "source_location": "L593",
       "_origin": "ast",
       "id": "tui_personal_supabase_rationale_593",
-      "community": 80,
-      "community_name": "PersonalSupabaseConfirmationScreen",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "return the target project's ``.env`` path for client credentials."
     },
     {
@@ -14874,8 +14874,8 @@
       "source_location": "L603",
       "_origin": "ast",
       "id": "tui_personal_supabase_rationale_603",
-      "community": 90,
-      "community_name": "remove_personal_supabase",
+      "community": 92,
+      "community_name": "PersonalSupabaseSetupWizardScreen",
       "norm_label": "load canonical supabase values from the daedalus tui ``.env``."
     },
     {
@@ -14885,8 +14885,8 @@
       "source_location": "L613",
       "_origin": "ast",
       "id": "tui_personal_supabase_rationale_613",
-      "community": 80,
-      "community_name": "PersonalSupabaseConfirmationScreen",
+      "community": 59,
+      "community_name": "PlanClarification",
       "norm_label": "append/update the managed project ``.env`` block, preserving other lines."
     },
     {
@@ -15014,20 +15014,20 @@
       "label": "Return the markdown section appended to coding/architecture profiles.",
       "file_type": "rationale",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1588",
+      "source_location": "L1591",
       "_origin": "ast",
-      "id": "tui_personal_supabase_rationale_1588",
-      "community": 59,
-      "community_name": "PlanClarification",
+      "id": "tui_personal_supabase_rationale_1591",
+      "community": 80,
+      "community_name": "PersonalSupabaseConfirmationScreen",
       "norm_label": "return the markdown section appended to coding/architecture profiles."
     },
     {
       "label": "Recognize the paired legacy local Supabase config and schema migration.      Som",
       "file_type": "rationale",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1674",
+      "source_location": "L1677",
       "_origin": "ast",
-      "id": "tui_personal_supabase_rationale_1674",
+      "id": "tui_personal_supabase_rationale_1677",
       "community": 59,
       "community_name": "PlanClarification",
       "norm_label": "recognize the paired legacy local supabase config and schema migration.      som"
@@ -15036,9 +15036,9 @@
       "label": "Read a dirty project file, falling back to HEAD for a tracked deletion.",
       "file_type": "rationale",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1718",
+      "source_location": "L1721",
       "_origin": "ast",
-      "id": "tui_personal_supabase_rationale_1718",
+      "id": "tui_personal_supabase_rationale_1721",
       "community": 59,
       "community_name": "PlanClarification",
       "norm_label": "read a dirty project file, falling back to head for a tracked deletion."
@@ -15047,9 +15047,9 @@
       "label": "Return the project ref from a canonical Supabase direct DB hostname.",
       "file_type": "rationale",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1861",
+      "source_location": "L1864",
       "_origin": "ast",
-      "id": "tui_personal_supabase_rationale_1861",
+      "id": "tui_personal_supabase_rationale_1864",
       "community": 90,
       "community_name": "remove_personal_supabase",
       "norm_label": "return the project ref from a canonical supabase direct db hostname."
@@ -15083,8 +15083,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "tui_plan_planquestion",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "planquestion"
     },
     {
@@ -15094,8 +15094,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "tui_plan_planclarification",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "planclarification"
     },
     {
@@ -15116,8 +15116,8 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "tui_plan_plan_answer_options",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "plan_answer_options()"
     },
     {
@@ -15127,8 +15127,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "tui_plan_encode_custom_answer",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "encode_custom_answer()"
     },
     {
@@ -15138,8 +15138,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "tui_plan_custom_answer_text",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "custom_answer_text()"
     },
     {
@@ -15149,8 +15149,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "tui_plan_is_valid_plan_answer",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "is_valid_plan_answer()"
     },
     {
@@ -15171,8 +15171,8 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "tui_plan_build_plan_clarification_prompt",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "build_plan_clarification_prompt()"
     },
     {
@@ -15182,8 +15182,8 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "tui_plan_build_plan_followup_prompt",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "build_plan_followup_prompt()"
     },
     {
@@ -15193,8 +15193,8 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "tui_plan_build_implementation_prompt",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "build_implementation_prompt()"
     },
     {
@@ -15292,8 +15292,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tui_plan_rationale_33",
-      "community": 2,
-      "community_name": "AgentRunner",
+      "community": 82,
+      "community_name": "TranscriptLog",
       "norm_label": "a side-channel clarification about one plan question (not plan follow-up)."
     },
     {
@@ -15303,8 +15303,8 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "tui_plan_rationale_53",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "return agent choices plus the ui-owned custom-answer choice."
     },
     {
@@ -15314,8 +15314,8 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "tui_plan_rationale_60",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "encode free text without confusing it with an agent option id."
     },
     {
@@ -15325,8 +15325,8 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "tui_plan_rationale_68",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "extract ui-entered text from an encoded custom answer, if present."
     },
     {
@@ -15336,8 +15336,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "tui_plan_rationale_76",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "validate agent option ids and the software-owned custom answer format."
     },
     {
@@ -15358,8 +15358,8 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "tui_plan_rationale_117",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "build a read-only ask prompt for one plan question, without other questions."
     },
     {
@@ -16117,8 +16117,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "tui_task_coordinator_string_list",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "_string_list()"
     },
     {
@@ -16128,8 +16128,8 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "tui_task_coordinator_nonnegative_int",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "_nonnegative_int()"
     },
     {
@@ -16139,8 +16139,8 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "tui_task_coordinator_snapshot_timestamp",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "_snapshot_timestamp()"
     },
     {
@@ -16150,8 +16150,8 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "tui_task_coordinator_snapshot_path",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "_snapshot_path()"
     },
     {
@@ -16172,8 +16172,8 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "tui_task_coordinator_snapshot_sequence",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "_snapshot_sequence()"
     },
     {
@@ -16183,8 +16183,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "tui_task_coordinator_phase_for_status",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "_phase_for_status()"
     },
     {
@@ -16205,8 +16205,8 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "tui_task_coordinator_integrationcoordinator",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "integrationcoordinator"
     },
     {
@@ -16216,8 +16216,8 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "tui_task_coordinator_integrationcoordinator_init",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".__init__()"
     },
     {
@@ -16227,8 +16227,8 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "tui_task_coordinator_integrationcoordinator_shutdown",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".shutdown()"
     },
     {
@@ -16238,8 +16238,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "tui_task_coordinator_integrationcoordinator_run_when_ready",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".run_when_ready()"
     },
     {
@@ -16249,8 +16249,8 @@
       "source_location": "L211",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "taskcoordinator"
     },
     {
@@ -16260,8 +16260,8 @@
       "source_location": "L214",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_init",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".__init__()"
     },
     {
@@ -16271,8 +16271,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "taskeventcallback",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "taskeventcallback"
     },
     {
@@ -16282,8 +16282,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tui_task_coordinator_py_lock",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "lock"
     },
     {
@@ -16293,8 +16293,8 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_set_event_callback",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".set_event_callback()"
     },
     {
@@ -16315,8 +16315,8 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_has_active_sync_recovery",
-      "community": 103,
-      "community_name": ".has_active_sync_recovery",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": ".has_active_sync_recovery()"
     },
     {
@@ -16326,8 +16326,8 @@
       "source_location": "L284",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_has_active_sync_recovery_locked",
-      "community": 103,
-      "community_name": ".has_active_sync_recovery",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "._has_active_sync_recovery_locked()"
     },
     {
@@ -16359,8 +16359,8 @@
       "source_location": "L395",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_answer_plan",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": ".answer_plan()"
     },
     {
@@ -16568,8 +16568,8 @@
       "source_location": "L1100",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_parse_plan_messages",
-      "community": 104,
-      "community_name": "._parse_plan_messages",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "._parse_plan_messages()"
     },
     {
@@ -16612,8 +16612,8 @@
       "source_location": "L1240",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_restore_tasks",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "._restore_tasks()"
     },
     {
@@ -16623,8 +16623,8 @@
       "source_location": "L1356",
       "_origin": "ast",
       "id": "tui_task_coordinator_taskcoordinator_restore_plan_state",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "._restore_plan_state()"
     },
     {
@@ -16656,8 +16656,8 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_168",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "run ready integration operations one at a time in ready order."
     },
     {
@@ -16667,8 +16667,8 @@
       "source_location": "L212",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_212",
-      "community": 48,
-      "community_name": "._persist_task",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "submit independent prompts while sharing a serialized integration gate."
     },
     {
@@ -16678,8 +16678,8 @@
       "source_location": "L280",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_280",
-      "community": 103,
-      "community_name": ".has_active_sync_recovery",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "return whether a sync conflict recovery is still in flight for this project."
     },
     {
@@ -16711,8 +16711,8 @@
       "source_location": "L396",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_396",
-      "community": 33,
-      "community_name": ".emit",
+      "community": 41,
+      "community_name": "KeyboardShortcutsScreen",
       "norm_label": "send selected plan answers back to the planning agent for confirmation."
     },
     {
@@ -16821,8 +16821,8 @@
       "source_location": "L1101",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_1101",
-      "community": 104,
-      "community_name": "._parse_plan_messages",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "parse plan json from one turn without letting join separators break it."
     },
     {
@@ -16854,8 +16854,8 @@
       "source_location": "L1241",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_1241",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "rehydrate this project's persisted tasks after a tui restart."
     },
     {
@@ -16865,8 +16865,8 @@
       "source_location": "L1357",
       "_origin": "ast",
       "id": "tui_task_coordinator_rationale_1357",
-      "community": 27,
-      "community_name": ".on_mount",
+      "community": 21,
+      "community_name": "._shutdown_coordinators",
       "norm_label": "recover review questions from the last persisted plan response."
     },
     {
@@ -19032,8 +19032,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "tui_vim_text_area_daedalusvimtextarea_enter_insert_mode",
-      "community": 89,
-      "community_name": "IntegrationCoordinator",
+      "community": 83,
+      "community_name": "discover_projects",
       "norm_label": ".enter_insert_mode()"
     },
     {
@@ -19219,8 +19219,8 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "tui_vim_text_area_rationale_64",
-      "community": 89,
-      "community_name": "IntegrationCoordinator",
+      "community": 83,
+      "community_name": "discover_projects",
       "norm_label": "return to insert mode after programmatic prompt operations."
     },
     {
@@ -20261,7 +20261,7 @@
       "label": "Key Points",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L17",
+      "source_location": "L18",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_key_points",
       "community": 66,
@@ -20272,7 +20272,7 @@
       "label": "Relevant Files",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L144",
+      "source_location": "L147",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_relevant_files",
       "community": 66,
@@ -20283,7 +20283,7 @@
       "label": "Dev Mode",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L166",
+      "source_location": "L169",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_dev_mode",
       "community": 66,
@@ -20294,7 +20294,7 @@
       "label": "State Log",
       "file_type": "document",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L169",
+      "source_location": "L172",
       "_origin": "ast",
       "id": "feature_files_daedalus_tui_personal_supabase_state_log",
       "community": 66,
@@ -63823,7 +63823,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1570",
+      "source_location": "L1573",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_expose_registered_personal_supabase_schema",
@@ -69119,7 +69119,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2026",
+      "source_location": "L2029",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69163,7 +69163,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1860",
+      "source_location": "L1863",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69174,7 +69174,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1939",
+      "source_location": "L1942",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69185,7 +69185,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2032",
+      "source_location": "L2035",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69196,7 +69196,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1905",
+      "source_location": "L1908",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69207,7 +69207,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1984",
+      "source_location": "L1987",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69251,7 +69251,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1727",
+      "source_location": "L1730",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69262,7 +69262,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1766",
+      "source_location": "L1769",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69273,7 +69273,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1743",
+      "source_location": "L1746",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69361,7 +69361,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1893",
+      "source_location": "L1896",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69372,7 +69372,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1652",
+      "source_location": "L1655",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69383,7 +69383,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1669",
+      "source_location": "L1672",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69482,7 +69482,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1791",
+      "source_location": "L1794",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69504,7 +69504,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1587",
+      "source_location": "L1590",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69537,7 +69537,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1717",
+      "source_location": "L1720",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69691,7 +69691,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1748",
+      "source_location": "L1751",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69713,7 +69713,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1995",
+      "source_location": "L1998",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69724,7 +69724,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1645",
+      "source_location": "L1648",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69735,7 +69735,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1871",
+      "source_location": "L1874",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69757,7 +69757,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2098",
+      "source_location": "L2101",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -69834,7 +69834,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2063",
+      "source_location": "L2066",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase",
@@ -70105,7 +70105,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1791",
+      "source_location": "L1794",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_probe_database_url",
@@ -70316,7 +70316,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1851",
+      "source_location": "L1854",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_probe_database_url",
@@ -70328,7 +70328,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1589",
+      "source_location": "L1592",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_profile_guidance_section",
@@ -70564,7 +70564,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1563",
+      "source_location": "L1566",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_expose_registered_personal_supabase_schema",
@@ -70682,7 +70682,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1939",
+      "source_location": "L1942",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_env_example",
@@ -70694,7 +70694,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2032",
+      "source_location": "L2035",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_profile_guidance",
@@ -70706,7 +70706,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1905",
+      "source_location": "L1908",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_supabase_scaffold",
@@ -70730,7 +70730,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1727",
+      "source_location": "L1730",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_git_output",
@@ -70742,7 +70742,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1766",
+      "source_location": "L1769",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_git_porcelain_paths",
@@ -70802,7 +70802,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1669",
+      "source_location": "L1672",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_personal_supabase_compat_scaffold_paths",
@@ -70850,7 +70850,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1717",
+      "source_location": "L1720",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_read_working_or_head_file",
@@ -70958,7 +70958,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1748",
+      "source_location": "L1751",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_run_git",
@@ -70970,7 +70970,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1871",
+      "source_location": "L1874",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_supabase_layout_conflict",
@@ -71042,7 +71042,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2063",
+      "source_location": "L2066",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_write_registration_marker",
@@ -71443,6 +71443,30 @@
       "_origin": "ast",
       "source": "tui_personal_supabase_write_project_personal_supabase_environment",
       "target": "tui_personal_supabase_project_personal_supabase_env_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tui/personal_supabase.py",
+      "source_location": "L1560",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tui_personal_supabase_expose_registered_personal_supabase_schema",
+      "target": "tui_personal_supabase_tui_personal_supabase_env_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tui/personal_supabase.py",
+      "source_location": "L604",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tui_personal_supabase_load_project_personal_supabase_env_values",
+      "target": "tui_personal_supabase_tui_personal_supabase_env_path",
       "confidence_score": 1.0
     },
     {
@@ -72000,7 +72024,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2033",
+      "source_location": "L2036",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_profile_guidance",
@@ -72011,11 +72035,23 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1588",
+      "source_location": "L1591",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tui_personal_supabase_rationale_1588",
+      "source": "tui_personal_supabase_rationale_1591",
       "target": "tui_personal_supabase_profile_guidance_section",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tui/personal_supabase.py",
+      "source_location": "L1700",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tui_personal_supabase_personal_supabase_compat_scaffold_paths",
+      "target": "tui_personal_supabase_migration_creates_schema",
       "confidence_score": 1.0
     },
     {
@@ -72027,18 +72063,6 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_personal_supabase_compat_scaffold_paths",
-      "target": "tui_personal_supabase_migration_creates_schema",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "tui/personal_supabase.py",
-      "source_location": "L1694",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "tui_personal_supabase_personal_supabase_compat_scaffold_paths",
       "target": "tui_personal_supabase_read_working_or_head_file",
       "confidence_score": 1.0
     },
@@ -72046,10 +72070,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1674",
+      "source_location": "L1677",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tui_personal_supabase_rationale_1674",
+      "source": "tui_personal_supabase_rationale_1677",
       "target": "tui_personal_supabase_personal_supabase_compat_scaffold_paths",
       "confidence_score": 1.0
     },
@@ -72057,10 +72081,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1718",
+      "source_location": "L1721",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tui_personal_supabase_rationale_1718",
+      "source": "tui_personal_supabase_rationale_1721",
       "target": "tui_personal_supabase_read_working_or_head_file",
       "confidence_score": 1.0
     },
@@ -72069,7 +72093,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1722",
+      "source_location": "L1725",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_read_working_or_head_file",
@@ -72081,7 +72105,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1748",
+      "source_location": "L1751",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_run_git",
@@ -72093,7 +72117,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1804",
+      "source_location": "L1807",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_probe_database_url",
@@ -72104,10 +72128,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1861",
+      "source_location": "L1864",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "tui_personal_supabase_rationale_1861",
+      "source": "tui_personal_supabase_rationale_1864",
       "target": "tui_personal_supabase_direct_database_host_project_ref",
       "confidence_score": 1.0
     },
@@ -72116,7 +72140,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1881",
+      "source_location": "L1884",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_supabase_layout_conflict",
@@ -72128,7 +72152,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1909",
+      "source_location": "L1912",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_supabase_scaffold",
@@ -72140,7 +72164,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1977",
+      "source_location": "L1980",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_env_example",
@@ -72152,7 +72176,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1941",
+      "source_location": "L1944",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_env_example",
@@ -72164,7 +72188,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1975",
+      "source_location": "L1978",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_ensure_env_example",
@@ -72176,7 +72200,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1991",
+      "source_location": "L1994",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_env_example_block",
@@ -72188,7 +72212,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L1986",
+      "source_location": "L1989",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_env_example_block",
@@ -72200,7 +72224,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tui/personal_supabase.py",
-      "source_location": "L2079",
+      "source_location": "L2082",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tui_personal_supabase_write_registration_marker",
@@ -81911,7 +81935,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L166",
+      "source_location": "L169",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -81922,7 +81946,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L17",
+      "source_location": "L18",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -81933,7 +81957,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L144",
+      "source_location": "L147",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -81944,7 +81968,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "feature_files/daedalus-tui-personal-supabase.md",
-      "source_location": "L169",
+      "source_location": "L172",
       "weight": 1.0,
       "_origin": "ast",
       "source": "feature_files_daedalus_tui_personal_supabase_daedalus_tui_personal_shared_supabase",
@@ -82580,5 +82604,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "278ebf6237714ac18f8d8c6f2c96706eab0c3864"
+  "built_at_commit": "2b6988620c977643fcdde29c2d4157f2745a0249"
 }
