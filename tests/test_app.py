@@ -218,7 +218,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
         )
         return app, coordinator
 
-    async def test_controls_and_launch_directory_are_visible(self):
+    async def test_controls_and_simplified_task_output_are_visible(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
             self.assertEqual(app.query_one("#provider-select", Select).value, "codex")
@@ -227,7 +227,11 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.query_one("#mode-select", Select).value, "coding")
             self.assertEqual(app.query_one("#target-branch-select", Select).value, "main")
             self.assertEqual(app.query_one("#topic-select", Select).value, TOPIC_NONE_VALUE)
-            self.assertIn("/workspace/project", str(app.query_one("#directory", Static).render()))
+            self.assertEqual(app.query("#directory, #phase, #output-toggle-button, #task-error").nodes, [])
+            self.assertEqual(
+                app.query_one("#task-context", Static).render().plain,
+                "Task branch: —    Worktree: —",
+            )
             self.assertIsInstance(app.query_one("#task-list", DataTable), DataTable)
             task_list = app.query_one("#task-list", DataTable)
             self.assertEqual(
@@ -260,8 +264,11 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertIsInstance(app.query_one("#view-topic-button", Button), Button)
             self.assertTrue(app.query_one("#view-topic-button", Button).disabled)
-            self.assertIsInstance(app.query_one("#output-toggle-button", Button), Button)
             await pilot.pause()
+            self.assertGreater(
+                app.query_one("#output", Log).size.height,
+                app.query_one("#output-toolbar").size.height,
+            )
 
     async def test_main_page_shows_codex_plan_usage(self):
         app, _ = self.make_app()
@@ -804,7 +811,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
 
             self.assertEqual(str(app.query_one("#status", Static).render()), "Sync failed")
-            self.assertIn("auth failed", "\n".join(app.query_one("#task-error", Log)._lines))
+            self.assertIn("auth failed", "\n".join(app.query_one("#output", Log)._lines))
             self.assertFalse(app._push_in_flight)
             await pilot.pause()
 
@@ -872,36 +879,22 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(coordinator.records, [])
             self.assertEqual(str(app.query_one("#status", Static).render()), "Sync failed")
-            self.assertIn("network down", "\n".join(app.query_one("#task-error", Log)._lines))
+            self.assertIn("network down", "\n".join(app.query_one("#output", Log)._lines))
             await pilot.pause()
 
-    async def test_output_and_error_logs_toggle_as_full_size_selectable_views(self):
+    async def test_task_errors_render_inline_in_red_selectable_output(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
             output = app.query_one("#output", Log)
-            error = app.query_one("#task-error", Log)
-            toggle = app.query_one("#output-toggle-button", Button)
-
-            self.assertEqual(output.styles.display, "block")
-            self.assertEqual(error.styles.display, "none")
-            self.assertEqual(str(toggle.label), "Show errors")
-
-            toggle.press()
-            await pilot.pause()
-
-            self.assertEqual(output.styles.display, "none")
-            self.assertEqual(error.styles.display, "block")
-            self.assertEqual(str(toggle.label), "Show agent output")
-            self.assertIs(app.focused, error)
-            app._handle_vim_key("j")
-            self.assertIs(app.focused, error)
-
-            toggle.press()
+            output.write_message("Agent response before failure.")
+            app._set_error("Authentication failed.")
             await pilot.pause()
 
             self.assertEqual(output.styles.display, "block")
-            self.assertEqual(error.styles.display, "none")
-            self.assertIs(app.focused, output)
+            self.assertIn("Agent response before failure.", "\n".join(output._lines))
+            self.assertIn("Authentication failed.", "\n".join(output._lines))
+            self.assertIn("error", output.line_tones)
+            self.assertTrue(output.allow_select)
 
     async def test_task_list_keeps_failures_active_work_and_current_session_tasks(self):
         app, coordinator = self.make_app()
@@ -1471,7 +1464,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(prompt.text, "")
             self.assertFalse(prompt.read_only)
             self.assertFalse(app.query_one("#send-button", Button).disabled)
-            self.assertEqual(str(app.query_one("#phase", Static).render()), "Phase: Idle")
+            self.assertEqual(app.query("#phase").nodes, [])
 
     async def test_ctrl_shift_n_opens_new_project_modal(self):
         app, _ = self.make_app()
@@ -1571,7 +1564,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(app.directory, second)
             self.assertIsNot(app.coordinator, first_coordinator)
-            self.assertIn("Active project: /workspace/second", str(app.query_one("#directory", Static).render()))
+            self.assertNotIn("/workspace/second", app.query_one("#task-context", Static).render().plain)
             self.assertEqual(len(first_coordinator.tasks()), 0)
 
             project_select.value = str(first)
@@ -1674,7 +1667,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             self.assertEqual(str(app.query_one("#status", Static).render()), "Error")
-            self.assertIn("cannot be empty", "\n".join(app.query_one("#task-error", Log)._lines))
+            self.assertIn("cannot be empty", "\n".join(app.query_one("#output", Log)._lines))
             self.assertFalse(app.query_one("#send-button", Button).disabled)
 
     async def test_submitted_prompt_is_visible_and_immutable(self):
@@ -1730,7 +1723,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(prompt.text, "")
             self.assertFalse(prompt.read_only)
             self.assertFalse(app.query_one("#send-button", Button).disabled)
-            self.assertEqual(str(app.query_one("#phase", Static).render()), "Phase: Idle")
+            self.assertEqual(app.query("#phase").nodes, [])
 
     async def test_failed_task_selection_restores_its_prompt(self):
         app, coordinator = self.make_app()
@@ -1767,7 +1760,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             retry_button = app.query_one("#retry-button", Button)
             self.assertFalse(retry_button.disabled)
-            self.assertIn("internet connection", "\n".join(app.query_one("#task-error", Log)._lines))
+            self.assertIn("internet connection", "\n".join(app.query_one("#output", Log)._lines))
             retry_button.press()
             await pilot.pause()
             self.assertEqual(coordinator.retry_actions, [record.task_id])
@@ -1990,7 +1983,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             coordinator.emit(record, "questioning", "Plan ready.", "status")
             await pilot.pause()
 
-            self.assertEqual(str(app.query_one("#phase", Static).render()), "Phase: Questioning")
+            self.assertNotIn("Phase", app.query_one("#task-context", Static).render().plain)
             self.assertFalse(app.query_one("#continue-plan-button", Button).disabled)
             self.assertTrue(app.query_one("#pause-button", Button).disabled)
             self.assertFalse(app.query_one("#cancel-button", Button).disabled)
@@ -2042,7 +2035,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(str(app.query_one("#status", Static).render()), "Error")
             self.assertNotIn(
                 "Expected markup value",
-                "\n".join(app.query_one("#task-error", Log)._lines),
+                "\n".join(app.query_one("#output", Log)._lines),
             )
             self.assertTrue(app.query_one("#plan-question-0", Select).query_one("#label"))
 
@@ -2455,7 +2448,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 [app.query_one(f"#plan-question-{index}", Select).value for index in range(2)],
                 [Select.NULL, Select.NULL],
             )
-            self.assertEqual(app.query_one("#phase", Static).render().plain, "Phase: Questions")
+            self.assertEqual(app.query("#phase").nodes, [])
 
     async def test_plan_question_clarification_button_and_viewer(self):
         from tui.app import PlanClarificationScreen
@@ -2547,7 +2540,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(str(app.query_one("#status", Static).render()), "Error")
             self.assertIn(
                 "synthetic plan widget failure",
-                "\n".join(app.query_one("#task-error", Log)._lines),
+                "\n".join(app.query_one("#output", Log)._lines),
             )
 
     async def test_late_background_event_is_ignored_after_app_shutdown(self):
@@ -2593,7 +2586,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertIsNone(app._exception)
             self.assertEqual(str(app.query_one("#status", Static).render()), "Error")
-            self.assertIn("render failure", "\n".join(app.query_one("#task-error", Log)._lines))
+            self.assertIn("render failure", "\n".join(app.query_one("#output", Log)._lines))
 
     async def test_paused_task_exposes_optional_resume_notes(self):
         app, coordinator = self.make_app()
@@ -2624,20 +2617,20 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             native_clipboard.assert_called_once_with("only this selected section")
 
     @patch("tui.app.copy_to_system_clipboard")
-    async def test_copy_selection_reads_selectable_error_log(self, native_clipboard):
+    async def test_copy_selection_reads_inline_error_output(self, native_clipboard):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            error = app.query_one("#task-error", Log)
-            error.write("only this diagnostic section")
-            error.focus()
+            output = app.query_one("#output", Log)
+            output.write_error("only this diagnostic section")
+            output.focus()
             await pilot.pause()
-            selected = error.get_selection(
+            selected = output.get_selection(
                 ScreenSelection.from_offsets(Offset(0, 0), Offset(10, 0))
             )
             self.assertTrue(selected)
             app.screen.get_selected_text = Mock(return_value=selected[0])
 
-            self.assertTrue(error.allow_select)
+            self.assertTrue(output.allow_select)
             app._handle_vim_key("y")
             native_clipboard.assert_called_once_with(selected[0])
 
@@ -2834,7 +2827,11 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             task_list.move_cursor(row=list(app._task_rows).index(second_row), column=0)
             task_list.action_select_cursor()
             await pilot.pause()
-            self.assertIn("Task branch: agent/task-2", str(app.query_one("#task-context", Static).render()))
+            task_context = app.query_one("#task-context", Static).render().plain
+            self.assertEqual(task_context, "Task branch: agent/task-2    Worktree: /tmp/task-2")
+            self.assertNotIn("Provider", task_context)
+            self.assertNotIn("Model", task_context)
+            self.assertNotIn("Thinking", task_context)
 
     async def test_background_progress_does_not_promote_an_unselected_task(self):
         app, coordinator = self.make_app()
