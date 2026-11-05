@@ -3280,7 +3280,12 @@ class DaedalusTuiApp(App[None]):
             )
             summary = " ".join(record.prompt.split())
             summary = self._fit_task_cell(summary, task_width)
-            marker = "!" if row_key in self._updated_task_rows else ""
+            if record.status == "failed":
+                marker = Text("✗", style="bold red")
+            elif record.status == "completed":
+                marker = Text("✓", style="bold green")
+            else:
+                marker = "!" if row_key in self._updated_task_rows else ""
             status = self._fit_task_cell(record.status, status_width)
             task_list.add_row(marker, project_name, summary, status, key=row_key)
 
