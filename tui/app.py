@@ -3298,6 +3298,8 @@ class DaedalusTuiApp(App[None]):
             summary = self._fit_task_cell(summary, task_width)
             if record.status == "failed":
                 marker = Text("✗", style="bold red")
+            elif record.mode == "plan" and record.status in {"completed", "awaiting_answers"}:
+                marker = Text("●", style="bold orange1")
             elif record.status == "completed":
                 marker = Text("✓", style="bold green")
             else:
