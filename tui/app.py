@@ -124,8 +124,8 @@ _THREAD_EXIT_HOOK_REGISTERED = False
 
 
 THEMES: dict[str, dict[str, str | bool]] = {
-    "rainbow": {
-        "label": "Rainbow",
+    "clown": {
+        "label": "Clown",
         "primary": "#ff4fa3", "secondary": "#ff9f1c", "accent": "#ffe14a",
         "success": "#42e695", "warning": "#48d8ff", "error": "#ff5263",
         "foreground": "#fff6fb", "background": "#17111c", "surface": "#24182a",
@@ -177,6 +177,8 @@ def _load_saved_theme(path: Path) -> str:
         value = json.loads(path.read_text(encoding="utf-8")).get("theme")
     except (OSError, ValueError, AttributeError):
         return "violet"
+    if value == "rainbow":
+        return "clown"
     return value if isinstance(value, str) and value in THEMES else "violet"
 
 
@@ -1544,8 +1546,12 @@ class DaedalusTuiApp(App[None]):
         yield Header()
         with VerticalScroll(
             id="screen",
-            classes="rainbow-theme" if self.selected_theme == "rainbow" else "",
+            classes="clown-theme" if self.selected_theme == "clown" else "",
         ):
+            yield Static(
+                "\n".join(("░░▒▒" if row % 2 == 0 else "▒▒░░") * 80 for row in range(80)),
+                id="clown-checkerboard",
+            )
             with Horizontal(id="workspace"):
                 with Vertical(id="task-sidebar"):
                     yield Static("Task updates", id="task-label")
@@ -2110,7 +2116,7 @@ class DaedalusTuiApp(App[None]):
         self.selected_theme = theme_name
         self.theme = f"daedalus-{theme_name}"
         self.query_one("#screen", VerticalScroll).set_class(
-            theme_name == "rainbow", "rainbow-theme"
+            theme_name == "clown", "clown-theme"
         )
         try:
             _save_theme(self._theme_preferences_path, theme_name)
