@@ -1,6 +1,4 @@
 import json
-import os
-import signal
 import tempfile
 import threading
 import unittest
@@ -15,12 +13,7 @@ from textual.selection import Selection as ScreenSelection
 from textual.widgets import Button, DataTable, Input, Log, Select, Static, TextArea
 from vimkeys_input import VimMode
 
-from tui.transcript import TranscriptLog
 from tui.app import (
-    GUARDED_SIGNALS,
-    OPEN_DIRECTORY_VALUE,
-    external_signal_plan,
-    install_signal_guards,
     CodingStatisticsScreen,
     CommandMenuScreen,
     CreateTopicScreen,
@@ -30,20 +23,14 @@ from tui.app import (
     PersonalSupabaseActivationProgressScreen,
     PersonalSupabaseRemovalConfirmationScreen,
     PersonalSupabaseSetupWizardScreen,
-    OpenProjectDirectoryScreen,
-    PushedCommitsScreen,
     ProjectInitializerScreen,
     TUI_ROOT,
     TopicViewerScreen,
 )
 from tui.codex_usage import CodexUsageSnapshot, CodexUsageWindow
 from tui.config import LayoutSettings, ModelOption, TuiSettings
-from tui.memory import TaskMemoryStore
-from tui.config import LayoutSettings, ModelOption, PromptingSettings, TuiSettings
-from tui.usage_monitor import ClaudeAccountUsage, UsageSettings
 from tui.projects import DaedalusProject
 from tui.plan import CUSTOM_ANSWER_OPTION_ID, PlanOption, PlanQuestion, encode_custom_answer
-from tui.conversation import TaskRun, TaskTurn
 from tui.task_coordinator import TaskRecord
 from tui.topics import TOPIC_NONE_VALUE
 from tui.vim_text_area import DaedalusVimTextArea
@@ -61,8 +48,6 @@ class FakeCoordinator:
         self.resume_notes = []
         self.plan_actions = []
         self.retry_actions = []
-        self.followups = []
-        self.interrupts = []
 
     def set_event_callback(self, callback):
         self.callback = callback
@@ -82,68 +67,9 @@ class FakeCoordinator:
             branch_name=f"agent/task-{len(self.records) + 1}",
             worktree_path=Path(f"/tmp/task-{len(self.records) + 1}"),
         )
-        record.title = prompt.strip().splitlines()[0][:60] if prompt.strip() else record.task_id
-        self._add_turn(record, prompt)
         self.records.append(record)
         self.emit(record, "agent", "", "status")
         return record
-
-    def _add_turn(self, record, text, revises_turn_id=None):
-        turn = TaskTurn(
-            turn_id=f"{record.task_id}-turn-{len(record.turns) + 1}",
-            sequence=len(record.turns) + 1,
-            text=text,
-            submitted_at=0.0,
-            revises_turn_id=revises_turn_id,
-        )
-        record.turns.append(turn)
-        record.active_turn_id = turn.turn_id
-        run = TaskRun(
-            run_id=f"{record.task_id}-run-{len(record.runs) + 1}",
-            turn_id=turn.turn_id,
-            attempt=1,
-            status="running",
-            message_start=len(record.messages),
-        )
-        record.runs.append(run)
-        record.active_run_id = run.run_id
-        return turn
-
-    def submit_followup(self, task_id, text, revises_turn_id=None, **changes):
-        record = self.get(task_id)
-        if record is None:
-            return None
-        if record.status in {"queued", "running", "planning", "verifying", "ready", "integrating", "resolving"}:
-            raise RuntimeError("Wait for the current run to stop before sending another prompt.")
-        self.followups.append((task_id, text, revises_turn_id, changes))
-        for name, value in changes.items():
-            if name in {"provider", "model", "reasoning", "mode"}:
-                setattr(record, name, value)
-        self._add_turn(record, text, revises_turn_id)
-        record.status = "running"
-        record.phase = "Agent"
-        self.emit(record, "agent", "", "status")
-        return record
-
-    def interrupt(self, task_id):
-        record = self.get(task_id)
-        if record is None or record.status not in {"queued", "running", "planning", "verifying", "ready", "integrating", "resolving"}:
-            return False
-        self.interrupts.append(task_id)
-        record.phase = "Stopping"
-        self.emit(record, "stopping", "Stopping the active run; progress is preserved.", "status")
-        return True
-
-    def finish_interrupt(self, record):
-        record.status = "interrupted"
-        record.phase = "Interrupted"
-        if record.runs:
-            record.runs[-1].status = "interrupted"
-            record.runs[-1].message_end = len(record.messages)
-        self.emit(record, "interrupted", "Run stopped; progress preserved.", "status")
-
-    def conversation_entries(self, record):
-        return []
 
     def tasks(self):
         return tuple(self.records)
@@ -159,9 +85,6 @@ class FakeCoordinator:
         record.messages.append(message)
         record.status = "completed"
         record.phase = "Completed"
-        if record.runs:
-            record.runs[-1].status = "completed"
-            record.runs[-1].message_end = len(record.messages)
         self.emit(record, "completed", "", "status")
 
     def shutdown(self):
@@ -183,13 +106,6 @@ class FakeCoordinator:
         return True
 
     def cancel(self, _task_id):
-        return True
-
-    def delete_task(self, task_id):
-        record = self.get(task_id)
-        if record is None or record.status in {"queued", "running", "planning", "verifying"}:
-            return False
-        self.records.remove(record)
         return True
 
     def retry(self, task_id):
@@ -267,21 +183,12 @@ class FakeCoordinator:
         return True
 
 
-def select_values(select):
-    """Return a Select's real option values, skipping its blank placeholder."""
-    return [value for _label, value in select._options if isinstance(value, str)]
-
-
 def settings():
     return TuiSettings(
         "codex",
         "gpt-6-luna",
         "medium",
-        (
-            ModelOption("Codex", "codex"),
-            ModelOption("Claude Code", "claude"),
-            ModelOption("Cursor CLI", "cursor"),
-        ),
+        (ModelOption("Codex", "codex"), ModelOption("Cursor CLI", "cursor")),
         (
             ModelOption("GPT-6 Astra", "gpt-6-astra"),
             ModelOption("GPT-6 Luna", "gpt-6-luna"),
@@ -297,83 +204,17 @@ def settings():
             ModelOption("Extra high", "extra-high"),
         ),
         ModelOption("Cursor CLI", "cursor"),
-        (ModelOption("Opus 5", "claude-opus-5"), ModelOption("Sonnet 5", "claude-sonnet-5")),
-        (
-            ModelOption("Light", "light"),
-            ModelOption("Medium", "medium"),
-            ModelOption("High", "high"),
-            ModelOption("Extra high", "extra-high"),
-            ModelOption("Max", "max"),
-        ),
-        usage=UsageSettings(enabled=False),
     )
-
-
-def prompting_settings():
-    """Prompt archives, drafts, and diagnostics for one test go to a fresh
-    throwaway root instead of the checkout's own prompts/ and errors/ folders,
-    so drafts saved by one test are never restored by the next."""
-    return PromptingSettings(
-        data_root=Path(tempfile.mkdtemp(prefix="daedalus-tui-tests-")),
-        draft_autosave_delay_ms=0,
-    )
-
-
-class SignalGuardTests(unittest.TestCase):
-    """Stray signals reach the app instead of asyncio's task-cancelling handler."""
-
-    def setUp(self):
-        self._saved = {signum: signal.getsignal(signum) for signum in GUARDED_SIGNALS}
-
-    def tearDown(self):
-        for signum, handler in self._saved.items():
-            signal.signal(signum, handler)
-
-    def test_signal_plan_maps_sigint_to_interrupt_and_the_rest_to_exit(self):
-        self.assertEqual(external_signal_plan(signal.SIGINT), ("interrupt", "SIGINT"))
-        self.assertEqual(external_signal_plan(signal.SIGTERM), ("exit", "SIGTERM"))
-        self.assertEqual(external_signal_plan(signal.SIGHUP), ("exit", "SIGHUP"))
-
-    def test_install_replaces_the_default_handler_and_delivers_to_the_app(self):
-        app = Mock()
-        install_signal_guards(app)
-        # asyncio.run installs its own SIGINT handler only over the default one.
-        self.assertIsNot(signal.getsignal(signal.SIGINT), signal.default_int_handler)
-        os.kill(os.getpid(), signal.SIGINT)
-        app._on_external_signal.assert_called_once_with(signal.SIGINT)
-
-    def test_sigint_schedules_the_ctrl_c_interrupt_on_the_loop(self):
-        app = Mock(spec=DaedalusTuiApp)
-        app._loop = Mock()
-        app.is_running = True
-        DaedalusTuiApp._on_external_signal(app, signal.SIGINT)
-        app._loop.call_soon_threadsafe.assert_called_once_with(app._interrupt_from_signal, "SIGINT")
-        app._shutdown_coordinators.assert_not_called()
-
-    def test_sigterm_exits_gracefully_and_pauses_agents_without_a_loop(self):
-        app = Mock(spec=DaedalusTuiApp)
-        app._loop = Mock()
-        app.is_running = True
-        DaedalusTuiApp._on_external_signal(app, signal.SIGTERM)
-        app._loop.call_soon_threadsafe.assert_called_once_with(app._exit_from_signal, "SIGTERM")
-        before_loop = Mock(spec=DaedalusTuiApp)
-        before_loop._loop = None
-        before_loop.is_running = False
-        DaedalusTuiApp._on_external_signal(before_loop, signal.SIGHUP)
-        before_loop._shutdown_coordinators.assert_called_once()
-        self.assertIn("SIGHUP", before_loop._shutdown_coordinators.call_args.args[0])
 
 
 class TuiAppTests(unittest.IsolatedAsyncioTestCase):
-    def make_app(self, prompting: PromptingSettings | None = None):
-        """Build an app; pass ``prompting`` to reopen one on the same storage."""
+    def make_app(self):
         coordinator = FakeCoordinator()
         app = DaedalusTuiApp(
             runner=FakeRunner(),
             directory=Path("/workspace/project"),
             settings=settings(),
             coordinator=coordinator,
-            prompting_settings=prompting or prompting_settings(),
         )
         return app, coordinator
 
@@ -400,10 +241,8 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(all(not column.auto_width for column in task_list.columns.values()))
             self.assertIsInstance(app.query_one("#prompt-input", TextArea), DaedalusVimTextArea)
             self.assertEqual(app.query_one("#prompt-input", DaedalusVimTextArea).vim_mode, VimMode.INSERT)
-            # A compact mode indicator is visible; no verbose Vim help chrome.
-            self.assertEqual(str(app.query_one("#vim-mode", Static).render()), "INSERT")
+            self.assertEqual(app.query("#vim-mode").nodes, [])
             self.assertEqual(app.query("#vim-help").nodes, [])
-            self.assertEqual(str(app.query_one("#usage-bar", Static).render()), "Usage: disabled")
             self.assertEqual(app.query("#copy-button, #copy-selection-button, #copy-error-button").nodes, [])
             self.assertIsInstance(app.query_one("#project-select", Select), Select)
             self.assertIsInstance(app.query_one("#pause-button", Button), Button)
@@ -423,12 +262,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 [binding[0] for binding in app.BINDINGS if len(binding) > 3 and binding[3]],
                 ["ctrl+k"],
             )
-            self.assertIsInstance(app.query_one("#start-coding-button", Button), Button)
-            self.assertIsInstance(app.query_one("#new-task-button", Button), Button)
-            self.assertIsInstance(app.query_one("#create-topic-button", Button), Button)
-            self.assertIsInstance(app.query_one("#register-backend-button", Button), Button)
-            self.assertFalse(app.query_one("#register-backend-button", Button).disabled)
-            self.assertIsInstance(app.query_one("#sign-in-button", Button), Button)
             self.assertIsInstance(app.query_one("#view-topic-button", Button), Button)
             self.assertTrue(app.query_one("#view-topic-button", Button).disabled)
             await pilot.pause()
@@ -563,7 +396,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 )
 
     async def test_supabase_setup_wizard_blocks_when_env_missing(self):
-    async def test_register_backend_button_disables_when_registered(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             project = root / "demo-app"
@@ -583,7 +415,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=project,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
             async with app.run_test() as pilot:
                 outcomes: list[bool] = []
@@ -637,28 +468,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory) / "demo-app"
             (project / "feature_files").mkdir(parents=True)
-                button = app.query_one("#register-backend-button", Button)
-                self.assertFalse(button.disabled)
-                app.action_register_backend()
-                await pilot.pause()
-                screen = app.screen
-                screen.query_one("#backend-select", Select).value = "supabase"
-                await pilot.pause()
-                screen.query_one("#register-backend-confirm", Button).press()
-                await pilot.pause()
-                await pilot.pause()
-                self.assertTrue(button.disabled)
-                self.assertTrue((project / "supabase" / "config.toml").is_file())
-                self.assertIn(
-                    "Registered personal Supabase schema",
-                    str(app.query_one("#status", Static).render()),
-                )
-
-    async def test_register_backend_scaffolds_firebase_files(self):
-        with tempfile.TemporaryDirectory() as directory:
-            project = Path(directory) / "demo-app"
-            (project / ".agents" / "profiles").mkdir(parents=True)
-            (project / "feature_files").mkdir()
             app = DaedalusTuiApp(
                 runner=FakeRunner(),
                 directory=project,
@@ -840,112 +649,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                     push.call_args.kwargs["database_url"],
                     "postgresql://pooler.example/shared",
                 )
-                prompting_settings=prompting_settings(),
-            )
-            async with app.run_test() as pilot:
-                app.action_register_backend()
-                await pilot.pause()
-                screen = app.screen
-                # Firebase is the default selection in the backend dialog.
-                self.assertEqual(screen.query_one("#backend-select", Select).value, "firebase")
-                screen.query_one("#register-backend-confirm", Button).press()
-                await pilot.pause()
-                await pilot.pause()
-                self.assertTrue((project / "firebase.json").is_file())
-                self.assertTrue((project / "firestore.rules").is_file())
-                self.assertIn("firebase", (project / ".daedalus").read_text(encoding="utf-8"))
-                self.assertTrue(app.query_one("#register-backend-button", Button).disabled)
-
-    async def test_new_project_modal_defaults_to_the_configured_backend(self):
-        app, _ = self.make_app()
-        async with app.run_test() as pilot:
-            app.push_screen(ProjectInitializerScreen(Path("/tmp"), "firebase"))
-            await pilot.pause()
-            backend = app.screen.query_one("#project-backend-select", Select)
-            self.assertEqual(backend.value, "firebase")
-            self.assertEqual(select_values(backend), ["firebase", "none"])
-            await app.screen.dismiss(None)
-            await pilot.pause()
-
-    async def test_app_starts_when_the_default_provider_is_claude(self):
-        """A Claude default model is not a Codex option, so the settings bar
-        must be built from the default provider's own lists at compose time
-        rather than crashing on mount with an illegal select value."""
-        claude_settings = replace(
-            settings(),
-            default_provider="claude",
-            default_model="claude-opus-5",
-            default_reasoning="high",
-        )
-        coordinator = FakeCoordinator()
-        app = DaedalusTuiApp(
-            runner=FakeRunner(),
-            directory=Path("/workspace/project"),
-            settings=claude_settings,
-            coordinator=coordinator,
-            prompting_settings=prompting_settings(),
-        )
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            self.assertEqual(app.query_one("#provider-select", Select).value, "claude")
-            model_select = app.query_one("#model-select", Select)
-            self.assertEqual(model_select.value, "claude-opus-5")
-            self.assertEqual(
-                select_values(model_select),
-                ["claude-opus-5", "claude-sonnet-5"],
-            )
-            self.assertEqual(app.query_one("#reasoning-select", Select).value, "high")
-            self.assertEqual(app._current_submission_settings()[:3], ("claude", "claude-opus-5", "high"))
-
-    async def test_claude_provider_offers_its_own_models_and_effort_scale(self):
-        app, _ = self.make_app()
-        async with app.run_test() as pilot:
-            app._apply_provider_selection("claude")
-            await pilot.pause()
-            model_select = app.query_one("#model-select", Select)
-            reasoning_select = app.query_one("#reasoning-select", Select)
-            self.assertEqual(
-                select_values(model_select),
-                ["claude-opus-5", "claude-sonnet-5"],
-            )
-            self.assertIn("max", select_values(reasoning_select))
-            self.assertFalse(model_select.disabled)
-            self.assertFalse(reasoning_select.disabled)
-            # The Codex default model does not exist for Claude, so the first
-            # Claude model is selected instead of an illegal value.
-            self.assertEqual(model_select.value, "claude-opus-5")
-            self.assertEqual(reasoning_select.value, "medium")
-
-    async def test_empty_provider_event_does_not_crash_selector_cascade(self):
-        app, _ = self.make_app()
-        async with app.run_test() as pilot:
-            provider = app.query_one("#provider-select", Select)
-            event = Mock(select=Mock(id="provider-select", value=Select.NULL), value=Select.NULL)
-            app.on_select_changed(event)
-            await pilot.pause()
-            self.assertEqual(provider.value, "codex")
-
-    async def test_cursor_provider_keeps_its_inert_model_and_reasoning_controls(self):
-        app, _ = self.make_app()
-        async with app.run_test() as pilot:
-            app._apply_provider_selection("cursor")
-            await pilot.pause()
-            self.assertTrue(app.query_one("#model-select", Select).disabled)
-            self.assertTrue(app.query_one("#reasoning-select", Select).disabled)
-            self.assertEqual(app.query_one("#reasoning-select", Select).value, "")
-
-    async def test_compact_picker_follows_the_claude_provider_cascade(self):
-        app, _ = self.make_app()
-        async with app.run_test() as pilot:
-            app._apply_provider_selection("claude")
-            await pilot.pause()
-            self.assertEqual(
-                [value for _label, value in app._compact_setting_options("model")],
-                ["claude-opus-5", "claude-sonnet-5"],
-            )
-            self.assertIn(
-                "max", [value for _label, value in app._compact_setting_options("reasoning")]
-            )
 
     async def test_responsive_layout_transitions_restore_wide_dimensions(self):
         app = DaedalusTuiApp(
@@ -953,7 +656,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             directory=Path("/workspace/project"),
             settings=replace(settings(), layout=LayoutSettings(100, 30, 6, 3)),
             coordinator=FakeCoordinator(),
-            prompting_settings=prompting_settings(),
         )
         async with app.run_test() as pilot:
             self.assertTrue(app._compact_mode)
@@ -980,55 +682,22 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(app._short_height_mode)
             self.assertEqual(app.query_one("#prompt-input").styles.height.value, 3)
 
-    async def test_responsive_layout_wraps_toolbars_before_compacting(self):
+    async def test_responsive_layout_compacts_when_settings_selects_are_too_narrow(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:
-            # Too narrow for the toolbars even on two rows: compact mode.
-            await pilot.resize_terminal(110, 60)
+            await pilot.resize_terminal(125, 60)
             await pilot.pause()
-            await pilot.pause()
+
             self.assertTrue(app._compact_mode)
             self.assertEqual(app.query_one("#settings").styles.display, "block")
             self.assertEqual(app.query_one("#settings").styles.layout.name, "grid")
             self.assertEqual(app.query_one("#compact-settings").styles.display, "none")
-            self.assertFalse(app._wrapped_toolbars)
-            self.assertEqual(app.query_one("#settings").styles.display, "none")
-            self.assertEqual(app.query_one("#compact-settings").styles.display, "block")
 
-            # A full-screen laptop terminal keeps the side-by-side workspace
-            # and wraps the task toolbar and settings row onto two rows.
-            await pilot.resize_terminal(140, 40)
-            await pilot.pause()
+            await pilot.resize_terminal(180, 40)
             await pilot.pause()
             self.assertFalse(app._compact_mode)
-            self.assertTrue(app._wrapped_toolbars)
-            screen = app.query_one("#screen")
-            self.assertTrue(screen.has_class("wrapped-toolbars"))
-            self.assertFalse(screen.has_class("compact-width"))
-            self.assertEqual(str(app.query_one("#main-workspace").styles.layout.name), "horizontal")
-            self.assertEqual(str(app.query_one("#task-bar").styles.layout.name), "grid")
             self.assertEqual(app.query_one("#settings").styles.display, "block")
             self.assertEqual(app.query_one("#compact-settings").styles.display, "none")
-            task_bar = app.query_one("#task-bar")
-            buttons = [button for button in task_bar.query(Button) if button.display]
-            self.assertEqual(len({button.region.y for button in buttons}), 2)
-            self.assertFalse(app._wide_controls_overflow())
-
-            # Once every control fits on one row, the toolbars unwrap.
-            await pilot.resize_terminal(240, 40)
-            await pilot.pause()
-            await pilot.pause()
-            self.assertFalse(app._compact_mode)
-            self.assertFalse(app._wrapped_toolbars)
-            self.assertEqual(str(app.query_one("#task-bar").styles.layout.name), "horizontal")
-            self.assertEqual(len({button.region.y for button in task_bar.query(Button)}), 1)
-
-            # Shrinking again re-wraps instead of dropping to compact mode.
-            await pilot.resize_terminal(140, 40)
-            await pilot.pause()
-            await pilot.pause()
-            self.assertFalse(app._compact_mode)
-            self.assertTrue(app._wrapped_toolbars)
 
     async def test_compact_settings_cascade_and_submission_snapshot(self):
         app, coordinator = self.make_app()
@@ -1308,7 +977,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 runner=FakeRunner(),
                 directory=root,
                 settings=settings(),
-                prompting_settings=prompting_settings(),
             )
             app._coordinator_for(second)
 
@@ -1340,7 +1008,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
             app._coordinators[nested.resolve()] = FakeCoordinator()
             app.projects = (*app.projects, DaedalusProject(nested, root))
@@ -1353,7 +1020,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 project_select = app.query_one("#project-select", Select)
                 labels = [str(label) for label, _value in project_select._options]
-                self.assertEqual(labels, ["daedalus", "other-project", "Open directory…"])
+                self.assertEqual(labels, ["daedalus", "other-project"])
                 self.assertNotIn("project-initialization/other-project", labels)
 
                 app._reload_projects()
@@ -1362,163 +1029,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 refreshed_labels = [
                     str(label) for label, _value in project_select._options
                 ]
-                self.assertEqual(
-                    refreshed_labels, ["daedalus", "other-project", "Open directory…"]
-                )
-
-    @patch("tui.app.TaskCoordinator")
-    @patch("tui.app.list_local_branches")
-    @patch("tui.app.discover_projects")
-    async def test_open_directory_entry_trails_the_discovered_projects(
-        self, discover, list_branches, coordinator_class
-    ):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            alpha = root / "alpha"
-            alpha.mkdir()
-            discover.return_value = (DaedalusProject(alpha, root),)
-            list_branches.return_value = ["main"]
-            coordinator_class.return_value = FakeCoordinator()
-
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                project_select = app.query_one("#project-select", Select)
-
-                self.assertEqual(
-                    [str(label) for label, _value in project_select._options],
-                    ["alpha", "Open directory…"],
-                )
-                self.assertEqual(project_select.value, str(alpha))
-
-    @patch("tui.app.TaskCoordinator")
-    @patch("tui.app.list_local_branches")
-    @patch("tui.app.discover_projects")
-    async def test_open_directory_entry_opens_a_dialog_and_keeps_the_project(
-        self, discover, list_branches, coordinator_class
-    ):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            alpha = root / "alpha"
-            alpha.mkdir()
-            discover.return_value = (DaedalusProject(alpha, root),)
-            list_branches.return_value = ["main"]
-            coordinator_class.return_value = FakeCoordinator()
-
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                app.query_one("#project-select", Select).value = OPEN_DIRECTORY_VALUE
-                await pilot.pause()
-
-                self.assertIsInstance(app.screen, OpenProjectDirectoryScreen)
-                # The sentinel is an action, so the selector still shows a project.
-                self.assertEqual(
-                    app.query_one("#project-select", Select).value, str(alpha)
-                )
-                self.assertEqual(app._active_project_path, alpha.resolve())
-
-    @patch("tui.app.TaskCoordinator")
-    @patch("tui.app.list_local_branches")
-    @patch("tui.app.discover_projects")
-    async def test_opening_a_directory_lists_it_and_switches_onto_it(
-        self, discover, list_branches, coordinator_class
-    ):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "launch-root"
-            alpha = root / "alpha"
-            outside = Path(directory) / "elsewhere" / "outside-project"
-            alpha.mkdir(parents=True)
-            (outside / "feature_files").mkdir(parents=True)
-            discover.return_value = (DaedalusProject(alpha, root),)
-            list_branches.return_value = ["main"]
-            coordinator_class.return_value = FakeCoordinator()
-
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                app._open_project_directory(outside)
-                await pilot.pause()
-
-                project_select = app.query_one("#project-select", Select)
-                self.assertEqual(
-                    [str(label) for label, _value in project_select._options],
-                    ["alpha", "outside-project", "Open directory…"],
-                )
-                self.assertEqual(project_select.value, str(outside.resolve()))
-                self.assertEqual(app._active_project_path, outside.resolve())
-                self.assertEqual(
-                    TaskMemoryStore(root / ".daedalus-memory.json").get_opened_project_directories(),
-                    (outside.resolve(),),
-                )
-
-                # Discovery refreshes must not drop the opened directory.
-                app._reload_projects()
-                await pilot.pause()
-                self.assertIn(
-                    "outside-project",
-                    [str(label) for label, _value in project_select._options],
-                )
-
-    @patch("tui.app.TaskCoordinator")
-    @patch("tui.app.list_local_branches")
-    @patch("tui.app.discover_projects")
-    async def test_remembered_directories_return_and_missing_ones_are_forgotten(
-        self, discover, list_branches, coordinator_class
-    ):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "launch-root"
-            alpha = root / "alpha"
-            outside = Path(directory) / "elsewhere" / "outside-project"
-            removed = Path(directory) / "elsewhere" / "deleted-project"
-            alpha.mkdir(parents=True)
-            (outside / "feature_files").mkdir(parents=True)
-            discover.return_value = (DaedalusProject(alpha, root),)
-            list_branches.return_value = ["main"]
-            coordinator_class.return_value = FakeCoordinator()
-            store = TaskMemoryStore(root / ".daedalus-memory.json")
-            store.add_opened_project_directory(outside)
-            store.add_opened_project_directory(removed)
-            store.set_last_opened_project(outside)
-
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
-            async with app.run_test() as pilot:
-                await pilot.pause()
-
-                self.assertEqual(app._active_project_path, outside.resolve())
-                self.assertEqual(
-                    [str(label) for label, _value in app.query_one("#project-select", Select)._options],
-                    ["alpha", "outside-project", "Open directory…"],
-                )
-                self.assertEqual(
-                    store.get_opened_project_directories(), (outside.resolve(),)
-                )
-
-    @patch("tui.app.TaskCoordinator")
-    @patch("tui.app.list_local_branches")
-    @patch("tui.app.discover_projects")
-    async def test_opening_a_missing_directory_reports_an_error(
-        self, discover, list_branches, coordinator_class
-    ):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            alpha = root / "alpha"
-            alpha.mkdir()
-            discover.return_value = (DaedalusProject(alpha, root),)
-            list_branches.return_value = ["main"]
-            coordinator_class.return_value = FakeCoordinator()
-
-            app = DaedalusTuiApp(runner=FakeRunner(), directory=root, settings=settings(), prompting_settings=prompting_settings())
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                app._open_project_directory(root / "missing")
-                await pilot.pause()
-
-                self.assertEqual(app._active_project_path, alpha.resolve())
-                self.assertEqual(
-                    [str(label) for label, _value in app.query_one("#project-select", Select)._options],
-                    ["alpha", "Open directory…"],
-                )
+                self.assertEqual(refreshed_labels, ["daedalus", "other-project"])
 
     @patch("tui.app.discover_projects")
     async def test_project_heading_opens_a_fresh_task_for_that_project(self, discover):
@@ -1585,7 +1096,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 runner=FakeRunner(),
                 directory=root,
                 settings=settings(),
-                prompting_settings=prompting_settings(),
             )
             async with app.run_test() as pilot:
                 await pilot.pause()
@@ -1631,7 +1141,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
 
             async with app.run_test() as pilot:
@@ -1678,7 +1187,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
 
             async with app.run_test() as pilot:
@@ -1716,7 +1224,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
 
             async with app.run_test() as pilot:
@@ -1793,7 +1300,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
 
             async with app.run_test() as pilot:
@@ -1836,7 +1342,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 runner=FakeRunner(),
                 directory=root,
                 settings=settings(),
-                prompting_settings=prompting_settings(),
             )
 
             self.assertEqual(coordinator_class.call_args.args[2].primary_branch, "james")
@@ -1864,7 +1369,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
 
             self.assertEqual(app.directory, second.resolve())
@@ -1898,7 +1402,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
 
             self.assertEqual(app.directory, first.resolve())
@@ -1920,7 +1423,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 directory=root,
                 settings=settings(),
                 coordinator=FakeCoordinator(),
-                prompting_settings=prompting_settings(),
             )
 
             self.assertEqual(
@@ -1972,15 +1474,13 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
                 str(widget.render()) for widget in app.screen.query(".shortcut-row")
             )
             self.assertIn("Ctrl+Q", shortcut_text)
-            self.assertIn("Shift+Enter / Ctrl+Enter", shortcut_text)
+            self.assertIn("Ctrl+Enter", shortcut_text)
             self.assertIn("Ctrl+K", shortcut_text)
             self.assertIn("Ctrl+P", shortcut_text)
             self.assertIn("Ctrl+T", shortcut_text)
             self.assertIn("Ctrl+U", shortcut_text)
             self.assertIn("Ctrl+Shift+N", shortcut_text)
-            self.assertIn("Ctrl+O", shortcut_text)
             self.assertIn("gg / G", shortcut_text)
-            self.assertIn("dd", shortcut_text)
 
             await pilot.press("escape")
             await pilot.pause()
@@ -2070,75 +1570,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.screen, CreateTopicScreen)
 
     async def test_ctrl_u_opens_coding_statistics_with_usage_columns_and_metrics(self):
-    async def test_dd_deletes_task_under_sidebar_cursor(self):
-        app, coordinator = self.make_app()
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("Remove this task")
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            record.status = "completed"
-            await pilot.pause()
-
-            task_list = app.query_one("#task-list", DataTable)
-            task_list.focus()
-            task_list.move_cursor(row=0, column=0)
-            await pilot.press("d")
-            await pilot.press("d")
-            await pilot.pause()
-
-            self.assertIsNone(coordinator.get(record.task_id))
-            self.assertNotIn(app._task_row_key(app._active_project_path, record.task_id), app._task_rows)
-            self.assertIsNone(app._selected_task_id)
-            self.assertIn("Deleted task", str(app.query_one("#status", Static).render()))
-
-    async def test_dd_keeps_the_sidebar_cursor_position_after_deletion(self):
-        app, coordinator = self.make_app()
-        async with app.run_test() as pilot:
-            for prompt_text in ("First task", "Second task", "Third task"):
-                app.query_one("#prompt-input", DaedalusVimTextArea).insert(prompt_text)
-                app.action_submit_prompt()
-                coordinator.records[-1].status = "completed"
-            app._refresh_task_list()
-
-            task_list = app.query_one("#task-list", DataTable)
-            task_list.focus()
-            task_list.move_cursor(row=2, column=0)
-            deleted_task_id = tuple(app._task_rows.values())[2][1]
-            await pilot.press("d")
-            await pilot.press("d")
-            await pilot.pause()
-
-            self.assertIsNone(coordinator.get(deleted_task_id))
-            self.assertEqual(task_list.cursor_row, 1)
-
-    @patch("tui.app.push_branch", return_value="a" * 40)
-    @patch("tui.app.remote_exists", return_value=True)
-    async def test_successful_push_is_saved_and_browsable(self, _remote_exists, _push_branch):
-        app, _ = self.make_app()
-        async with app.run_test() as pilot:
-            def run_inline(work, **kwargs):
-                work()
-
-            with patch.object(app, "run_worker", side_effect=run_inline), patch.object(
-                app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)
-            ):
-                app.query_one("#push-branch-button", Button).press()
-                await pilot.pause()
-
-            records = app.memory.get_pushed_commits()
-            self.assertEqual(len(records), 1)
-            self.assertEqual(records[0]["commit"], "a" * 40)
-            self.assertIn("recorded in", str(app.query_one("#status", Static).render()))
-
-            app.action_show_push_history()
-            await pilot.pause()
-            self.assertIsInstance(app.screen, PushedCommitsScreen)
-            self.assertIn("a" * 40, app.screen.query_one("#pushed-commits-content", TextArea).text)
-            await pilot.press("escape")
-            await pilot.pause()
-
-    async def test_ctrl_t_opens_coding_statistics_with_usage_columns_and_metrics(self):
         app, coordinator = self.make_app()
         async with app.run_test() as pilot:
             prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
@@ -2184,86 +1615,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
             self.assertNotIsInstance(app.screen, CodingStatisticsScreen)
-
-    async def test_statistics_shows_total_claude_tokens_from_outside_daedalus(self):
-        """The screen reports the operator's whole Claude spend, read in the background."""
-        app, _ = self.make_app()
-        account = ClaudeAccountUsage(
-            total_tokens=4_321_000,
-            today_tokens=12_500,
-            transcript_tokens=4_000_000,
-            cache_tokens=4_321_000,
-            scanned_files=9,
-            first_day="2026-01-02",
-            days_recorded=3,
-            ok=True,
-            detail="stats cache: 4.3M tokens",
-        )
-        async with app.run_test() as pilot:
-            def run_inline(work, **kwargs):
-                work()
-
-            with patch.object(app, "run_worker", side_effect=run_inline), patch.object(
-                app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)
-            ):
-                app.push_screen(
-                    CodingStatisticsScreen(
-                        (),
-                        app.statistics_settings,
-                        account_usage_reader=lambda: account,
-                    )
-                )
-                await pilot.pause()
-
-            summary = "\n".join(str(widget.render()) for widget in app.screen.query(".usage-metric"))
-            self.assertIn("All Claude tokens", summary)
-            self.assertIn("4,321,000", summary)
-            self.assertIn("12,500", app.screen.query_one("#claude-account-metric", Static).tooltip)
-
-            # The account total is tokens even while the screen shows tasks.
-            app.screen.query_one("#statistics-unit-select", Select).value = "tasks"
-            await pilot.pause()
-            self.assertIn(
-                "4,321,000",
-                str(app.screen.query_one("#claude-account-metric", Static).render()),
-            )
-            await pilot.press("escape")
-            await pilot.pause()
-
-    async def test_statistics_reports_when_the_claude_total_cannot_be_read(self):
-        app, _ = self.make_app()
-
-        def fail():
-            raise OSError("transcripts unreadable")
-
-        async with app.run_test() as pilot:
-            def run_inline(work, **kwargs):
-                work()
-
-            with patch.object(app, "run_worker", side_effect=run_inline), patch.object(
-                app, "call_from_thread", side_effect=lambda fn, *args: fn(*args)
-            ):
-                app.push_screen(CodingStatisticsScreen((), app.statistics_settings, account_usage_reader=fail))
-                await pilot.pause()
-
-            tile = app.screen.query_one("#claude-account-metric", Static)
-            self.assertIn("unavailable", str(tile.render()))
-            self.assertIn("transcripts unreadable", tile.tooltip)
-            await pilot.press("escape")
-            await pilot.pause()
-
-    async def test_statistics_marks_the_claude_total_absent_when_usage_is_disabled(self):
-        """Usage readings are off in these settings, so no transcripts are read."""
-        app, _ = self.make_app()
-        async with app.run_test() as pilot:
-            await pilot.press("ctrl+t")
-            await pilot.pause()
-
-            self.assertIsInstance(app.screen, CodingStatisticsScreen)
-            self.assertIsNone(app.screen._account_usage_reader)
-            self.assertIn("—", str(app.screen.query_one("#claude-account-metric", Static).render()))
-            await pilot.press("escape")
-            await pilot.pause()
 
     @patch("tui.app.discover_projects")
     async def test_sidebar_switches_active_project_and_keeps_task_coordinators_separate(self, discover):
@@ -2347,10 +1698,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertFalse(prompt.read_only)
             self.assertEqual(prompt.text, "")
-            # After submission the composer is a blank follow-up draft whose
-            # Send waits for the run; the submitted text itself is immutable.
-            self.assertEqual(prompt.text, "")
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
 
             app.query_one("#project-select", Select).value = str(second)
             await pilot.pause()
@@ -2358,7 +1705,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.directory, second)
             self.assertEqual(prompt.text, "")
             self.assertFalse(prompt.read_only)
-            self.assertFalse(app.query_one("#send-button", Button).disabled)
 
     async def test_cursor_disables_model_and_reasoning_controls(self):
         app, _ = self.make_app()
@@ -2414,18 +1760,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(coordinator.records[0].prompt, "Keep this prompt available")
             output = app.query_one("#output", Log)
             self.assertTrue(any("Keep this prompt available" in line for line in output._lines))
-            record = coordinator.records[0]
-            # The exact submission is an immutable turn shown in the transcript
-            # and listed in Prompt history; the composer becomes a blank
-            # follow-up draft whose Send waits for the run to stop.
-            self.assertEqual(record.prompt, "Keep this prompt available")
-            self.assertIn("Keep this prompt available", "\n".join(app.query_one("#output", TranscriptLog).messages))
-            history = app.query_one("#prompt-history-select", Select)
-            self.assertEqual([value for _label, value in history._options if isinstance(value, str)], [record.turns[0].turn_id and f"turn:{record.turns[0].turn_id}"])
-            self.assertEqual(prompt.text, "")
-            self.assertFalse(prompt.read_only)
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
-            self.assertEqual(str(app.query_one("#task-title", Static).render()), "Task: Keep this prompt available")
 
     async def test_submitted_task_becomes_selected_for_every_mode(self):
         app, coordinator = self.make_app()
@@ -2490,13 +1824,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(prompt.read_only)
             self.assertFalse(app.query_one("#send-button", Button).disabled)
             self.assertTrue(any("A task that will fail" in line for line in app.query_one("#output", Log)._lines))
-            # The submitted prompt stays visible in the conversation while the
-            # composer is an editable follow-up draft for the failed task.
-            self.assertIn("A task that will fail", "\n".join(app.query_one("#output", TranscriptLog).messages))
-            self.assertEqual(str(app.query_one("#task-title", Static).render()), "Task: A task that will fail")
-            self.assertEqual(prompt.text, "")
-            self.assertFalse(prompt.read_only)
-            self.assertFalse(app.query_one("#send-button", Button).disabled)
 
     async def test_failed_task_exposes_retry_action(self):
         app, coordinator = self.make_app()
@@ -2529,25 +1856,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("shift+enter")
             prompt.insert("second line")
             self.assertEqual(prompt.text, "first line\nsecond line")
-
-    async def test_shift_enter_and_ctrl_enter_send_the_prompt(self):
-        """Both submit keys must reach the app while the Vim editor has focus."""
-        for key in ("shift+enter", "ctrl+enter"):
-            with self.subTest(key=key):
-                app, coordinator = self.make_app()
-                async with app.run_test() as pilot:
-                    prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-                    prompt.focus()
-                    prompt.insert(f"Send with {key}")
-                    await pilot.press(key)
-                    await pilot.pause()
-
-                    self.assertEqual(
-                        [record.prompt for record in coordinator.records],
-                        [f"Send with {key}"],
-                    )
-                    # The submit key must never also land in the prompt.
-                    self.assertNotIn("\n", prompt.text)
 
     async def test_prompt_accepts_typing_after_resume_and_new_task(self):
         app, coordinator = self.make_app()
@@ -2757,11 +2065,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("Phase", app.query_one("#task-context", Static).render().plain)
             self.assertFalse(app.query_one("#continue-plan-button", Button).disabled)
             self.assertTrue(app.query_one("#pause-button", Button).disabled)
-            # Nothing is running while the plan waits for review, so there is
-            # nothing to stop; the worktree is never deleted from here.
-            self.assertTrue(app.query_one("#cancel-button", Button).disabled)
-            # A follow-up prompt can be typed and sent from the composer.
-            self.assertFalse(app.query_one("#send-button", Button).disabled)
+            self.assertFalse(app.query_one("#cancel-button", Button).disabled)
 
             app.query_one("#resume-notes", TextArea).insert("Please clarify the data flow.")
             app.action_continue_plan()
@@ -3435,11 +2739,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             assistant_line = output._lines.index("Selectable assistant transcript line.")
             selected = output.get_selection(
                 ScreenSelection.from_offsets(Offset(0, assistant_line), Offset(10, assistant_line))
-            # The user's turn is rendered above the assistant's response.
-            self.assertEqual(output._lines[0], "You · turn 1:")
-            line = output._lines.index("Selectable assistant transcript line.")
-            selected = output.get_selection(
-                ScreenSelection.from_offsets(Offset(0, line), Offset(10, line))
             )
             self.assertIsNotNone(selected)
             self.assertEqual(selected[0], "Selectable")
@@ -3482,11 +2781,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             first_message = output._lines.index("Deciphering things")
             self.assertEqual(output._lines[first_message:first_message + 3], [
                 "Deciphering things", "", "Deciphering more things",
-            start = output._lines.index("Deciphering things")
-            self.assertEqual(output._lines[start:start + 3], [
-                "Deciphering things",
-                "",
-                "Deciphering more things",
             ])
             self.assertEqual(output._lines[0], "Task 1")
             self.assertEqual(output._lines[2], "Show progress")
@@ -3545,27 +2839,15 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_selected_task_prompt_editor_remains_blank_and_editable(self):
         app, _ = self.make_app()
-    async def test_earlier_prompt_can_be_reloaded_without_changing_its_archive(self):
-        app, coordinator = self.make_app()
         async with app.run_test() as pilot:
             prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
             prompt.insert("Keep this task immutable")
             app.action_submit_prompt()
-            record = coordinator.records[0]
-            coordinator.finish(record, "Done.")
-            await pilot.pause()
-            prompt.insert("half-typed follow-up")
-            history = app.query_one("#prompt-history-select", Select)
-            history.value = f"turn:{record.turns[0].turn_id}"
             await pilot.pause()
 
             self.assertEqual(prompt.text, "")
             self.assertFalse(prompt.read_only)
             self.assertFalse(prompt.has_class("-read-only"))
-            self.assertEqual(prompt.text, "Keep this task immutable")
-            self.assertFalse(prompt.read_only)
-            self.assertEqual(record.turns[0].text, "Keep this task immutable")
-            self.assertEqual(app._composer_revises_turn_id, record.turns[0].turn_id)
 
     async def test_output_selection_uses_prompt_selection_colors(self):
         app, _ = self.make_app()
@@ -3704,678 +2986,6 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertIn(row_key, app._updated_task_rows)
 
-    async def test_ctrl_c_interrupts_and_restores_the_submitted_prompt_for_editing(self):
-        app, coordinator = self.make_app()
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("first line\n  second line\n")
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            await pilot.pause()
-            output = app.query_one("#output", TranscriptLog)
-            output.focus()
-            app.screen.get_selected_text = Mock(return_value="selected output")
-            await pilot.pause()
-
-            with patch("tui.app.copy_to_system_clipboard") as clipboard:
-                await pilot.press("ctrl+c")
-                await pilot.pause()
-                clipboard.assert_not_called()
-
-            self.assertEqual(coordinator.interrupts, [record.task_id])
-            self.assertEqual(prompt.text, "first line\n  second line\n")
-            self.assertFalse(prompt.read_only)
-            self.assertEqual(prompt.vim_mode, VimMode.INSERT)
-            self.assertEqual(prompt.cursor_location, (2, 0))
-            self.assertIs(app.focused, prompt)
-            self.assertEqual(app._composer_revises_turn_id, record.turns[0].turn_id)
-            # Send stays disabled until the run has actually stopped.
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
-            self.assertIn("Stopping", str(app.query_one("#status", Static).render()))
-            coordinator.finish_interrupt(record)
-            await pilot.pause()
-            self.assertFalse(app.query_one("#send-button", Button).disabled)
-            self.assertEqual(prompt.text, "first line\n  second line\n")
-            self.assertFalse(app.query_one("#resume-button", Button).disabled)
-
-    async def test_ctrl_c_with_nothing_running_keeps_the_draft(self):
-        app, _ = self.make_app()
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("untouched draft")
-            await pilot.press("ctrl+c")
-            await pilot.pause()
-            self.assertEqual(prompt.text, "untouched draft")
-            self.assertEqual(str(app.query_one("#status", Static).render()), "Nothing is running")
-            self.assertIsNone(app._exception)
-
-    async def test_interrupt_saves_a_different_follow_up_before_restoring_the_prompt(self):
-        app, coordinator = self.make_app()
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("original request")
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            await pilot.pause()
-            prompt.insert("a different follow-up I was typing")
-            await pilot.pause()
-
-            app.action_interrupt_task()
-            await pilot.pause()
-
-            self.assertEqual(prompt.text, "original request")
-            stashed = [
-                draft for draft in app.prompt_store.list_drafts(app._active_project_path, record.task_id)
-                if draft.kind == "stashed"
-            ]
-            self.assertEqual([draft.text for draft in stashed], ["a different follow-up I was typing"])
-            history = app.query_one("#prompt-history-select", Select)
-            values = [value for _label, value in history._options if isinstance(value, str)]
-            self.assertTrue(any(value.startswith("draft:stash-") for value in values))
-            history.value = next(value for value in values if value.startswith("draft:stash-"))
-            await pilot.pause()
-            self.assertEqual(prompt.text, "a different follow-up I was typing")
-
-    async def test_streaming_output_does_not_overwrite_the_draft_or_steal_focus(self):
-        app, coordinator = self.make_app()
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("run this")
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            await pilot.pause()
-            prompt.insert("typing the next prompt")
-            prompt.cursor_location = (0, 6)
-            for index in range(5):
-                record.messages.append(f"progress {index}")
-                coordinator.emit(record, "agent", f"progress {index}", "message")
-                await pilot.pause()
-            self.assertEqual(prompt.text, "typing the next prompt")
-            self.assertEqual(prompt.cursor_location, (0, 6))
-            self.assertIs(app.focused, prompt)
-            self.assertIn("progress 4", "\n".join(app.query_one("#output", TranscriptLog).messages))
-
-    async def test_follow_up_sends_to_the_selected_named_task_and_records_setting_changes(self):
-        app, coordinator = self.make_app()
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("Build the login page")
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            await pilot.pause()
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
-            coordinator.finish(record, "Login page built.")
-            await pilot.pause()
-            self.assertFalse(app.query_one("#send-button", Button).disabled)
-
-            app.query_one("#reasoning-select", Select).value = "high"
-            prompt.insert("Now add validation\n")
-            app.action_submit_prompt()
-            await pilot.pause()
-
-            self.assertEqual(len(coordinator.records), 1)
-            task_id, text, revises, changes = coordinator.followups[0]
-            self.assertEqual((task_id, text, revises), (record.task_id, "Now add validation\n", None))
-            self.assertEqual(changes, {"reasoning": "high"})
-            self.assertEqual(app._selected_task_id, record.task_id)
-            self.assertEqual(prompt.text, "")
-            self.assertTrue(app.query_one("#send-button", Button).disabled)
-            self.assertEqual(str(app.query_one("#task-title", Static).render()), "Task: Build the login page")
-            transcript = "\n".join(app.query_one("#output", TranscriptLog).messages)
-            self.assertIn("Build the login page", transcript)
-            self.assertIn("Now add validation", transcript)
-            self.assertIn("Login page built.", transcript)
-
-    async def test_drafts_autosave_and_restore_for_new_task_and_selected_task(self):
-        app, coordinator = self.make_app()
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("draft for a new task")
-            await pilot.pause()
-            saved = app.prompt_store.load_draft(app._active_project_path, None)
-            self.assertEqual(saved.text, "draft for a new task")
-
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            await pilot.pause()
-            self.assertIsNone(app.prompt_store.load_draft(app._active_project_path, None))
-            prompt.insert("follow-up in progress")
-            await pilot.pause()
-            self.assertEqual(app.prompt_store.load_draft(app._active_project_path, record.task_id).text, "follow-up in progress")
-
-            app.action_new_task()
-            await pilot.pause()
-            self.assertEqual(prompt.text, "")
-            task_list = app.query_one("#task-list", DataTable)
-            task_list.move_cursor(row=0, column=0)
-            task_list.action_select_cursor()
-            await pilot.pause()
-            self.assertEqual(prompt.text, "follow-up in progress")
-
-    async def test_closing_the_window_clears_the_composer_prompt(self):
-        """Reopening Daedalus starts on an empty composer, not last night's text."""
-        prompting = prompting_settings()
-        app, _ = self.make_app(prompting)
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("half-typed idea I never sent")
-            await pilot.pause()
-            saved = app.prompt_store.load_draft(app._active_project_path, None)
-            self.assertEqual(saved.text, "half-typed idea I never sent")
-        self.assertIsNone(app.prompt_store.load_draft(app._active_project_path, None))
-
-        reopened, _ = self.make_app(prompting)
-        async with reopened.run_test() as pilot:
-            await pilot.pause()
-            self.assertEqual(reopened.query_one("#prompt-input", DaedalusVimTextArea).text, "")
-
-    async def test_a_fatal_error_still_leaves_the_composer_prompt_on_disk(self):
-        """A crash is not a deliberate close, so the draft stays recoverable."""
-        prompting = prompting_settings()
-        app, _ = self.make_app(prompting)
-        async with app.run_test() as pilot:
-            app.query_one("#prompt-input", DaedalusVimTextArea).insert("work in progress")
-            await pilot.pause()
-            app._fatal_error = True
-        saved = app.prompt_store.load_draft(app._active_project_path, None)
-        self.assertEqual(saved.text, "work in progress")
-
-    async def test_a_shutdown_flush_does_not_resurrect_the_cleared_prompt(self):
-        """Shutdown flushes the draft too, and one path runs after the close hook."""
-        prompting = prompting_settings()
-        app, _ = self.make_app(prompting)
-        async with app.run_test() as pilot:
-            app.query_one("#prompt-input", DaedalusVimTextArea).insert("cleared on close")
-            await pilot.pause()
-            app._close_composer_draft()
-            # Still running, so the composer is mounted and a forced flush
-            # would happily write the prompt back out again.
-            app._flush_draft(force=True)
-            self.assertIsNone(app.prompt_store.load_draft(app._active_project_path, None))
-        self.assertIsNone(app.prompt_store.load_draft(app._active_project_path, None))
-
-    async def test_keeping_prompts_across_sessions_is_configurable(self):
-        prompting = replace(prompting_settings(), clear_drafts_on_exit=False)
-        app, _ = self.make_app(prompting)
-        async with app.run_test() as pilot:
-            app.query_one("#prompt-input", DaedalusVimTextArea).insert("keep me for tomorrow")
-            await pilot.pause()
-
-        reopened, _ = self.make_app(prompting)
-        async with reopened.run_test() as pilot:
-            await pilot.pause()
-            self.assertEqual(
-                reopened.query_one("#prompt-input", DaedalusVimTextArea).text,
-                "keep me for tomorrow",
-            )
-
-    async def test_closing_the_window_keeps_a_stashed_prompt(self):
-        """Interruption sets a prompt aside deliberately; closing must not eat it."""
-        prompting = prompting_settings()
-        app, coordinator = self.make_app(prompting)
-        async with app.run_test() as pilot:
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("Build the login page")
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            await pilot.pause()
-            prompt.insert("a different follow-up I was typing")
-            await pilot.pause()
-            app.action_interrupt_task()
-            await pilot.pause()
-            stashed = [
-                draft
-                for draft in app.prompt_store.list_drafts(app._active_project_path, record.task_id)
-                if draft.kind == "stashed"
-            ]
-            self.assertEqual([draft.text for draft in stashed], ["a different follow-up I was typing"])
-        kept = [
-            draft
-            for draft in app.prompt_store.list_drafts(app._active_project_path, record.task_id)
-            if draft.kind == "stashed"
-        ]
-        self.assertEqual([draft.text for draft in kept], ["a different follow-up I was typing"])
-
-    async def test_all_tasks_toggle_reveals_completed_history(self):
-        app, coordinator = self.make_app()
-        old = TaskRecord("001-old", 1, "An old completed task", "codex", "model", "medium", status="completed")
-        old.title = "An old completed task"
-        coordinator.records.append(old)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            key = app._task_row_key(app._active_project_path, old.task_id)
-            self.assertNotIn(key, app._task_rows)
-            app.action_toggle_task_history()
-            await pilot.pause()
-            self.assertIn(key, app._task_rows)
-            self.assertEqual(str(app.query_one("#history-toggle-button", Button).label), "Recent tasks")
-            task_list = app.query_one("#task-list", DataTable)
-            task_list.move_cursor(row=list(app._task_rows).index(key), column=0)
-            task_list.action_select_cursor()
-            await pilot.pause()
-            self.assertEqual(app._selected_task_id, old.task_id)
-            self.assertFalse(app.query_one("#send-button", Button).disabled)
-
-    async def test_output_viewer_toggles_takes_the_right_third_and_survives_resizing(self):
-        app, coordinator = self.make_app()
-        async with app.run_test(size=(180, 50)) as pilot:
-            await pilot.pause()
-            workspace = app.query_one("#workspace")
-            viewer = app.query_one("#output-viewer")
-            self.assertEqual(viewer.styles.display, "none")
-            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
-            prompt.insert("Render **markdown**")
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            coordinator.finish(record, "# Result\n\n- one\n- two")
-            await pilot.pause()
-            prompt.insert("keep this draft")
-
-            app.query_one("#viewer-toggle-button", Button).press()
-            await pilot.pause()
-            await pilot.pause()
-            self.assertTrue(workspace.has_class("viewer-visible"))
-            self.assertFalse(workspace.has_class("viewer-full"))
-            main = app.query_one("#main-workspace")
-            self.assertAlmostEqual(viewer.region.width / (viewer.region.width + main.region.width), 1 / 3, delta=0.04)
-            self.assertEqual(app.query_one("#output-viewer").current_text(), "# Result\n\n- one\n- two")
-            self.assertEqual(prompt.text, "keep this draft")
-            self.assertTrue(app._viewer_visible)
-
-            await pilot.resize_terminal(90, 40)
-            await pilot.pause()
-            self.assertTrue(workspace.has_class("viewer-full"))
-            self.assertEqual(main.styles.display, "none")
-            self.assertEqual(prompt.text, "keep this draft")
-            app.query_one("#viewer-back-button", Button).press()
-            await pilot.pause()
-            self.assertFalse(workspace.has_class("viewer-full"))
-            self.assertEqual(viewer.styles.display, "none")
-            await pilot.resize_terminal(180, 50)
-            await pilot.pause()
-            app.action_toggle_output_viewer()
-            await pilot.pause()
-            self.assertTrue(workspace.has_class("viewer-visible"))
-            self.assertEqual(prompt.text, "keep this draft")
-
-    async def test_errors_view_names_the_local_diagnostics_files(self):
-        app, coordinator = self.make_app()
-        async with app.run_test() as pilot:
-            app.query_one("#prompt-input", TextArea).insert("Fail please")
-            app.action_submit_prompt()
-            record = coordinator.records[0]
-            record.diagnostics_dir = Path("/tmp/errors/project/task-1")
-            record.runs[-1].diagnostics_path = "/tmp/errors/project/task-1/turn-0001-run-0001.log"
-            record.status = "failed"
-            record.error = "Verification failed."
-            coordinator.emit(record, "failed", "Verification failed.", "error")
-            await pilot.pause()
-            lines = "\n".join(app.query_one("#task-error", Log)._lines)
-            self.assertIn("turn-0001-run-0001.log", lines)
-            self.assertIn(str(app.debug_log_path), lines)
-            self.assertIn("Verification failed.", lines)
-
-    async def test_usage_bar_shows_monitor_readings(self):
-        from tui.usage_monitor import ProviderUsage
-
-        class FakeMonitor:
-            def poll(self):
-                return (
-                    ProviderUsage("claude", "Claude", "Claude today 1.0k tok · 2 msgs", checked_at=1.0),
-                    ProviderUsage("codex", "Codex", "Codex 5h 30% · week 46%", checked_at=1.0),
-                )
-
-        coordinator = FakeCoordinator()
-        app = DaedalusTuiApp(
-            runner=FakeRunner(),
-            directory=Path("/workspace/project"),
-            settings=replace(settings(), usage=UsageSettings(enabled=True, interval_seconds=60)),
-            coordinator=coordinator,
-            prompting_settings=prompting_settings(),
-            usage_monitor=FakeMonitor(),
-        )
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            await pilot.pause()
-            text = str(app.query_one("#usage-bar", Static).render())
-            self.assertIn("Claude today 1.0k tok · 2 msgs", text)
-            self.assertIn("Codex 5h 30% · week 46%", text)
-            self.assertIsNotNone(app._usage_timer)
-
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class FakeOrchestrateCoordinator:
-    """Stub dispatcher: records starts and stops and serves scripted sessions."""
-
-    def __init__(self):
-        self.callback = None
-        self.sessions_list = []
-        self.starts = []
-        self.stops = []
-
-    def set_event_callback(self, callback):
-        self.callback = callback
-
-    def start(self, prompt, planner_selection, worker_selection, max_workers, topic=None):
-        from tui.orchestrate_session import OrchestrationSession
-
-        self.starts.append((prompt, planner_selection, worker_selection, max_workers, topic))
-        session = OrchestrationSession(
-            session_id=f"orc-{len(self.sessions_list) + 1:03d}-deadbeef",
-            project_key="project",
-            prompt=prompt,
-            planner_selection=planner_selection,
-            worker_selection=worker_selection,
-            max_workers=max_workers,
-            status="planning",
-        )
-        self.sessions_list.append(session)
-        self.emit(session, "Session started.")
-        return session
-
-    def stop(self, session_id):
-        session = self.get(session_id)
-        if session is None or not session.active:
-            return False
-        self.stops.append(session_id)
-        session.status = "stopped"
-        self.emit(session, "Session stopped.")
-        return True
-
-    def sessions(self):
-        return tuple(self.sessions_list)
-
-    def get(self, session_id):
-        return next((session for session in self.sessions_list if session.session_id == session_id), None)
-
-    def plan_text(self, session):
-        return f"# Plan for {session.session_id}\n\n{session.summary}"
-
-    def shutdown(self):
-        return None
-
-    def emit(self, session, message, kind="status"):
-        from tui.orchestrate_coordinator import ORCHESTRATE_PHASE, SessionEventRecord
-
-        if self.callback:
-            record = SessionEventRecord(session.session_id, session.session_id, session.status, error=session.error)
-            self.callback(record, ORCHESTRATE_PHASE, message, kind)
-
-
-class OrchestrateViewTests(unittest.IsolatedAsyncioTestCase):
-    def make_app(self, **overrides):
-        from tui.config import OrchestrateSettings
-
-        coordinator = FakeCoordinator()
-        orchestrator = FakeOrchestrateCoordinator()
-        app = DaedalusTuiApp(
-            runner=FakeRunner(),
-            directory=Path("/workspace/project"),
-            settings=overrides.pop("settings", settings()),
-            coordinator=coordinator,
-            prompting_settings=prompting_settings(),
-            orchestrate_settings=overrides.pop("orchestrate_settings", OrchestrateSettings()),
-            orchestrate_coordinator=orchestrator,
-        )
-        return app, coordinator, orchestrator
-
-    async def test_button_and_ctrl_o_toggle_the_orchestrate_view_with_role_defaults(self):
-        from textual.widgets import ContentSwitcher
-
-        app, _, _ = self.make_app()
-        async with app.run_test() as pilot:
-            button = app.query_one("#orchestrate-mode-button", Button)
-            switcher = app.query_one("#view-switcher", ContentSwitcher)
-            self.assertEqual(str(button.label), "Orchestrate Mode")
-            self.assertEqual(switcher.current, "tasks-view")
-            self.assertEqual(app.query_one("#planner-provider-select", Select).value, "claude")
-            self.assertEqual(app.query_one("#planner-model-select", Select).value, "claude-fable-5-1")
-            self.assertEqual(app.query_one("#planner-reasoning-select", Select).value, "medium")
-            self.assertEqual(app.query_one("#worker-provider-select", Select).value, "claude")
-            self.assertEqual(app.query_one("#worker-model-select", Select).value, "claude-opus-5")
-            self.assertEqual(app.query_one("#worker-reasoning-select", Select).value, "high")
-            self.assertEqual(app.query_one("#max-workers-input", Input).value, "3")
-            self.assertTrue(app.query_one("#orchestrate-stop-button", Button).disabled)
-
-            await pilot.resize_terminal(200, 50)
-            await pilot.pause()
-            await pilot.click("#orchestrate-mode-button")
-            await pilot.pause()
-            self.assertEqual(switcher.current, "orchestrate-view")
-            self.assertEqual(str(button.label), "Task Mode")
-            # Tab no longer toggles plan mode while the orchestrate view is shown.
-            await pilot.press("tab")
-            await pilot.pause()
-            self.assertEqual(app.query_one("#mode-select", Select).value, "coding")
-
-            await pilot.press("ctrl+o")
-            await pilot.pause()
-            self.assertEqual(switcher.current, "tasks-view")
-            self.assertEqual(str(button.label), "Orchestrate Mode")
-            from tui.app import GLOBAL_SHORTCUTS
-
-            self.assertIn("Ctrl+O", {shortcut for shortcut, _, _ in GLOBAL_SHORTCUTS})
-
-    async def test_start_submits_the_prompt_models_and_worker_count(self):
-        app, _, orchestrator = self.make_app()
-        async with app.run_test() as pilot:
-            app._set_orchestrate_view(True)
-            await pilot.pause()
-            app.query_one("#orchestrate-prompt", DaedalusVimTextArea).load_text("Build the whole feature")
-            app.query_one("#worker-model-select", Select).value = "claude-sonnet-5"
-            workers = app.query_one("#max-workers-input", Input)
-            workers.value = "2"
-            app._start_orchestration()
-            await pilot.pause()
-
-            self.assertEqual(len(orchestrator.starts), 1)
-            prompt, planner, worker, max_workers, topic = orchestrator.starts[0]
-            self.assertEqual(prompt, "Build the whole feature")
-            self.assertEqual(planner, ("claude", "claude-fable-5-1", "medium"))
-            self.assertEqual(worker, ("claude", "claude-sonnet-5", "high"))
-            self.assertEqual(max_workers, 2)
-            self.assertIsNone(topic)
-
-    async def test_role_provider_switch_offers_that_providers_models_and_effort(self):
-        """Either role may run on Codex (ChatGPT) or Cursor; the row follows the provider."""
-        app, _, orchestrator = self.make_app()
-        async with app.run_test() as pilot:
-            app._set_orchestrate_view(True)
-            await pilot.pause()
-            app.query_one("#orchestrate-prompt", DaedalusVimTextArea).load_text("Build it with a mixed team")
-
-            app.query_one("#worker-provider-select", Select).value = "codex"
-            await pilot.pause()
-            worker_model = app.query_one("#worker-model-select", Select)
-            self.assertEqual(worker_model.value, "gpt-5.6-luna")
-            self.assertIn("gpt-5.6-terra", {value for _, value in worker_model._options})
-            self.assertEqual(app.query_one("#worker-reasoning-select", Select).value, "medium")
-            worker_model.value = "gpt-5.6-terra"
-            app.query_one("#worker-reasoning-select", Select).value = "high"
-
-            app.query_one("#planner-provider-select", Select).value = "cursor"
-            await pilot.pause()
-            planner_model = app.query_one("#planner-model-select", Select)
-            self.assertEqual(planner_model.value, "cursor")
-            self.assertTrue(planner_model.disabled)
-            planner_reasoning = app.query_one("#planner-reasoning-select", Select)
-            self.assertTrue(planner_reasoning.disabled)
-
-            app._start_orchestration()
-            await pilot.pause()
-            _, planner, worker, _, _ = orchestrator.starts[0]
-            self.assertEqual(planner, ("cursor", "cursor", ""))
-            self.assertEqual(worker, ("codex", "gpt-5.6-terra", "high"))
-
-            # Switching back to the configured provider restores the parameter-file defaults.
-            app.query_one("#planner-provider-select", Select).value = "claude"
-            await pilot.pause()
-            self.assertEqual(app.query_one("#planner-model-select", Select).value, "claude-fable-5-1")
-            self.assertEqual(app.query_one("#planner-reasoning-select", Select).value, "medium")
-            self.assertFalse(app.query_one("#planner-model-select", Select).disabled)
-            self.assertEqual(app.query_one("#orchestrate-prompt", DaedalusVimTextArea).text, "")
-            self.assertFalse(app.query_one("#orchestrate-stop-button", Button).disabled)
-            self.assertIn("orc-001-deadbeef", str(app.query_one("#orchestrate-status", Static).render()))
-            self.assertEqual(app.query_one("#orchestrate-session-select", Select).value, "orc-001-deadbeef")
-
-            # Ctrl+C in the orchestrate view stops the session, not one worker.
-            await pilot.press("ctrl+c")
-            await pilot.pause()
-            self.assertEqual(orchestrator.stops, ["orc-001-deadbeef"])
-            self.assertTrue(app.query_one("#orchestrate-stop-button", Button).disabled)
-
-    async def test_max_workers_is_validated_and_empty_prompts_are_rejected(self):
-        app, _, orchestrator = self.make_app()
-        async with app.run_test() as pilot:
-            app._set_orchestrate_view(True)
-            await pilot.pause()
-            app._start_orchestration()
-            await pilot.pause()
-            self.assertEqual(orchestrator.starts, [])
-            self.assertIn("empty", str(app.query_one("#orchestrate-status", Static).render()))
-
-            app.query_one("#orchestrate-prompt", DaedalusVimTextArea).load_text("Do it")
-            for bad in ("0", "9", "", "abc"):
-                app.query_one("#max-workers-input", Input).value = bad
-                app._start_orchestration()
-                await pilot.pause()
-                self.assertEqual(orchestrator.starts, [], bad)
-                self.assertIn("from 1 to 8", str(app.query_one("#orchestrate-status", Static).render()))
-
-            app.query_one("#max-workers-input", Input).value = "8"
-            app._start_orchestration()
-            await pilot.pause()
-            self.assertEqual(len(orchestrator.starts), 1)
-            self.assertEqual(orchestrator.starts[0][3], 8)
-
-    async def test_session_events_render_the_board_log_and_summary(self):
-        from tui.orchestrate_protocol import PlannerTask, WorkerReport
-        from tui.orchestrate_session import TaskCard
-
-        app, coordinator, orchestrator = self.make_app()
-        async with app.run_test() as pilot:
-            app._set_orchestrate_view(True)
-            await pilot.pause()
-            session = orchestrator.start("Build it", ("claude", "claude-fable-5-1", "high"), ("claude", "claude-opus-5", "high"), 2)
-            worker = coordinator.submit("t1: Add parser\n\nParse.", "claude", "claude-opus-5", "high")
-            worker.session_id = session.session_id
-            worker.card_id = "t1"
-            session.round = 1
-            session.summary = "Two cards."
-            session.status = "waiting"
-            session.tokens_planner = 40
-            session.tokens_workers = 12
-            session.log.extend(["Planner round 1.", "Dispatched t1 as task task-1; 900 characters of context."])
-            t1 = TaskCard(PlannerTask("t1", "Add parser", "Parse.", ("a", "b"), ("tui/parse.py",)))
-            t1.status = "running"
-            t1.worker_task_id = worker.task_id
-            t1.prompt_chars = 900
-            t1.checklist_state = (True, False)
-            t2 = TaskCard(PlannerTask("t2", "Add renderer with a very long title that must be clipped", "Render.", ("c",), ("tui/render.py",), depends_on=("t1",)))
-            t2.status = "waiting"
-            session.cards = {"t1": t1, "t2": t2}
-            orchestrator.emit(session, "Dispatched t1 as task task-1.")
-            await pilot.pause()
-
-            board = app.query_one("#orchestrate-board", DataTable)
-            self.assertEqual(board.row_count, 2)
-            self.assertEqual([column.label.plain for column in board.columns.values()], ["Card", "Title", "Status", "Checklist", "Worker task", "Tokens"])
-            first = board.get_row_at(0)
-            self.assertEqual(first[0], "t1")
-            self.assertEqual(first[2], "running")
-            self.assertEqual(first[3], "1/2")
-            self.assertEqual(first[4], worker.task_id)
-            second = board.get_row_at(1)
-            self.assertTrue(str(second[1]).endswith("…"))
-            self.assertLessEqual(len(str(second[1])), 28)
-            self.assertEqual(second[2], "waiting")
-            log = app.query_one("#planner-log", TranscriptLog)
-            self.assertIn("Planner round 1.", log.messages)
-            summary = str(app.query_one("#orchestrate-summary", Static).render())
-            self.assertIn("Planner tokens: 40", summary)
-            self.assertIn("Worker tokens: 12", summary)
-            self.assertIn("Total: 52", summary)
-            self.assertIn("900 chars over 1 tasks", summary)
-            self.assertFalse(app.query_one("#orchestrate-stop-button", Button).disabled)
-            # The inbox marks the worker row with its card id.
-            app._refresh_task_list()
-            task_list = app.query_one("#task-list", DataTable)
-            rows = [task_list.get_row_at(index) for index in range(task_list.row_count)]
-            self.assertTrue(any(str(row[1]).startswith("⋯ t1") for row in rows), rows)
-            # Selecting the board row focuses the worker task.
-            app._focus_board_row("t1")
-            await pilot.pause()
-            self.assertEqual(app._selected_task_id, worker.task_id)
-            self.assertIn("Selected worker task", str(app.query_one("#orchestrate-status", Static).render()))
-            # The viewer shows the plan while the orchestrate view is active.
-            with patch.object(app._viewer(), "show_sources") as show_sources:
-                app._refresh_orchestrate_view()
-                sources = show_sources.call_args.args[1]
-            self.assertEqual(sources[0].label, "Plan")
-            self.assertIn("Plan for orc-001-deadbeef", sources[0].text)
-
-            session.status = "completed"
-            session.error = None
-            t1.status = "promoted"
-            t2.status = "promoted"
-            orchestrator.emit(session, "Session completed.")
-            await pilot.pause()
-            self.assertTrue(app.query_one("#orchestrate-stop-button", Button).disabled)
-            self.assertIn("completed", str(app.query_one("#orchestrate-status", Static).render()))
-
-    async def test_compact_layout_stacks_the_role_row_and_keeps_the_task_bar_usable(self):
-        app, _, _ = self.make_app(settings=replace(settings(), layout=LayoutSettings(100, 30, 6, 3)))
-        async with app.run_test() as pilot:
-            self.assertTrue(app._compact_mode)
-            app._set_orchestrate_view(True)
-            await pilot.pause()
-            self.assertEqual(app.query_one("#orchestrate-mode-button").styles.display, "block")
-            self.assertTrue(app.query_one("#screen").has_class("compact-width"))
-            roles = app.query_one("#orchestrate-roles")
-            self.assertEqual(str(roles.styles.layout.name), "vertical")
-
-            # Mid-width terminals keep the wide workspace and stack the roles
-            # on their own rows; each role stays on one line.
-            await pilot.resize_terminal(200, 50)
-            await pilot.pause()
-            await pilot.pause()
-            self.assertFalse(app._compact_mode)
-            self.assertTrue(app._wrapped_toolbars)
-            self.assertEqual(str(app.query_one("#orchestrate-roles").styles.layout.name), "vertical")
-            self.assertEqual(str(app.query_one("#planner-role").styles.layout.name), "horizontal")
-
-            await pilot.resize_terminal(280, 50)
-            await pilot.pause()
-            await pilot.pause()
-            self.assertFalse(app._compact_mode)
-            self.assertFalse(app._wrapped_toolbars)
-            self.assertEqual(str(app.query_one("#orchestrate-roles").styles.layout.name), "horizontal")
-
-    async def test_orchestrate_draft_persists_across_relaunch(self):
-        prompting = prompting_settings()
-        from tui.config import OrchestrateSettings
-
-        app = DaedalusTuiApp(
-            runner=FakeRunner(), directory=Path("/workspace/project"), settings=settings(),
-            coordinator=FakeCoordinator(), prompting_settings=prompting,
-            orchestrate_settings=OrchestrateSettings(), orchestrate_coordinator=FakeOrchestrateCoordinator(),
-        )
-        async with app.run_test() as pilot:
-            app._set_orchestrate_view(True)
-            await pilot.pause()
-            app.query_one("#orchestrate-prompt", DaedalusVimTextArea).insert("Half-written orchestration prompt")
-            await pilot.pause()
-        reopened = DaedalusTuiApp(
-            runner=FakeRunner(), directory=Path("/workspace/project"), settings=settings(),
-            coordinator=FakeCoordinator(), prompting_settings=prompting,
-            orchestrate_settings=OrchestrateSettings(), orchestrate_coordinator=FakeOrchestrateCoordinator(),
-        )
-        async with reopened.run_test() as pilot:
-            await pilot.pause()
-            self.assertEqual(
-                reopened.query_one("#orchestrate-prompt", DaedalusVimTextArea).text,
-                "Half-written orchestration prompt",
-            )

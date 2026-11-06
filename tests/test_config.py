@@ -1,5 +1,3 @@
-from dataclasses import replace
-import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,11 +8,9 @@ from tui.config import (
     load_codex_usage_settings,
     load_coding_statistics_settings,
     load_command_menu_settings,
-    load_orchestrate_settings,
     load_orchestration_settings,
     load_tui_settings,
 )
-from tui.git_worktree import DIRTY_PRIMARY_COMMIT_MESSAGE
 
 
 class ConfigTests(unittest.TestCase):
@@ -23,7 +19,6 @@ class ConfigTests(unittest.TestCase):
         settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
         orchestration = load_orchestration_settings(root / "parameter_files" / "daedalus-tui-orchestration.toml")
 
-        self.assertEqual(settings.default_provider, "codex")
         self.assertEqual(settings.default_model, "gpt-6-luna")
         self.assertEqual(settings.default_reasoning, "high")
         self.assertEqual([item.value for item in settings.codex_models], [
@@ -45,134 +40,6 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(orchestration.graphify_executable, "graphify")
         self.assertTrue(orchestration.supabase_db_push_enabled)
         self.assertEqual(orchestration.supabase_executable, "supabase")
-        self.assertTrue(orchestration.firebase_deploy_enabled)
-        self.assertEqual(orchestration.firebase_executable, "firebase")
-        # Promotions are published as soon as their conflicts are resolved.
-        self.assertTrue(orchestration.promotion_push_enabled)
-
-    def test_loads_claude_provider_models_effort_and_permission_mode(self):
-        root = Path(__file__).resolve().parents[1]
-        settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
-
-        self.assertIn("claude", [item.value for item in settings.providers])
-        self.assertEqual(
-            [item.value for item in settings.claude_models],
-            ["claude-opus-5", "claude-sonnet-5", "claude-fable-5-1", "claude-haiku-4-5-20251001"],
-        )
-        # Claude Code exposes an effort level Codex has no equivalent for.
-        self.assertIn("max", [item.value for item in settings.claude_reasoning])
-        self.assertEqual(settings.claude.permission_mode, "acceptEdits")
-        # Non-interactive Claude runs need the project checks pre-approved.
-        self.assertIn("Bash(npm test:*)", settings.claude.allowed_tools)
-        self.assertIn("Bash(python3 -m pytest:*)", settings.claude.allowed_tools)
-
-    def test_claude_allowed_tools_must_be_a_string_array(self):
-        root = Path(__file__).resolve().parents[1]
-        source = (root / "parameter_files" / "daedalus-tui.toml").read_text(encoding="utf-8")
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "daedalus-tui.toml"
-            path.write_text(
-                re.sub(r"allowed_tools = \[.*?\]", 'allowed_tools = "Bash(*)"', source, count=1, flags=re.S),
-                encoding="utf-8",
-            )
-            with self.assertRaises(ValueError) as raised:
-                load_tui_settings(path)
-        self.assertIn("claude.allowed_tools", str(raised.exception))
-
-    def test_provider_cascade_falls_back_to_a_legal_model_and_effort(self):
-        root = Path(__file__).resolve().parents[1]
-        settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
-
-        # The configured Codex default remains legal when the provider changes.
-        self.assertEqual(settings.default_model_for("codex"), "gpt-6-luna")
-        self.assertEqual(settings.default_model_for("claude"), "claude-opus-5")
-        self.assertEqual(settings.default_model_for("cursor"), "cursor")
-        self.assertEqual(settings.default_reasoning_for("claude"), "high")
-        self.assertEqual(settings.default_reasoning_for("cursor"), "")
-        self.assertEqual(settings.reasoning_for("cursor"), ())
-
-    def test_account_auth_mode_lists_provider_key_variables_to_strip(self):
-        root = Path(__file__).resolve().parents[1]
-        settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
-
-        self.assertTrue(settings.auth.uses_account_login)
-        self.assertEqual(
-            settings.auth.for_provider("claude").api_key_variables,
-            ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"),
-        )
-        self.assertEqual(
-            settings.auth.for_provider("claude").sign_in_command,
-            ("claude", "auth", "login"),
-        )
-        policy = settings.auth.runner_policy()
-        self.assertTrue(policy.account_login)
-        self.assertEqual(policy.stripped_variables("cursor"), ("CURSOR_API_KEY",))
-        self.assertEqual(policy.stripped_variables("codex"), ("OPENAI_API_KEY",))
-
-    def test_api_key_mode_strips_nothing(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "auth.toml"
-            path.write_text(
-                """
-                providers = [{ label = "Codex", value = "codex" }]
-                codex_models = [{ label = "Model", value = "model" }]
-                codex_reasoning = [{ label = "High", value = "high" }]
-
-                [auth]
-                mode = "api-key"
-
-                [auth.codex]
-                label = "Codex"
-                api_key_variables = ["OPENAI_API_KEY"]
-                """,
-                encoding="utf-8",
-            )
-            policy = load_tui_settings(path).auth.runner_policy()
-
-            self.assertFalse(policy.account_login)
-            self.assertEqual(policy.stripped_variables("codex"), ())
-
-    def test_rejects_an_unknown_auth_mode(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "auth.toml"
-            path.write_text(
-                """
-                providers = [{ label = "Codex", value = "codex" }]
-                codex_models = [{ label = "Model", value = "model" }]
-                codex_reasoning = [{ label = "High", value = "high" }]
-
-                [auth]
-                mode = "oauth"
-                """,
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(ValueError, "auth.mode"):
-                load_tui_settings(path)
-
-    def test_rejects_a_claude_provider_without_models(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "claude.toml"
-            path.write_text(
-                """
-                providers = [
-                  { label = "Codex", value = "codex" },
-                  { label = "Claude Code", value = "claude" },
-                ]
-                codex_models = [{ label = "Model", value = "model" }]
-                codex_reasoning = [{ label = "High", value = "high" }]
-                """,
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(ValueError, "claude_models"):
-                load_tui_settings(path)
-
-    def test_loads_project_discovery_breadth(self):
-        root = Path(__file__).resolve().parents[1]
-        settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
-
-        self.assertTrue(settings.project_discovery.include_git_repositories)
-        self.assertFalse(settings.project_discovery.include_all_directories)
-        self.assertIn("node_modules", settings.project_discovery.skipped_directory_names)
 
     def test_loads_target_branch_and_primary_branch_alias(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -183,36 +50,6 @@ class ConfigTests(unittest.TestCase):
 
             self.assertEqual(load_orchestration_settings(target_path).primary_branch, "develop")
             self.assertEqual(load_orchestration_settings(alias_path).primary_branch, "release")
-
-    def test_dirty_primary_autocommit_defaults_to_committing_and_pushing(self):
-        root = Path(__file__).resolve().parents[1]
-        orchestration = load_orchestration_settings(
-            root / "parameter_files" / "daedalus-tui-orchestration.toml"
-        )
-
-        self.assertTrue(orchestration.dirty_primary_autocommit_enabled)
-        self.assertTrue(orchestration.dirty_primary_push_enabled)
-        self.assertEqual(orchestration.git_remote, "origin")
-        self.assertTrue(orchestration.dirty_primary_commit_message)
-
-    def test_dirty_primary_autocommit_can_be_disabled(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "orchestration.toml"
-            path.write_text(
-                "dirty_primary_autocommit_enabled = false\n"
-                "dirty_primary_push_enabled = false\n"
-                'git_remote = "upstream"\n'
-                'dirty_primary_commit_message = "   "\n'
-                "verification_commands = []\n",
-                encoding="utf-8",
-            )
-            settings = load_orchestration_settings(path)
-
-            self.assertFalse(settings.dirty_primary_autocommit_enabled)
-            self.assertFalse(settings.dirty_primary_push_enabled)
-            self.assertEqual(settings.git_remote, "upstream")
-            # A blank message would make `git commit -m` fail; fall back instead.
-            self.assertEqual(settings.dirty_primary_commit_message, DIRTY_PRIMARY_COMMIT_MESSAGE)
 
     def test_loads_coding_statistics_forecast_settings(self):
         root = Path(__file__).resolve().parents[1]
@@ -291,191 +128,3 @@ class ConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class PromptingAndUsageSettingsTests(unittest.TestCase):
-    def test_loads_prompting_settings_anchored_to_the_tui_project(self):
-        from tui.config import load_prompting_settings
-
-        root = Path(__file__).resolve().parents[1]
-        settings = load_prompting_settings(root / "parameter_files" / "daedalus-tui-prompting.toml")
-        self.assertEqual(settings.data_root, root)
-        self.assertEqual(settings.draft_autosave_delay_ms, 300)
-        self.assertTrue(settings.clear_drafts_on_exit)
-        self.assertEqual(settings.task_title_length, 60)
-        self.assertFalse(settings.viewer_visible_by_default)
-        self.assertEqual((settings.viewer_minimum_width, settings.main_minimum_width), (40, 80))
-        self.assertTrue(settings.viewer_hard_line_breaks)
-        self.assertTrue(settings.viewer_action_items_by_default)
-        self.assertEqual(settings.viewer_action_item_limit, 6)
-        self.assertEqual(settings.error_log_max_bytes, 2_000_000)
-        self.assertEqual(settings.error_log_backup_count, 3)
-
-    def test_relative_data_root_resolves_against_the_parameter_files_owner_not_cwd(self):
-        from tui.config import load_prompting_settings
-
-        with tempfile.TemporaryDirectory() as directory:
-            project = Path(directory) / "installed-tui"
-            (project / "parameter_files").mkdir(parents=True)
-            parameter_path = project / "parameter_files" / "daedalus-tui-prompting.toml"
-            parameter_path.write_text('[storage]\ndata_root = "state"\n', encoding="utf-8")
-            settings = load_prompting_settings(parameter_path)
-            self.assertEqual(settings.data_root, (project / "state").resolve())
-            parameter_path.write_text(f'[storage]\ndata_root = "{Path(directory) / "abs"}"\n', encoding="utf-8")
-            self.assertEqual(load_prompting_settings(parameter_path).data_root, (Path(directory) / "abs").resolve())
-
-    def test_generated_storage_folders_are_never_discovered_as_projects(self):
-        from tui.projects import discover_projects
-
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "prompts" / "feature_files").mkdir(parents=True)
-            (root / "errors").mkdir()
-            (root / "real" / "feature_files").mkdir(parents=True)
-            settings = load_tui_settings(Path(__file__).resolve().parents[1] / "parameter_files" / "daedalus-tui.toml")
-            discovered = discover_projects(root, replace(settings.project_discovery, include_all_directories=True))
-            self.assertEqual([project.name for project in discovered], ["real"])
-            self.assertIn("prompts", settings.project_discovery.skipped_directory_names)
-
-    def test_loads_usage_bar_settings(self):
-        root = Path(__file__).resolve().parents[1]
-        settings = load_tui_settings(root / "parameter_files" / "daedalus-tui.toml")
-        self.assertTrue(settings.usage.enabled)
-        self.assertEqual(settings.usage.interval_seconds, 60)
-        self.assertEqual(set(settings.usage.providers), {"claude", "codex"})
-        self.assertEqual(settings.usage.providers["codex"].command, ())
-        self.assertEqual(settings.usage.providers["claude"].label, "Claude")
-        # Scalar tuning keys must not be mistaken for provider tables.
-        self.assertEqual(settings.usage.session_scan_limit, 12)
-        self.assertEqual(settings.usage.session_tail_bytes, 262_144)
-        self.assertEqual(settings.usage.bar_width, 12)
-        self.assertEqual(settings.usage.claude_projects_dir, "~/.claude/projects")
-        self.assertEqual(settings.usage.claude_transcript_days, 30)
-        # The statistics screen's account-wide total looks back much further
-        # than the bar's recent window.
-        self.assertEqual(settings.usage.claude_account_scan_days, 3650)
-        # 0 means the Claude bars calibrate against the busiest recorded window.
-        self.assertEqual(settings.usage.claude_five_hour_token_limit, 0)
-        self.assertEqual(settings.usage.claude_weekly_token_limit, 0)
-
-
-class OrchestrateSettingsTests(unittest.TestCase):
-    def parameter_file(self, body: str) -> Path:
-        directory = tempfile.mkdtemp()
-        path = Path(directory) / "daedalus-tui-orchestrate-mode.toml"
-        path.write_text(body, encoding="utf-8")
-        return path
-
-    def test_loads_the_shipped_orchestrate_parameter_file(self):
-        root = Path(__file__).resolve().parents[1]
-        settings = load_orchestrate_settings(
-            root / "parameter_files" / "daedalus-tui-orchestrate-mode.toml"
-        )
-
-        self.assertEqual(settings.planner_selection, ("claude", "claude-fable-5-1", "medium"))
-        self.assertEqual(settings.worker_selection, ("claude", "claude-opus-5", "high"))
-        self.assertEqual(settings.default_max_workers, 3)
-        self.assertEqual(settings.max_workers_limit, 8)
-        # No round cap: the planner decides how many rounds the work needs.
-        self.assertEqual(settings.planner_round_limit, 0)
-        self.assertEqual(settings.task_reissue_limit, 2)
-        self.assertEqual(settings.planner_repository_map_chars, 8_000)
-        self.assertEqual(settings.planner_digest_budget_chars, 12_000)
-        self.assertEqual(settings.worker_report_budget_chars, 4_000)
-        self.assertEqual(settings.worker_card_budget_chars, 6_000)
-        self.assertEqual(settings.session_dirname, "orchestrate")
-        self.assertEqual(settings.card_filename, "task.md")
-        self.assertEqual(settings.runtime_artifact_dirname, ".daedalus-orchestration")
-        self.assertEqual(settings.context_filename, "DAEDALUS_CONTEXT.md")
-        self.assertEqual(settings.planner_context_chars, 12_000)
-        self.assertEqual(settings.board_title_width, 28)
-        self.assertEqual(settings.planner_log_lines, 400)
-
-    def test_context_filename_must_stay_inside_the_repository(self):
-        for value in ("/etc/context.md", "../context.md"):
-            path = self.parameter_file(f'[files]\ncontext_filename = "{value}"\n')
-            with self.assertRaises(ValueError) as error:
-                load_orchestrate_settings(path)
-            self.assertIn("context_filename", str(error.exception))
-        path = self.parameter_file('[files]\ncontext_filename = ""\n[limits]\nplanner_context_chars = 0\n')
-        settings = load_orchestrate_settings(path)
-        self.assertEqual(settings.context_filename, "")
-        self.assertEqual(settings.planner_context_chars, 0)
-
-    def test_missing_file_falls_back_to_the_documented_defaults(self):
-        settings = load_orchestrate_settings(Path("/nonexistent/orchestrate.toml"))
-
-        self.assertEqual(settings.planner_model, "claude-fable-5-1")
-        self.assertEqual(settings.worker_model, "claude-opus-5")
-        self.assertEqual(settings.default_max_workers, 3)
-
-    def test_unknown_claude_model_is_rejected(self):
-        path = self.parameter_file('[roles]\nplanner_model = "claude-imaginary-9"\n')
-
-        with self.assertRaises(ValueError) as error:
-            load_orchestrate_settings(path)
-        self.assertIn("planner_model", str(error.exception))
-
-    def test_non_claude_provider_skips_the_claude_model_catalogue(self):
-        path = self.parameter_file(
-            '[roles]\nworker_provider = "codex"\nworker_model = "gpt-6-astra"\n'
-        )
-
-        settings = load_orchestrate_settings(path)
-
-        self.assertEqual(settings.worker_selection, ("codex", "gpt-6-astra", "high"))
-
-    def test_default_max_workers_may_not_exceed_the_limit(self):
-        path = self.parameter_file("[limits]\ndefault_max_workers = 9\nmax_workers_limit = 4\n")
-
-        with self.assertRaises(ValueError) as error:
-            load_orchestrate_settings(path)
-        self.assertIn("max_workers_limit", str(error.exception))
-
-    def test_non_positive_limits_are_rejected(self):
-        path = self.parameter_file("[limits]\nplanner_digest_budget_chars = 0\n")
-
-        with self.assertRaises(ValueError) as error:
-            load_orchestrate_settings(path)
-        self.assertIn("must be positive", str(error.exception))
-
-    def test_round_cap_is_optional_and_may_not_be_negative(self):
-        self.assertEqual(
-            load_orchestrate_settings(self.parameter_file("[limits]\nplanner_round_limit = 4\n")).planner_round_limit,
-            4,
-        )
-        self.assertEqual(
-            load_orchestrate_settings(self.parameter_file("[limits]\nplanner_round_limit = 0\n")).planner_round_limit,
-            0,
-        )
-        with self.assertRaises(ValueError) as error:
-            load_orchestrate_settings(self.parameter_file("[limits]\nplanner_round_limit = -1\n"))
-        self.assertIn("planner_round_limit", str(error.exception))
-
-    def test_cursor_and_codex_may_play_either_role(self):
-        path = self.parameter_file(
-            '[roles]\nplanner_provider = "cursor"\nplanner_model = "cursor"\nplanner_reasoning = ""\n'
-            'worker_provider = "codex"\nworker_model = "gpt-6-astra"\nworker_reasoning = "medium"\n'
-        )
-
-        settings = load_orchestrate_settings(path)
-
-        self.assertEqual(settings.planner_selection, ("cursor", "cursor", ""))
-        self.assertEqual(settings.worker_selection, ("codex", "gpt-6-astra", "medium"))
-
-    def test_unknown_provider_model_and_reasoning_are_rejected(self):
-        cases = (
-            ('[roles]\nplanner_provider = "gemini"\n', "planner_provider"),
-            ('[roles]\nworker_provider = "codex"\nworker_model = "gpt-0"\n', "worker_model"),
-            ('[roles]\nworker_reasoning = "turbo"\n', "worker_reasoning"),
-        )
-        for body, field in cases:
-            with self.subTest(field=field):
-                with self.assertRaises(ValueError) as error:
-                    load_orchestrate_settings(self.parameter_file(body))
-                self.assertIn(field, str(error.exception))
-
-    def test_forbidding_reissues_is_allowed(self):
-        path = self.parameter_file("[limits]\ntask_reissue_limit = 0\n")
-
-        self.assertEqual(load_orchestrate_settings(path).task_reissue_limit, 0)

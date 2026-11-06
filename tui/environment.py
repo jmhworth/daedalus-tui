@@ -7,9 +7,7 @@ import os
 
 # Operator credentials for agent CLIs. These are not project secrets: the
 # orchestrated agent path uses the TUI package `.env` as its file fallback.
-AGENT_CREDENTIAL_KEYS = frozenset({
-    "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CURSOR_API_KEY"
-})
+AGENT_CREDENTIAL_KEYS = frozenset({"CURSOR_API_KEY"})
 
 
 def tui_package_env_path() -> Path:
@@ -79,38 +77,6 @@ def with_agent_credential_fallbacks(
             if candidate.strip():
                 merged[key] = candidate
     return merged
-
-def agent_environment(
-    provider: str,
-    directory: Path,
-    extra_files: tuple[Path, ...] = (),
-    stripped_variables: tuple[str, ...] = (),
-) -> dict[str, str] | None:
-    """Return the subprocess environment for one provider, or None to inherit.
-
-    Cursor reads its credentials from local `.env` files. Other providers load
-    only explicitly supplied environment files into their subprocess
-    environment, without placing a copy in the isolated worktree. Every
-    provider additionally has ``stripped_variables`` removed so account mode
-    cannot accidentally bill an API key from one of those files.
-    """
-    if provider == "cursor":
-        environment = cursor_environment(
-            directory,
-            extra_files,
-            include_directory_env=False,
-        )
-    elif stripped_variables or extra_files:
-        environment = os.environ.copy()
-        for path in extra_files:
-            for key, value in read_env_file(path).items():
-                environment.setdefault(key, value)
-    else:
-        # Nothing to change; let the child inherit the parent environment.
-        return None
-    for variable in stripped_variables:
-        environment.pop(variable, None)
-    return environment
 
 
 def read_env_file(path: Path) -> dict[str, str]:

@@ -105,8 +105,8 @@
     "semantic_hash": "e5c00634ce8bd1e0a3f5dc86854c8119"
   },
   "tui/orchestrator.py": {
-    "mtime": 1793810709.1170413,
-    "ast_hash": "82c7aa589db589e507d22dc7ede4787a",
+    "mtime": 1793895127.8347287,
+    "ast_hash": "d4984e6e3b34eaed1915b4903599eecc",
     "semantic_hash": ""
   },
   "tui/projects.py": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui-orchestration.md": {
-    "mtime": 1793848489.6368532,
-    "ast_hash": "88615d00b94b3ca95830a4b29e5c150c",
+    "mtime": 1793895127.8334184,
+    "ast_hash": "43e07124493f3a290c1d92976f5c78da",
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
@@ -200,8 +200,8 @@
     "semantic_hash": ""
   },
   "tui/transcript.py": {
-    "mtime": 1793855872.0157242,
-    "ast_hash": "4389f9d74d7d8aa24393fefdaa98ddfc",
+    "mtime": 1793895127.83616,
+    "ast_hash": "9e8c1410e26e80749719c89e695567a6",
     "semantic_hash": ""
   },
   "tests/test_token_usage.py": {

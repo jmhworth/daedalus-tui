@@ -1,16 +1,16 @@
 # Graph Report - daedalus-tui  (2026-11-05)
 
 ## Corpus Check
-- 101 files · ~100,768 words
+- 101 files · ~100,866 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1944 nodes · 5413 edges · 93 communities (82 shown, 11 thin omitted)
+- 1944 nodes · 5413 edges · 92 communities (80 shown, 12 thin omitted)
 - Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 634 edges (avg confidence: 0.54)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2e98d4c5`
+- Built from commit: `e61843e8`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -63,7 +63,6 @@
 - orchestrator.py
 - DaedalusTuiApp
 - ._persist_task
-- ._rebuild_plan_questions
 - environment.py
 - CompactSettingsSelect
 - Daedalus TUI Call Graph Visualization
@@ -135,11 +134,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (93 total, 11 thin omitted)
+## Communities (92 total, 12 thin omitted)
 
 ### Community 0 - "PlanQuestion"
 Cohesion: 0.14
-Nodes (31): CandidateFeatureGroup, A deterministic connected component of qualifying similarity relations., Return the stable identifier using the concise ``id`` spelling., score_band(), SimilarityResult, _canonical_tree_name(), _feature_ids_by_member(), _histogram_bars() (+23 more)
+Nodes (32): CandidateFeatureGroup, A deterministic connected component of qualifying similarity relations., Return the stable identifier using the concise ``id`` spelling., score_band(), SimilarityResult, _canonical_tree_name(), _feature_ids_by_member(), _histogram_bars() (+24 more)
 
 ### Community 1 - "DaedalusVimTextArea"
 Cohesion: 0.04
@@ -154,8 +153,8 @@ Cohesion: 0.06
 Nodes (49): AnnAssign, Assign, AsyncFunctionDef, Attribute, AugAssign, Call, ClassDef, comprehension (+41 more)
 
 ### Community 4 - "app.py"
-Cohesion: 0.19
-Nodes (9): CallGraphTreeTests, candidate_feature_id(), group_candidate_features(), Return a stable ID derived solely from a group's sorted member symbols., Group symbols connected by inclusive-threshold relations.      Parent/child dire, Compatibility alias for callers that refer to group relations directly., ScoredRelation, Choose tree roots from configured entry points or orphan graph nodes. (+1 more)
+Cohesion: 0.13
+Nodes (15): CallGraphTreeTests, candidate_feature_id(), group_candidate_features(), parent_child_score_map(), Return a stable ID derived solely from a group's sorted member symbols., Group symbols connected by inclusive-threshold relations.      Parent/child dire, Compatibility alias for callers that refer to group relations directly., ScoredRelation (+7 more)
 
 ### Community 5 - "TokenUsageStore"
 Cohesion: 0.29
@@ -226,8 +225,8 @@ Cohesion: 0.29
 Nodes (6): Daedalus TUI Coding Statistics, Dev Mode, Key Points, Relevant Files, State Log, Summary
 
 ### Community 25 - "._set_status"
-Cohesion: 0.09
-Nodes (13): Text, _literal_select_options(), Build Select prompts that Rich will not parse as markup., Apply only the newest event per task to keep the UI responsive., Surface Sync conflict recovery progress in the status bar., Promote only events that need the user's attention in the inbox., Refresh the account usage line without blocking the TUI event loop., Render actionable history and tasks created during this session. (+5 more)
+Cohesion: 0.11
+Nodes (10): Text, _literal_select_options(), Build Select prompts that Rich will not parse as markup., Apply only the newest event per task to keep the UI responsive., Surface Sync conflict recovery progress in the status bar., Promote only events that need the user's attention in the inbox., Refresh the account usage line without blocking the TUI event loop., Finish Select setup without allowing a stale value to exit the TUI.          Pla (+2 more)
 
 ### Community 26 - ".provider_split"
 Cohesion: 0.26
@@ -257,17 +256,13 @@ Nodes (6): Daedalus TUI Project Initialization, Dev Mode, Key Points, Relevant F
 Cohesion: 0.25
 Nodes (7): 4-Stage Development Lifecycle, Alignment, Debugging, Execution Boundaries (CRITICAL), Feature File Automation, Parameter File Centralization, Topics (when tagged)
 
-### Community 33 - ".emit"
-Cohesion: 0.15
-Nodes (11): Unit tests for AST variable-lineage analysis., parent_child_score_map(), build_tree(), datetime, Build a call tree from *root* with cycle and depth limits., Render a self-contained HTML page for the call trees., render_html(), Render the HTML section for variable lineage statistics. (+3 more)
-
 ### Community 34 - "._render_line_strip"
 Cohesion: 0.25
 Nodes (7): 4-Stage Development Lifecycle, Alignment, Debugging, Execution Boundaries (CRITICAL), Feature File Automation, Parameter File Centralization, Topics (when tagged)
 
 ### Community 35 - "agent_runner.py"
-Cohesion: 0.17
-Nodes (3): Path, _sample_files(), VariableLineageTests
+Cohesion: 0.15
+Nodes (5): Path, Unit tests for AST variable-lineage analysis., _sample_files(), VariableLineageTests, write_variable_lineage_json()
 
 ### Community 36 - "architecture.md"
 Cohesion: 0.33
@@ -317,10 +312,6 @@ Nodes (7): Key, Route visual-line mode and mirror new yanks to the host clipboar
 Cohesion: 0.31
 Nodes (5): GitWorktreeError, push_branch(), RuntimeError, Push a local branch to ``remote``, setting upstream with ``-u`` when needed., Install project resources and link declared shared read-only paths.
 
-### Community 49 - "._rebuild_plan_questions"
-Cohesion: 0.50
-Nodes (3): _looks_like_file(), Selectable transcript rendering with semantic assistant-message emphasis., Return whether a link label or target resembles a file reference.
-
 ### Community 50 - "environment.py"
 Cohesion: 0.29
 Nodes (6): Daedalus TUI Command Menu, Dev Mode, Key Points, Relevant Files, State Log, Summary
@@ -346,8 +337,8 @@ Cohesion: 0.50
 Nodes (3): pytest_configure(), Pytest hooks shared across the test suite., Install pyan3 when call-graph tests run in an environment missing it.
 
 ### Community 57 - "DescriptorEmbedder"
-Cohesion: 0.09
-Nodes (5): Changed, Pressed, Submitted, PersonalSupabaseConfirmationScreen, Require an explicit confirmation before scaffolding/Activating a shared schema.
+Cohesion: 0.10
+Nodes (4): Pressed, Submitted, CommandMenuScreen, Offer low-frequency actions as discoverable buttons.
 
 ### Community 59 - "PlanClarification"
 Cohesion: 0.07
@@ -427,7 +418,7 @@ Nodes (14): EnvironmentTests, apply_process_supabase_overrides(), cursor_environ
 
 ### Community 82 - "TranscriptLog"
 Cohesion: 0.04
-Nodes (59): Binding, ComposeResult, Log, Mount, Select, CodingStatisticsScreen, CommandMenuScreen, CompactSettingsSelect (+51 more)
+Nodes (63): Binding, Changed, ComposeResult, Log, Mount, Select, CodingStatisticsScreen, CompactSettingsSelect (+55 more)
 
 ### Community 83 - "IntegrationCoordinator"
 Cohesion: 0.25
@@ -454,8 +445,8 @@ Cohesion: 0.10
 Nodes (27): main(), Child-process probe for Daedalus TUI Supabase env key presence.  Invoke as ``pyt, _direct_database_host_project_ref(), expose_registered_personal_supabase_schema(), _first_filled_env_value(), _key_or_aliases_label(), load_personal_supabase_settings(), load_project_personal_supabase_env_values() (+19 more)
 
 ### Community 91 - "._apply_task_event"
-Cohesion: 0.12
-Nodes (11): RowSelected, Theme, _load_saved_theme(), Path, Open a fresh project task or focus a task from the update inbox., Memory override for the project, else the parameter-file default., Update the project's coordinator so later submits use ``branch``., Switch the project context and focus a row selected in the inbox. (+3 more)
+Cohesion: 0.10
+Nodes (14): RowSelected, Theme, _load_saved_theme(), Path, Open a fresh project task or focus a task from the update inbox., Memory override for the project, else the parameter-file default., Update the project's coordinator so later submits use ``branch``., Render actionable history and tasks created during this session. (+6 more)
 
 ### Community 92 - "PersonalSupabaseSetupWizardScreen"
 Cohesion: 0.33
@@ -464,12 +455,12 @@ Nodes (4): probe_project_personal_supabase_environment(), Return the TUI root ``
 ## Knowledge Gaps
 - **120 isolated node(s):** `daedalus-tui`, `Execution Boundaries (CRITICAL)`, `Evidence Extraction`, `Architecture Boundaries`, `Parameter Files` (+115 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `AgentRunner`, `log_exception`, `GitWorktreeError`, `.on_mount`, `KeyboardShortcutsScreen`, `._rebuild_plan_questions`, `bootstrap_personal_supabase`, `CandidateFeatureGroup`, `._persist_task`, `TranscriptLog`, `.edit_paste_after`, `._set_status`, `._apply_task_event`, `calculate_token_usage`?**
+- **Why does `DaedalusTuiApp` connect `DaedalusVimTextArea` to `AgentRunner`, `log_exception`, `GitWorktreeError`, `.on_mount`, `KeyboardShortcutsScreen`, `._rebuild_plan_questions`, `bootstrap_personal_supabase`, `CandidateFeatureGroup`, `._persist_task`, `TranscriptLog`, `.edit_paste_after`, `calculate_token_usage`, `DescriptorEmbedder`, `._apply_task_event`, `._set_status`?**
   _High betweenness centrality (0.146) - this node is a cross-community bridge._
 - **Why does `AgentRunner` connect `CandidateFeatureGroup` to `DaedalusVimTextArea`, `AgentRunner`, `GitWorktreeError`, `debug_log.py`, `TranscriptLog`, `CodingStatisticsScreen`, `IntegrationCoordinator`, `.__init__`, `DescriptorEmbedder`, `.provider_split`, `._apply_task_event`, `CodingStatisticsScreen`, `._set_status`?**
   _High betweenness centrality (0.060) - this node is a cross-community bridge._

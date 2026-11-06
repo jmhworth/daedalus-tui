@@ -7,15 +7,11 @@ import json
 import os
 from dataclasses import replace
 from pathlib import Path
-from typing import Callable
-import signal
 import sys
 import tempfile
 import threading
-import time
 import uuid
 
-from rich.cells import cell_len
 from rich.text import Text
 from textual import events, on
 from textual.app import App, ComposeResult
@@ -38,7 +34,7 @@ from textual.widgets import (
     TextArea,
 )
 from textual.theme import Theme
-from textual.widgets import TabbedContent, TabPane, ContentSwitcher
+from textual.widgets import TabbedContent, TabPane
 from textual.widgets.select import InvalidSelectValueError
 from .agent_runner import AgentRunner
 from .clipboard import copy_to_system_clipboard, paste_from_system_clipboard
@@ -47,46 +43,24 @@ from .config import (
     CodingStatisticsSettings,
     CommandMenuSettings,
     CodexUsageSettings,
-    OrchestrateSettings,
-    PromptingSettings,
     TuiSettings,
     load_command_menu_settings,
     load_codex_usage_settings,
     load_coding_statistics_settings,
-    load_orchestrate_settings,
     load_orchestration_settings,
-    load_prompting_settings,
     load_tui_settings,
 )
-from .debug_log import (
-    LOGGER,
-    LoggingStatus,
-    close_fault_handler,
-    configure_debug_logging,
-    install_fault_handler,
-    log_exception,
-)
+from .debug_log import LOGGER, close_fault_handler, configure_debug_logging, install_fault_handler, log_exception
 from .environment import cursor_environment, redact_environment_values
 from .git_worktree import (
     GitWorktreeError,
     SyncMergeConflictError,
     list_local_branches,
-    parse_push_notice,
     push_branch,
     remote_exists,
 )
-from .local_storage import LocalStorage
-from .output_viewer import LATEST_SOURCE, OutputViewer, ViewerSource, response_sources
-from .prompt_store import DraftRecord, PromptStore, PromptStoreError
 from .memory import DEFAULT_MEMORY_FILE, TaskMemoryStore
-from .orchestrate_coordinator import ORCHESTRATE_PHASE, OrchestrateCoordinator
-from .orchestrate_session import OrchestrationSession
-from .project_initializer import (
-    BACKENDS,
-    initialize_project,
-    load_initializer_settings,
-    validate_project_name,
-)
+from .project_initializer import initialize_project, load_initializer_settings, validate_project_name
 from .personal_supabase import (
     ActivationResult,
     PersonalSupabaseBootstrapResult,
@@ -105,19 +79,7 @@ from .personal_supabase import (
     tui_personal_supabase_env_path,
     probe_project_personal_supabase_environment,
 )
-from .firebase import (
-    is_firebase_registered,
-    load_firebase_status,
-    project_id_from_project_root,
-    register_firebase,
-)
-from .provider_auth import check_provider_auth, sign_in_instructions
-from .projects import (
-    DaedalusProject,
-    discover_projects,
-    is_direct_child_project,
-    project_from_directory,
-)
+from .projects import DaedalusProject, discover_projects, is_direct_child_project
 from .plan import (
     CUSTOM_ANSWER_OPTION_ID,
     PlanClarification,
@@ -130,7 +92,6 @@ from .plan import (
 from .prompts import build_topic_population_prompt
 from .task_coordinator import TaskCoordinator, TaskRecord
 from .supabase_migrations import ROOT_MIGRATION_LOCK, TUI_ROOT, push_migrations, synchronize_personal_migrations
-from .task_coordinator import ACTIVE_RUN_STATUSES, TaskCoordinator, TaskRecord
 from .topics import (
     TOPIC_NONE_VALUE,
     build_topic_template,
@@ -142,10 +103,9 @@ from .topics import (
     validate_topic_name,
 )
 from .transcript import TranscriptLog
-from .usage_monitor import ClaudeAccountUsage, ProviderUsage, UsageMonitor, format_usage_bar
 from .token_usage import calculate_token_usage, merge_usage_entries, task_usage_entry, usage_entries_from_memory
 from .verification import truncate_diagnostic
-from .vim_text_area import MODE_LABELS, SUBMIT_KEYS, DaedalusVimTextArea, VimMode as VimModeEnum
+from .vim_text_area import DaedalusVimTextArea
 
 
 def _literal_select_options(options: list[tuple[str, str]]) -> list[tuple[Text, str]]:
@@ -266,62 +226,6 @@ def _shutdown_apps_before_thread_join() -> None:
             log_exception("Pre-thread-shutdown coordinator cleanup failed", error)
 
 
-#: Signals another process can send to the TUI. Textual runs the terminal
-#: with ISIG off, so a keyboard Ctrl+C never becomes SIGINT; one that does
-#: arrive comes from outside (a child, a shell, the OS) and must not be left
-#: to asyncio's default handling.
-GUARDED_SIGNALS: tuple[int, ...] = tuple(
-    getattr(signal, name) for name in ("SIGINT", "SIGTERM", "SIGHUP") if hasattr(signal, name)
-)
-
-
-def external_signal_plan(signum: int) -> tuple[str, str]:
-    """Return ``(action, signal name)`` for a signal delivered to the TUI.
-
-    SIGINT is what Ctrl+C means inside Daedalus, so it becomes the same
-    interrupt action instead of killing the app; SIGTERM and SIGHUP become a
-    graceful exit that pauses the running agents and records their state.
-    """
-    try:
-        name = signal.Signals(signum).name
-    except ValueError:
-        name = str(signum)
-    return ("interrupt" if signum == signal.SIGINT else "exit"), name
-
-
-def install_signal_guards(app: "DaedalusTuiApp") -> None:
-    """Route stray signals through the app instead of asyncio's default handler.
-
-    ``asyncio.run`` installs a SIGINT handler that cancels the main task when
-    it finds the default one in place, and Textual then returns from ``run()``
-    as if nothing happened: no return code, no unmount hook, the session gone.
-    Installing Daedalus' own handlers first keeps that handler out, and the
-    app decides what the signal means. Must be called from the main thread
-    before ``app.run()``; it is a no-op elsewhere.
-    """
-    if threading.current_thread() is not threading.main_thread():
-        return
-
-    def handle(signum: int, _frame: object) -> None:
-        app._on_external_signal(signum)
-
-    for signum in GUARDED_SIGNALS:
-        try:
-            signal.signal(signum, handle)
-        except (OSError, ValueError) as error:
-            LOGGER.warning("Could not install a handler for signal %s: %s", signum, error)
-
-
-def _terminal_isig_enabled() -> bool | None:
-    """Whether the controlling terminal would turn Ctrl+C into SIGINT, if known."""
-    try:
-        import termios
-
-        return bool(termios.tcgetattr(sys.stdin.fileno())[3] & termios.ISIG)
-    except Exception:
-        return None
-
-
 def _register_app_for_thread_exit(app: "DaedalusTuiApp") -> None:
     global _THREAD_EXIT_HOOK_REGISTERED
     with _THREAD_EXIT_APPS_LOCK:
@@ -341,18 +245,10 @@ def _unregister_app_for_thread_exit(app: "DaedalusTuiApp") -> None:
         _THREAD_EXIT_APPS.pop(id(app), None)
 
 
-# The prompt editor owns the submit keys because it must let them through
-# instead of inserting a newline; the menu label is derived from them so the
-# two can never drift apart.
-SUBMIT_SHORTCUT = " / ".join(
-    "+".join(part.capitalize() for part in key.split("+")) for key in SUBMIT_KEYS
-)
-
 GLOBAL_SHORTCUTS = (
-    (SUBMIT_SHORTCUT, "Send prompt (new task or follow-up)", "submit_prompt"),
+    ("Ctrl+Enter", "Send prompt", "submit_prompt"),
     ("Tab", "Toggle coding/plan mode", "toggle_plan_mode"),
-    ("Ctrl+C", "Stop the run, keep progress, restore prompt", "interrupt_task"),
-    ("Ctrl+X", "Same as Ctrl+C (stop the run)", "interrupt_task"),
+    ("Ctrl+C", "Copy selected text", "copy_selection"),
     ("Ctrl+Alt+S", "Copy selection", "copy_selection"),
     ("Ctrl+P", "Pause task", "pause_task"),
     ("Ctrl+R", "Resume task", "resume_task"),
@@ -392,25 +288,6 @@ class _LegacyCompatibleBinding(Binding):
             self.show,
         )
         return values[index]
-    ("Ctrl+R", "Resume task (Vim redo inside the prompt)", "resume_task"),
-    ("Ctrl+N", "New project", "show_new_project"),
-    ("Ctrl+Q", "Quit Daedalus", "quit"),
-    ("Ctrl+K", "Show keyboard shortcuts", "show_shortcuts"),
-    ("Ctrl+U", "Show coding statistics and total Claude usage", "show_statistics"),
-    ("Ctrl+H", "Show pushed commit history", "show_push_history"),
-    ("Ctrl+O", "Toggle Orchestrate Mode", "toggle_orchestrate_mode"),
-)
-
-
-def binding_keys(shortcut: str) -> str:
-    """Turn a displayed shortcut into Textual's comma-separated key list.
-
-    A shortcut may offer several keys for one action, written for the
-    shortcuts menu as ``"Shift+Enter / Ctrl+Enter"``. Textual binds the same
-    alternatives as ``"shift+enter,ctrl+enter"``.
-    """
-    return ",".join(part.strip().lower() for part in shortcut.split("/") if part.strip())
-
 
 _ACTIVE_TASK_STATUSES = {
     "queued",
@@ -422,10 +299,8 @@ _ACTIVE_TASK_STATUSES = {
     "integrating",
     "resolving",
     "paused",
-    "interrupted",
     "awaiting_answers",
 }
-_SELECT_EMPTY = (Select.BLANK, "", getattr(Select, "NULL", None))
 
 SHORTCUT_SECTIONS = (
     (
@@ -433,22 +308,15 @@ SHORTCUT_SECTIONS = (
         tuple((shortcut, description) for shortcut, description, _ in GLOBAL_SHORTCUTS),
     ),
     (
-        "Output navigation (transcript, errors, or viewer)",
+        "Output navigation",
         (
             ("j / k", "Scroll output down / up"),
             ("gg / G", "Scroll to output start / end"),
             ("Ctrl+D / PageUp", "Scroll one page down / up"),
-            ("j / k", "Scroll down / up"),
-            ("gg / G", "Scroll to start / end"),
-            ("Ctrl+D / Ctrl+U", "Scroll one page down / up"),
             ("y", "Copy selected text"),
-            ("p", "Paste clipboard into the prompt"),
+            ("p", "Paste into the prompt"),
             ("i", "Focus the prompt"),
         ),
-    ),
-    (
-        "Task sidebar",
-        (("dd", "Delete the task under the sidebar cursor"),),
     ),
     (
         "Prompt (Vim mode)",
@@ -463,49 +331,9 @@ SHORTCUT_SECTIONS = (
             ("d / u", "Delete / undo"),
             ("y / p", "Yank / paste"),
             ("V", "Select whole lines"),
-            ("Esc", "Normal mode; clears selection and pending keys"),
-            ("i / a / I / A / o / O", "Enter Insert mode"),
-            ("h / j / k / l", "Move the cursor (counts: 3j)"),
-            ("w / b / e / 0 / $", "Move by word or line"),
-            ("gg / G", "Move to document start / end"),
-            ("v / V", "Select characters / whole lines"),
-            ("x / dd / dw / d$", "Cut (2dd cuts two lines)"),
-            ("yy / yw / y$", "Copy (2yy copies two lines)"),
-            ("visual d / x / y / c", "Cut / copy / change selection"),
-            ("p / P", "Paste after / before (lines stay lines)"),
-            ("\"+y / \"+p / \"+P", "Copy to / paste from the system clipboard"),
-            ("u / Ctrl+R", "Undo / redo"),
-            ("Enter", "Insert a newline"),
-        ),
-    ),
-    (
-        "Clipboard and storage",
-        (
-            ("Every cut/yank", "Also copies to the system clipboard"),
-            ("p with empty register", "Pastes the system clipboard"),
-            ("Drafts", "Saved automatically under prompts/"),
-            ("Sent prompts", "Archived exactly as turn-NNNN.md"),
-            ("Errors", "Written under errors/ with task and run ids"),
-            ("Pushed commits", "Recorded in launch-root memory; Ctrl+H opens the Push log"),
         ),
     ),
 )
-
-# Backends available during New Project initialization. Personal Supabase is
-# registered only after initialization from the existing-project action.
-BACKEND_LABELS = {
-    "none": "No backend",
-    "firebase": "Firebase",
-}
-BACKEND_OPTIONS = tuple((BACKEND_LABELS[name], name) for name in ("firebase", "none"))
-
-
-# Trailing project-selector entry. Discovery only walks the launch root, so one
-# sentinel keeps a project living anywhere else reachable without listing every
-# directory on the machine in the selector.
-OPEN_DIRECTORY_VALUE = "__open-project-directory__"
-OPEN_DIRECTORY_LABEL = "Open directory…"
-
 
 COMPACT_SETTING_CATEGORIES = (
     ("Model provider", "provider"),
@@ -562,22 +390,9 @@ class PlanAnswerSelect(Select):
 class CompactSettingsSelect(Select):
     """Keep only the latest value-change event for rebuilt compact controls."""
 
-    _pending_user_value = None
-
     def _watch_value(self, value) -> None:
         super()._watch_value(value)
         self._latest_value = value
-        if self.id == "compact-settings-value":
-            # A value assigned outside a programmatic refresh is a user choice
-            # that has not been applied yet. Remember it so a refresh queued
-            # behind it (for example from a mount-time Select.Changed event)
-            # cannot reset the control before the choice is processed.
-            try:
-                suppressed = self.app._suppress_compact_setting_change
-            except Exception:
-                suppressed = True
-            self._pending_user_value = None if suppressed else value
-            return
         if self.id != "compact-settings-category" or value not in dict(COMPACT_SETTING_CATEGORIES).values():
             return
         try:
@@ -1212,76 +1027,6 @@ class PersonalSupabaseExposureErrorScreen(ModalScreen[None]):
     def action_close_error(self) -> None:
         self.dismiss(None)
 
-class OpenProjectDirectoryScreen(ModalScreen[str | None]):
-    """Collect the path of a project that launch-root discovery cannot see.
-
-    Discovery is deliberately limited to immediate launch-root children, so a
-    project created, cloned, or moved elsewhere would otherwise require
-    relaunching the TUI from another directory.
-    """
-
-    BINDINGS = [
-        ("escape", "cancel_open_directory", "Cancel"),
-    ]
-
-    def __init__(self, base_directory: Path) -> None:
-        super().__init__()
-        self.base_directory = base_directory.expanduser().resolve()
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="open-directory-dialog"):
-            yield Static("Open project directory", id="open-directory-title")
-            yield Static(
-                f"Absolute path, ~ path, or a path relative to {self.base_directory}",
-                id="open-directory-subtitle",
-                markup=False,
-            )
-            yield Input(placeholder="~/code/my-project", id="open-directory-input")
-            yield Static("", id="open-directory-status", markup=False)
-            with Horizontal(id="open-directory-actions"):
-                yield Button("Open", id="open-directory-button", variant="primary")
-                yield Button("Cancel", id="cancel-open-directory-button")
-
-    def on_mount(self) -> None:
-        self.query_one("#open-directory-input", Input).focus()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel-open-directory-button":
-            self.dismiss(None)
-        elif event.button.id == "open-directory-button":
-            self._open_directory()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "open-directory-input":
-            self._open_directory()
-
-    def action_cancel_open_directory(self) -> None:
-        self.dismiss(None)
-
-    def _open_directory(self) -> None:
-        status = self.query_one("#open-directory-status", Static)
-        directory_input = self.query_one("#open-directory-input", Input)
-        entered = directory_input.value.strip()
-        if not entered:
-            status.update("Enter a directory path.")
-            directory_input.focus()
-            return
-        candidate = Path(entered).expanduser()
-        if not candidate.is_absolute():
-            candidate = self.base_directory / candidate
-        try:
-            resolved = candidate.resolve()
-            is_directory = resolved.is_dir()
-        except OSError as error:
-            status.update(str(error))
-            directory_input.focus()
-            return
-        if not is_directory:
-            status.update(f"{resolved} is not an existing directory.")
-            directory_input.focus()
-            return
-        self.dismiss(str(resolved))
-
 
 class ProjectInitializerScreen(ModalScreen[dict | None]):
     """Collect a project slug and create a Daedalus-compatible directory."""
@@ -1290,10 +1035,9 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
         ("escape", "cancel_initializer", "Cancel"),
     ]
 
-    def __init__(self, launch_root: Path, default_backend: str = "firebase") -> None:
+    def __init__(self, launch_root: Path) -> None:
         super().__init__()
         self.launch_root = launch_root.resolve()
-        self.default_backend = default_backend if default_backend in BACKENDS else "none"
         self._busy = False
 
     def compose(self) -> ComposeResult:
@@ -1306,13 +1050,6 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
             yield Static("Project name (lowercase, digits, hyphens)", id="project-name-label")
             yield Input(placeholder="example-project", id="project-name-input")
             yield Checkbox("Also create a private GitHub repository", id="project-github-checkbox")
-            yield Static("Backend", id="project-backend-label")
-            yield Select(
-                list(BACKEND_OPTIONS),
-                value=self.default_backend,
-                allow_blank=False,
-                id="project-backend-select",
-            )
             yield Static("", id="project-initializer-status")
             with Horizontal(id="project-initializer-actions"):
                 yield Button("Create", id="create-project-button", variant="primary")
@@ -1341,7 +1078,6 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
         status = self.query_one("#project-initializer-status", Static)
         name_input = self.query_one("#project-name-input", Input)
         create_github = self.query_one("#project-github-checkbox", Checkbox).value
-        backend = str(self.query_one("#project-backend-select", Select).value)
         try:
             settings = load_initializer_settings()
             project_name = validate_project_name(
@@ -1353,13 +1089,12 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
             name_input.focus()
             return
 
-        self._initialize_project(project_name, create_github, backend)
+        self._initialize_project(project_name, create_github)
 
     def _initialize_project(
         self,
         project_name: str,
         create_github: bool,
-        backend: str,
     ) -> None:
         status = self.query_one("#project-initializer-status", Static)
         self._busy = True
@@ -1371,7 +1106,6 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
                     "requestId": str(uuid.uuid4()),
                     "projectName": project_name,
                     "createGitHubRepository": create_github,
-                    "backend": backend,
                 },
                 execution_root=self.launch_root,
             )
@@ -1388,163 +1122,6 @@ class ProjectInitializerScreen(ModalScreen[dict | None]):
         self._busy = False
         self.query_one("#create-project-button", Button).disabled = False
         status.update(str(result.get("error") or "Initialization failed."))
-
-
-class ProviderSignInScreen(ModalScreen[None]):
-    """Report a provider's sign-in status and hand over the login command.
-
-    The TUI deliberately does not host the login itself: a child CLI that takes
-    over this terminal makes the Textual application appear to vanish, which is
-    the same reason agent subprocesses run with their stdin detached.
-    """
-
-    BINDINGS = [
-        ("escape", "close_sign_in", "Close"),
-    ]
-
-    def __init__(self, provider: str, settings: TuiSettings) -> None:
-        super().__init__()
-        self.provider = provider
-        self.settings = settings
-        self.provider_settings = settings.auth.for_provider(provider)
-        self._checking = False
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="sign-in-dialog"):
-            yield Static(f"{self.provider_settings.label} sign-in", id="sign-in-title")
-            mode = "account" if self.settings.auth.uses_account_login else "API key"
-            yield Static(f"Authentication mode: {mode}", id="sign-in-mode")
-            yield Static("Checking…", id="sign-in-detail", markup=False)
-            with Horizontal(id="sign-in-actions"):
-                yield Button("Check again", id="recheck-sign-in-button", variant="primary")
-                yield Button("Close", id="close-sign-in-button")
-
-    def on_mount(self) -> None:
-        self._check()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "close-sign-in-button":
-            self.dismiss(None)
-        elif event.button.id == "recheck-sign-in-button":
-            self._check()
-
-    def action_close_sign_in(self) -> None:
-        self.dismiss(None)
-
-    def _check(self) -> None:
-        if self._checking:
-            return
-        self._checking = True
-        self.query_one("#sign-in-detail", Static).update("Checking…")
-        self.query_one("#recheck-sign-in-button", Button).disabled = True
-
-        def work() -> None:
-            try:
-                status = check_provider_auth(self.provider, self.provider_settings)
-            except Exception as error:  # pragma: no cover - defensive UI boundary
-                self.app.call_from_thread(self._show_failure, str(error))
-            else:
-                self.app.call_from_thread(self._show_status, status)
-
-        self.app.run_worker(
-            work,
-            thread=True,
-            exclusive=True,
-            group="provider-auth",
-            exit_on_error=False,
-        )
-
-    def _show_status(self, status) -> None:
-        self._checking = False
-        if not self.is_running:
-            return
-        self.query_one("#recheck-sign-in-button", Button).disabled = False
-        self.query_one("#sign-in-detail", Static).update(
-            f"{status.summary}\n\n"
-            + sign_in_instructions(status, self.settings.auth.uses_account_login)
-        )
-
-    def _show_failure(self, message: str) -> None:
-        self._checking = False
-        if not self.is_running:
-            return
-        self.query_one("#recheck-sign-in-button", Button).disabled = False
-        self.query_one("#sign-in-detail", Static).update(
-            f"Could not check {self.provider_settings.label} sign-in status.\n\n{message}"
-        )
-
-
-class BackendRegistrationScreen(ModalScreen[str | None]):
-    """Choose and scaffold the backend an existing project targets."""
-
-    BINDINGS = [
-        ("escape", "cancel_backend", "Cancel"),
-    ]
-
-    def __init__(self, project_root: Path, registered: str | None, default_backend: str) -> None:
-        super().__init__()
-        self.project_root = project_root.resolve()
-        self.registered = registered
-        self.default_backend = registered or (
-            default_backend if default_backend in BACKENDS and default_backend != "none" else "firebase"
-        )
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="backend-dialog"):
-            yield Static("Project backend", id="backend-title")
-            yield Static(f"Scaffolds backend files in {self.project_root}", id="backend-subtitle")
-            if self.registered:
-                yield Static(
-                    f"Already registered for {BACKEND_LABELS[self.registered]}.",
-                    id="backend-registered",
-                    markup=False,
-                )
-            yield Select(
-                [(label, value) for label, value in BACKEND_OPTIONS if value != "none"],
-                value=self.default_backend,
-                allow_blank=False,
-                id="backend-select",
-            )
-            yield Static(
-                "Registration writes configuration and rules only. Orchestration "
-                "applies them remotely after verification passes.",
-                id="backend-note",
-            )
-            yield Static("", id="backend-status", markup=False)
-            with Horizontal(id="backend-actions"):
-                yield Button("Register", id="register-backend-confirm", variant="primary")
-                yield Button("Cancel", id="cancel-backend-button")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel-backend-button":
-            self.dismiss(None)
-        elif event.button.id == "register-backend-confirm":
-            self._register()
-
-    def action_cancel_backend(self) -> None:
-        self.dismiss(None)
-
-    def _register(self) -> None:
-        backend = str(self.query_one("#backend-select", Select).value)
-        status = self.query_one("#backend-status", Static)
-        try:
-            if backend == "firebase":
-                result = register_firebase(
-                    self.project_root,
-                    project_id=project_id_from_project_root(self.project_root),
-                )
-            else:
-                result = register_personal_supabase(
-                    self.project_root,
-                    schema=schema_from_project_root(self.project_root),
-                )
-        except ValueError as error:
-            status.update(str(error))
-            return
-        if result.status != "success":
-            status.update(result.message)
-            return
-        self.dismiss(result.message)
 
 
 class CreateTopicScreen(ModalScreen[dict | None]):
@@ -1683,7 +1260,6 @@ class CodingStatisticsScreen(ModalScreen[None]):
         self,
         entries,
         settings: CodingStatisticsSettings | None = None,
-        account_usage_reader: Callable[[], ClaudeAccountUsage] | None = None,
     ) -> None:
         super().__init__()
         self.settings = settings or CodingStatisticsSettings()
@@ -1694,11 +1270,6 @@ class CodingStatisticsScreen(ModalScreen[None]):
             thirty_day_forecast_days=self.settings.thirty_day_forecast_days,
         )
         self.unit = "tokens"
-        # Reading every Claude Code transcript can take a moment, so the screen
-        # opens with the Daedalus figures and fills the account total in later.
-        self._account_usage_reader = account_usage_reader
-        self.account_usage: ClaudeAccountUsage | None = None
-        self._account_error = ""
 
     def compose(self) -> ComposeResult:
         with Vertical(id="coding-statistics-dialog"):
@@ -1716,7 +1287,6 @@ class CodingStatisticsScreen(ModalScreen[None]):
                 yield Static(id="cumulative-metric", classes="usage-metric")
                 yield Static(id="daily-metric", classes="usage-metric")
                 yield Static(id="thirty-day-metric", classes="usage-metric")
-                yield Static(id="claude-account-metric", classes="usage-metric")
             with Horizontal(id="coding-statistics-body"):
                 with Vertical(id="usage-history-panel"):
                     yield Static("Task usage", classes="statistics-heading")
@@ -1732,7 +1302,6 @@ class CodingStatisticsScreen(ModalScreen[None]):
 
     def on_mount(self) -> None:
         self._refresh_statistics_view()
-        self._start_account_usage_read()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id != "statistics-unit-select" or event.value in (Select.BLANK, ""):
@@ -1772,7 +1341,6 @@ class CodingStatisticsScreen(ModalScreen[None]):
             f"Monthly projected {suffix}\n{_format_count(thirty_day)}"
         )
         self.query_one("#provider-split", Static).update(self._provider_split_text())
-        self._render_account_metric()
 
         table = self.query_one("#usage-table", DataTable)
         table.clear(columns=True)
@@ -1804,85 +1372,6 @@ class CodingStatisticsScreen(ModalScreen[None]):
     def action_close_statistics(self) -> None:
         self.dismiss(None)
 
-    # --- account-wide Claude usage ---------------------------------------------
-
-    def _start_account_usage_read(self) -> None:
-        """Read every Claude Code token off the UI thread, then show the total.
-
-        The Daedalus figures above count only tasks this app launched; this
-        reads Claude Code's own local records so the operator sees their whole
-        Claude spend, including sessions run outside Daedalus.
-        """
-        reader = self._account_usage_reader
-        if reader is None:
-            return
-        app = self.app
-
-        def work() -> None:
-            try:
-                usage = reader()
-            except Exception as error:  # pragma: no cover - defensive UI boundary
-                log_exception("Claude account usage reading failed", error)
-                usage, failure = None, str(error)
-            else:
-                failure = ""
-            try:
-                app.call_from_thread(self._show_account_usage, usage, failure)
-            except RuntimeError:
-                # The operator closed the screen, or the app stopped, while the
-                # transcripts were still being read.
-                return
-
-        self.app.run_worker(
-            work,
-            thread=True,
-            exclusive=True,
-            group="claude-account-usage",
-            exit_on_error=False,
-        )
-
-    def _show_account_usage(self, usage: ClaudeAccountUsage | None, error: str) -> None:
-        self.account_usage = usage
-        self._account_error = error
-        if not self.is_running:
-            return
-        self._render_account_metric()
-
-    def _render_account_metric(self) -> None:
-        """Draw the account-wide Claude total, which is always a token count."""
-        try:
-            tile = self.query_one("#claude-account-metric", Static)
-        except NoMatches:  # pragma: no cover - the tile is part of compose
-            return
-        usage = self.account_usage
-        if usage is None:
-            if self._account_error:
-                tile.update("All Claude tokens\nunavailable")
-                tile.tooltip = self._account_error
-            elif self._account_usage_reader is None:
-                tile.update("All Claude tokens\n—")
-                tile.tooltip = "Usage readings are disabled in the parameter file."
-            else:
-                tile.update("All Claude tokens\nreading…")
-                tile.tooltip = None
-            return
-        if not usage.ok:
-            tile.update("All Claude tokens\nno usage data")
-            tile.tooltip = usage.detail or None
-            return
-        # The tile keeps the same two-line shape as its neighbours; the record's
-        # span and sources belong in the tooltip, where they cannot clip.
-        tile.update(f"All Claude tokens\n{_format_count(usage.total_tokens)}")
-        since = f"recorded since {usage.first_day}\n" if usage.first_day else ""
-        tile.tooltip = (
-            "Every Claude Code token recorded on this machine, including "
-            "sessions run outside Daedalus.\n"
-            f"{since}"
-            f"today: {_format_count(usage.today_tokens)} tokens\n"
-            f"{usage.days_recorded} days recorded · {usage.scanned_files} transcripts\n"
-            f"{usage.detail}"
-        )
-
     def _average_per_prompt_text(self) -> str:
         suffix = "tasks" if self.unit == "tasks" else "tokens"
         lines = [f"Average {suffix} per prompt"]
@@ -1907,50 +1396,6 @@ class CodingStatisticsScreen(ModalScreen[None]):
                 f"{provider}: {_format_count(count)} {suffix}"
                 for provider, count in split
             )
-        return "\n".join(lines)
-
-
-class PushedCommitsScreen(ModalScreen[None]):
-    """Show the persistent record of commits successfully pushed by Daedalus."""
-
-    BINDINGS = [
-        ("escape", "close_push_history", "Close"),
-        ("ctrl+h", "close_push_history", "Close"),
-    ]
-
-    def __init__(self, records: tuple[dict[str, object], ...], memory_path: Path) -> None:
-        super().__init__()
-        self.records = records
-        self.memory_path = memory_path
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="pushed-commits-dialog"):
-            yield Static("Pushed commits", id="pushed-commits-title")
-            yield Static(
-                f"Successful pushes are recorded in {self.memory_path}",
-                id="pushed-commits-subtitle",
-                markup=False,
-            )
-            yield TextArea(self._history_text(), id="pushed-commits-content", read_only=True, soft_wrap=False)
-            yield Static("Press Esc or Ctrl+H to close", id="pushed-commits-footer")
-
-    def on_mount(self) -> None:
-        self.query_one("#pushed-commits-content", TextArea).focus()
-
-    def action_close_push_history(self) -> None:
-        self.dismiss(None)
-
-    def _history_text(self) -> str:
-        if not self.records:
-            return "No pushed commits recorded yet."
-        lines = []
-        for record in reversed(self.records):
-            timestamp = str(record.get("timestamp", "—"))
-            project = str(record.get("project", "—"))
-            branch = str(record.get("branch", "—"))
-            remote = str(record.get("remote", "—"))
-            commit = str(record.get("commit", "—"))
-            lines.append(f"{timestamp}  {project}  {remote}/{branch}  {commit}")
         return "\n".join(lines)
 
 
@@ -1998,15 +1443,6 @@ class DaedalusTuiApp(App[None]):
             description,
             show=shortcut == "Ctrl+K",
             priority=True,
-    # Ctrl+C and Ctrl+X are priority bindings: they must reach the interrupt
-    # action before the Screen's copy binding or TextArea's cut binding can
-    # consume them, even when output text is selected.
-    BINDINGS = [
-        Binding(
-            binding_keys(shortcut),
-            action,
-            description,
-            priority=action == "interrupt_task",
         )
         for shortcut, description, action in GLOBAL_SHORTCUTS
     ]
@@ -2021,10 +1457,6 @@ class DaedalusTuiApp(App[None]):
         codex_usage_settings: CodexUsageSettings | None = None,
         codex_usage_reader=None,
         theme_preferences_path: Path | None = None,
-        prompting_settings: PromptingSettings | None = None,
-        usage_monitor: UsageMonitor | None = None,
-        orchestrate_settings: OrchestrateSettings | None = None,
-        orchestrate_coordinator: object | None = None,
     ) -> None:
         super().__init__()
         self._theme_preferences_path = theme_preferences_path or _theme_preferences_path()
@@ -2047,35 +1479,12 @@ class DaedalusTuiApp(App[None]):
         self.codex_usage_settings = codex_usage_settings or load_codex_usage_settings()
         self._codex_usage_reader = codex_usage_reader or fetch_codex_usage
         self.orchestration_settings = load_orchestration_settings()
-        self.orchestrate_settings = orchestrate_settings or self._load_orchestrate_settings()
-        self.prompting = prompting_settings or load_prompting_settings()
-        # Prompt archives and diagnostics live under the TUI's own storage
-        # root, never under the target project or the working directory.
-        self.storage = LocalStorage(self.prompting.data_root)
-        self.prompt_store = PromptStore(self.storage)
-        self.debug_log_path = self.storage.runtime_log_path
-        self.fault_log_path = self.storage.fault_log_path
-        # Configure the runtime log before anything else can fail, so
-        # initialization problems are captured before widgets mount.
-        self._logging_status: LoggingStatus = configure_debug_logging(
-            self.debug_log_path,
-            self.prompting.error_log_max_bytes,
-            self.prompting.error_log_backup_count,
-        )
+        self.debug_log_path = self.launch_root / self.orchestration_settings.debug_log_filename
         self._fault_log_file = None
-        self.runner = runner or AgentRunner(
-            auth_policy=self.settings.auth.runner_policy(),
-            claude_permission_mode=self.settings.claude.permission_mode,
-            claude_allowed_tools=self.settings.claude.allowed_tools,
-        )
-        try:
-            self._opened_directories = list(self.memory.get_opened_project_directories())
-        except (OSError, ValueError):
-            # Project navigation should remain usable if local memory is unavailable.
-            self._opened_directories = []
+        self.runner = runner or AgentRunner()
         discovered = [
             project
-            for project in discover_projects(self.launch_root, self.settings.project_discovery)
+            for project in discover_projects(self.launch_root)
             if is_direct_child_project(project.path, self.launch_root)
         ]
         if not discovered:
@@ -2083,10 +1492,6 @@ class DaedalusTuiApp(App[None]):
             # orchestration will provide the actionable Git error if needed.
             discovered = [DaedalusProject(self.launch_root, self.launch_root)]
         discovered_paths = {project.path.resolve() for project in discovered}
-        for opened in self._opened_project_entries():
-            if opened.path not in discovered_paths:
-                discovered.append(opened)
-                discovered_paths.add(opened.path)
         remembered_project = self._remembered_project()
         if remembered_project in discovered_paths:
             active_project = remembered_project
@@ -2098,16 +1503,6 @@ class DaedalusTuiApp(App[None]):
         self._coordinators: dict[Path, TaskCoordinator] = {}
         self._migration_push_locks: dict[Path, threading.Lock] = {}
         self._external_coordinator = coordinator
-        # One Orchestrate Mode dispatcher per project, created beside the
-        # task coordinator the first time the project's view is used.
-        self._orchestrators: dict[Path, OrchestrateCoordinator] = {}
-        self._external_orchestrator = orchestrate_coordinator
-        self._orchestrate_view_shown = False
-        self._selected_session_id: str | None = None
-        self._orchestrate_board_rows: list[tuple[str, str | None]] = []
-        self._orchestrate_draft_dirty = False
-        self._orchestrate_draft_timer = None
-        self._suppress_orchestrate_draft_events = False
         self._active_project_path = active_project
         self.directory = active_project
         self._remember_project(active_project)
@@ -2122,25 +1517,14 @@ class DaedalusTuiApp(App[None]):
         self._updated_task_rows: set[str] = set()
         self._new_task_mode = True
         self._vim_pending_g = False
-        self._vim_pending_d = False
-        self._showing_error_output = False
         self._plan_review_generation = 0
         self._accept_task_events = False
         self._task_event_lock = threading.Lock()
         self._pending_task_events: dict[str, tuple[TaskRecord, str, str, str]] = {}
-        self._pending_push_notices: list[tuple[TaskRecord, str]] = []
         self._task_event_flush_scheduled = False
         self._shutdown_lock = threading.Lock()
         self._shutdown_started = False
         self._textual_unmounted = False
-        # Set when Textual unwinds from an unhandled exception, so the close
-        # hook keeps the composer draft instead of clearing it.
-        self._fatal_error = False
-        # Set once the close hook has settled the composer draft. Shutdown runs
-        # through several entry points that each flush the draft, and one of
-        # them follows the close hook, so without this the flush would write
-        # back the very prompt the close just cleared.
-        self._composer_draft_closed = False
         self._previous_asyncio_exception_handler = None
         self._rendered_plan_question_signature: tuple[object, ...] | None = None
         self._suppress_target_branch_change = False
@@ -2149,9 +1533,7 @@ class DaedalusTuiApp(App[None]):
         self._compact_setting_category = "provider"
         self._compact_setting_values: dict[str, str] = {}
         self._push_in_flight = False
-        self._push_confirmation_branch: str | None = None
         self._compact_mode = False
-        self._wrapped_toolbars = False
         self._short_height_mode = False
         self._responsive_measure_pending = False
         self._displayed_error = ""
@@ -2161,42 +1543,6 @@ class DaedalusTuiApp(App[None]):
         ) = None
         self._codex_usage_refresh_lock = threading.Lock()
         self._codex_usage_stop = threading.Event()
-        # Composer draft state. The composer always holds an editable draft:
-        # either the new-task draft (``_composer_task_id`` is None) or the
-        # follow-up draft of the selected task.
-        self._composer_task_id: str | None = None
-        self._composer_project: Path = active_project
-        self._composer_revises_turn_id: str | None = None
-        self._draft_revision = 0
-        self._draft_dirty = False
-        self._draft_timer = None
-        self._suppress_draft_events = False
-        self._submission_in_progress = False
-        self._selection_settings: tuple[str, str, str, str] | None = None
-        self._suppress_history_select = False
-        self._show_all_tasks = False
-        self._viewer_visible = False
-        self._viewer_full = False
-        self._storage_error: str | None = None
-        self.usage_monitor = usage_monitor or UsageMonitor(self.settings.usage)
-        self._usage_readings: tuple[ProviderUsage, ...] = ()
-        self._usage_timer = None
-        try:
-            self._show_all_tasks = bool(self.memory.get_ui_preference("show_all_tasks", False))
-            self._viewer_visible = bool(
-                self.memory.get_ui_preference("output_viewer_visible", self.prompting.viewer_visible_by_default)
-            )
-            self._orchestrate_view_shown = bool(self.memory.get_ui_preference("orchestrate_view", False))
-        except (OSError, ValueError):
-            pass
-
-    def _load_orchestrate_settings(self) -> OrchestrateSettings:
-        """Load the Orchestrate Mode parameter file, falling back to its defaults."""
-        try:
-            return load_orchestrate_settings(tui_settings=self.settings)
-        except (OSError, ValueError) as error:
-            LOGGER.warning("Orchestrate Mode settings unavailable, using defaults: %s", error)
-            return OrchestrateSettings()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -2447,306 +1793,20 @@ class DaedalusTuiApp(App[None]):
         else:
             self._set_status(f"Supabase bootstrap skipped ({len(results)} unregistered project(s))")
 
-                with Horizontal(id="main-workspace"):
-                    with Vertical(id="task-sidebar"):
-                        yield Static("Task updates", id="task-label")
-                        yield DataTable(id="task-list", cursor_type="row")
-                        yield Button("All tasks", id="history-toggle-button")
-                        # Bottom-left usage bar, refreshed every minute.
-                        yield Static("Usage: —", id="usage-bar", markup=False)
-                    yield from self._compose_project_main()
-                yield OutputViewer(
-                    id="output-viewer",
-                    render_debounce_ms=self.prompting.viewer_render_debounce_ms,
-                    hard_line_breaks=self.prompting.viewer_hard_line_breaks,
-                    show_action_items=self.prompting.viewer_action_items_by_default,
-                    action_item_limit=self.prompting.viewer_action_item_limit,
-                )
-        yield Footer()
-
-    def _compose_project_main(self) -> ComposeResult:
-        with Vertical(id="project-main"):
-            yield Static("Local agent orchestration", id="title")
-            with Horizontal(id="task-bar"):
-                yield Static("Project", id="project-label")
-                yield Select(
-                    self._project_selector_options(),
-                    value=self._project_select_value(),
-                    allow_blank=False,
-                    id="project-select",
-                )
-                yield Button("New Project", id="new-project-button")
-                yield Button("Create Topic", id="create-topic-button", variant="primary")
-                yield Button("Register Backend", id="register-backend-button")
-                yield Button("Sign In", id="sign-in-button")
-                yield Button("New Task", id="new-task-button", variant="primary")
-                yield Button(
-                    "Task Mode" if self._orchestrate_view_shown else "Orchestrate Mode",
-                    id="orchestrate-mode-button",
-                )
-            with ContentSwitcher(
-                id="view-switcher",
-                initial="orchestrate-view" if self._orchestrate_view_shown else "tasks-view",
-            ):
-                with Vertical(id="tasks-view"):
-                    yield from self._compose_tasks_view()
-                with Vertical(id="orchestrate-view"):
-                    yield from self._compose_orchestrate_view()
-
-    def _compose_tasks_view(self) -> ComposeResult:
-        """The ordinary task view: settings, output, plan review, composer."""
-        if True:
-            # The model and effort lists depend on the default provider: the
-            # Claude default model is not a Codex option, so building these
-            # controls from the Codex lists would make the initial value
-            # illegal and crash on mount before the provider cascade runs.
-            default_provider = self.settings.default_provider
-            with Horizontal(id="settings"):
-                yield Select(
-                    [(option.label, option.value) for option in self.settings.providers],
-                    value=default_provider,
-                    id="provider-select",
-                )
-                yield Select(
-                    self._provider_model_options(default_provider),
-                    value=self.settings.default_model_for(default_provider),
-                    id="model-select",
-                )
-                yield Select(
-                    self._provider_reasoning_options(default_provider),
-                    value=self.settings.default_reasoning_for(default_provider),
-                    id="reasoning-select",
-                )
-                yield Select(
-                    [(option.label, option.value) for option in self.settings.modes],
-                    value="coding",
-                    id="mode-select",
-                )
-                yield Select(
-                    [("(None)", TOPIC_NONE_VALUE)],
-                    value=TOPIC_NONE_VALUE,
-                    id="topic-select",
-                )
-                yield Button("View Topic", id="view-topic-button", disabled=True)
-                yield Select(
-                    [
-                        (
-                            self.orchestration_settings.primary_branch,
-                            self.orchestration_settings.primary_branch,
-                        )
-                    ],
-                    value=self.orchestration_settings.primary_branch,
-                    id="target-branch-select",
-                )
-                yield Button("Push", id="push-branch-button")
-                yield Button("Push log", id="push-history-button")
-            with Vertical(id="compact-settings"):
-                yield CompactSettingsSelect(
-                    _literal_select_options(list(COMPACT_SETTING_CATEGORIES)),
-                    value="provider",
-                    allow_blank=False,
-                    id="compact-settings-category",
-                )
-                yield CompactSettingsSelect(
-                    [(option.label, option.value) for option in self.settings.providers],
-                    value=self.settings.default_provider,
-                    allow_blank=False,
-                    id="compact-settings-value",
-                )
-            yield Static(self._directory_text(), id="directory")
-            yield Static("Phase: Idle", id="phase")
-            yield Static("Task branch: —    Worktree: —", id="task-context")
-            with Vertical(id="output-panel"):
-                with Horizontal(id="output-toolbar"):
-                    yield Static("Agent output", id="output-view-label")
-                    yield Button("Show errors", id="output-toggle-button")
-                    yield Button(
-                        "Hide viewer" if self._viewer_visible else "Show viewer",
-                        id="viewer-toggle-button",
-                    )
-                # Keep diagnostics on the same selectable Log surface
-                # as the transcript so mouse selection, y, and Ctrl+C
-                # all use Textual's screen-selection clipboard path.
-                yield Log(id="task-error", auto_scroll=False)
-                # Log supports Textual click-drag selection; RichLog does not.
-                yield TranscriptLog(id="output", auto_scroll=True)
-            with Vertical(id="plan-review"):
-                # Agent plan text is literal; brackets and scientific
-                # notation must not be parsed as Textual/Rich markup.
-                yield Static("", id="plan-display", markup=False)
-                with Vertical(id="plan-questions"):
-                    yield Static("", id="plan-questions-empty", markup=False)
-                with Horizontal(id="plan-actions"):
-                    yield Button("Submit Answers", id="answer-plan-button", disabled=True)
-                    yield Button("Implement", id="implement-button", disabled=True, variant="primary")
-            with Vertical(id="composer"):
-                yield Static("New task", id="task-title", markup=False)
-                with Horizontal(id="composer-tools"):
-                    yield Select(
-                        [],
-                        prompt="Prompt history…",
-                        allow_blank=True,
-                        id="prompt-history-select",
-                    )
-                    yield Static(MODE_LABELS[VimModeEnum.INSERT], id="vim-mode")
-                yield DaedalusVimTextArea(
-                    id="prompt-input",
-                    placeholder="Describe the change for the local agent...",
-                )
-                with Vertical(id="resume-notes-panel"):
-                    yield Static("Optional notes for resuming this task", id="resume-notes-label")
-                    yield TextArea(
-                        id="resume-notes",
-                        placeholder="Tell the agent what it missed or what to update next...",
-                    )
-                with Horizontal(id="actions"):
-                    yield Button("Send", id="send-button", variant="primary")
-                    yield Button("Continue Plan", id="continue-plan-button", disabled=True)
-                    yield Button("Start Coding", id="start-coding-button", disabled=True, variant="primary")
-                    yield Button("Pause", id="pause-button", disabled=True)
-                    yield Button("Resume", id="resume-button", disabled=True)
-                    yield Button("Cancel", id="cancel-button", disabled=True, variant="error")
-                    yield Button("Retry", id="retry-button", disabled=True)
-                    yield Static("Idle", id="status")
-
-    def _compose_orchestrate_view(self) -> ComposeResult:
-        """Orchestrate Mode: role row, prompt, actions, board, planner log, summary."""
-        orchestrate = self.orchestrate_settings
-        with Horizontal(id="orchestrate-roles"):
-            # Each role keeps its provider, model, and effort on one line even
-            # when the compact layout stacks the roles vertically.
-            for role, provider, model, reasoning in (
-                ("planner", orchestrate.planner_provider, orchestrate.planner_model, orchestrate.planner_reasoning),
-                ("worker", orchestrate.worker_provider, orchestrate.worker_model, orchestrate.worker_reasoning),
-            ):
-                with Horizontal(classes="orchestrate-role", id=f"{role}-role"):
-                    yield Static(role.capitalize(), classes="orchestrate-role-label")
-                    yield Select(
-                        self._role_provider_options(provider),
-                        value=provider,
-                        allow_blank=False,
-                        id=f"{role}-provider-select",
-                        classes="orchestrate-role-provider",
-                    )
-                    model_options = self._role_model_options(provider, model)
-                    yield Select(
-                        model_options,
-                        value=model,
-                        allow_blank=False,
-                        disabled=len(model_options) < 2,
-                        id=f"{role}-model-select",
-                        classes="orchestrate-role-model",
-                    )
-                    reasoning_options = self._role_reasoning_options(provider, reasoning)
-                    yield Select(
-                        reasoning_options,
-                        value=reasoning_options[0][1] if not self.settings.reasoning_for(provider) else reasoning,
-                        allow_blank=False,
-                        disabled=not self.settings.reasoning_for(provider),
-                        id=f"{role}-reasoning-select",
-                        classes="orchestrate-role-reasoning",
-                    )
-            with Horizontal(classes="orchestrate-role orchestrate-role-workers", id="workers-role"):
-                yield Static("Workers", classes="orchestrate-role-label")
-                yield Input(
-                    value=str(orchestrate.default_max_workers),
-                    type="integer",
-                    id="max-workers-input",
-                    tooltip=f"1 to {orchestrate.max_workers_limit} workers",
-                )
-        yield DaedalusVimTextArea(
-            id="orchestrate-prompt",
-            placeholder="Describe the whole change; the planner splits it into worker cards...",
-        )
-        with Horizontal(id="orchestrate-actions"):
-            yield Button("Start", id="orchestrate-start-button", variant="primary")
-            yield Button("Stop", id="orchestrate-stop-button", variant="error", disabled=True)
-            yield Select([], prompt="Session…", allow_blank=True, id="orchestrate-session-select")
-            yield Static("Idle", id="orchestrate-status", markup=False)
-        yield DataTable(id="orchestrate-board", cursor_type="row")
-        yield TranscriptLog(id="planner-log", auto_scroll=True)
-        yield Static("", id="orchestrate-summary", markup=False)
-
-    def _role_provider_options(self, default_provider: str) -> list[tuple[str, str]]:
-        """Provider choices for one Orchestrate role: every provider the settings bar offers."""
-        options = [(option.label, option.value) for option in self.settings.providers]
-        if default_provider and default_provider not in {value for _, value in options}:
-            options.insert(0, (default_provider, default_provider))
-        return options
-
-    def _role_model_options(self, provider: str, default_model: str) -> list[tuple[str, str]]:
-        """Model choices for one Orchestrate role, always including its default."""
-        options = [(option.label, option.value) for option in self.settings.models_for(provider)]
-        if default_model and default_model not in {value for _, value in options}:
-            options.insert(0, (default_model, default_model))
-        return options
-
-    def _role_reasoning_options(self, provider: str, default_reasoning: str) -> list[tuple[str, str]]:
-        """Effort choices for one Orchestrate role, or one inert entry for providers without any."""
-        options = [(option.label, option.value) for option in self.settings.reasoning_for(provider)]
-        if not options:
-            return [("Not applicable", "")]
-        if default_reasoning and default_reasoning not in {value for _, value in options}:
-            options.insert(0, (default_reasoning, default_reasoning))
-        return options
-
-    def _role_defaults(self, role: str, provider: str) -> tuple[str, str]:
-        """Model and reasoning preselected when ``role`` switches to ``provider``.
-
-        The parameter file's choice wins for its own provider; any other
-        provider starts from the settings bar defaults for that provider.
-        """
-        orchestrate = self.orchestrate_settings
-        configured_provider, configured_model, configured_reasoning = (
-            orchestrate.planner_selection if role == "planner" else orchestrate.worker_selection
-        )
-        if provider == configured_provider:
-            return configured_model, configured_reasoning
-        return self.settings.default_model_for(provider), self.settings.default_reasoning_for(provider)
-
-    def _apply_role_provider(self, role: str, provider: str) -> None:
-        """Swap one Orchestrate role's model and effort choices to match its provider."""
-        model_select = self.query_one(f"#{role}-model-select", Select)
-        reasoning_select = self.query_one(f"#{role}-reasoning-select", Select)
-        default_model, default_reasoning = self._role_defaults(role, provider)
-        model_options = self._role_model_options(provider, default_model)
-        reasoning_options = self._role_reasoning_options(provider, default_reasoning)
-        has_reasoning = bool(self.settings.reasoning_for(provider))
-        model_select.disabled = len(model_options) < 2
-        reasoning_select.disabled = not has_reasoning
-        self._set_select_options_if_changed(model_select, model_options)
-        if model_select.value != default_model:
-            model_select.value = default_model
-        self._set_select_options_if_changed(reasoning_select, reasoning_options)
-        reasoning_value = default_reasoning if has_reasoning else reasoning_options[0][1]
-        if reasoning_select.value != reasoning_value:
-            reasoning_select.value = reasoning_value
 
     def on_mount(self) -> None:
-        if not self._logging_status.available:
-            self._logging_status = configure_debug_logging(
-                self.debug_log_path,
-                self.prompting.error_log_max_bytes,
-                self.prompting.error_log_backup_count,
-            )
-        self._fault_log_file = install_fault_handler(self.fault_log_path)
+        self.debug_log_path = configure_debug_logging(self.debug_log_path)
+        self._fault_log_file = install_fault_handler(self.debug_log_path)
         self._install_exit_diagnostics()
         self._accept_task_events = True
         prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
-        prompts_status, errors_status = self.storage.ensure_roots()
-        storage_problems = [status.error for status in (prompts_status, errors_status) if status.error]
-        if not self._logging_status.available and self._logging_status.error:
-            storage_problems.append(f"diagnostics log unavailable: {self._logging_status.error}")
-        self._storage_error = "; ".join(storage_problems) or None
         self.query_one("#output", TranscriptLog).styles.width = self.settings.output_width
         self._apply_provider_selection(str(self.query_one("#provider-select", Select).value))
         self._refresh_target_branch_select()
         self._refresh_topic_select()
-        self._refresh_backend_button()
         self._refresh_push_button()
         self._refresh_task_list()
         self._refresh_compact_setting_value()
-        self._refresh_history_toggle_button()
         self._apply_responsive_layout()
         self._start_codex_usage_refresh()
         self.set_interval(
@@ -2757,98 +1817,25 @@ class DaedalusTuiApp(App[None]):
         prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
         prompt.enter_insert_mode()
         prompt.focus()
-        self._apply_viewer_visibility()
-        self._refresh_output_viewer(None)
-        # Restore any draft still on disk. A deliberate close clears the
-        # composer's own draft (``[drafts] clear_on_exit``), so what is left to
-        # restore here is a crash's autosave or a deliberately stashed prompt.
-        self._load_composer_for_selection(restore_status=False)
-        if self._storage_error:
-            self._set_error(f"Local prompt/error storage is unavailable: {self._storage_error}")
-            self._set_status("Storage unavailable")
-        self.query_one("#output", TranscriptLog).set_user_color(self.screen.rich_style.color)
-        self._load_orchestrate_draft()
-        self._refresh_orchestrate_view()
-        self._start_usage_polling()
-
-    # ------------------------------------------------------------------
-    # Usage bar
-    # ------------------------------------------------------------------
-
-    def _start_usage_polling(self) -> None:
-        """Read provider usage now and then on the configured cadence."""
-        if not self.settings.usage.enabled:
-            self.query_one("#usage-bar", Static).update("Usage: disabled")
-            return
-        self._poll_usage()
-        self._usage_timer = self.set_interval(
-            max(1, self.settings.usage.interval_seconds), self._poll_usage
-        )
-
-    def _poll_usage(self) -> None:
-        """Run the usage readers off the UI thread and update the bar."""
-        monitor = self.usage_monitor
-
-        def work() -> None:
-            try:
-                readings = monitor.poll()
-            except Exception as error:  # pragma: no cover - monitor guards itself
-                log_exception("Usage polling failed", error)
-                return
-            try:
-                self.call_from_thread(self._show_usage, readings)
-            except RuntimeError:
-                return
-
-        self.run_worker(work, thread=True, exclusive=True, group="usage", exit_on_error=False)
-
-    def _show_usage(self, readings: tuple[ProviderUsage, ...]) -> None:
-        self._usage_readings = readings
-        nodes = self.query("#usage-bar")
-        if not nodes:
-            return
-        bar = nodes.first()
-        bar.update(format_usage_bar(readings, bar_width=self.settings.usage.bar_width))
-        bar.tooltip = "\n\n".join(
-            f"{reading.label}: {reading.detail or reading.summary}" + (
-                "" if reading.ok else " (unavailable)"
-            )
-            for reading in readings
-        ) or None
 
     def on_key(self, event: events.Key) -> None:
         """Add Vim-like navigation without changing TextArea insert behavior."""
-        if event.key == "tab" and len(self.screen_stack) == 1 and not self._orchestrate_view_shown:
+        if event.key == "tab" and len(self.screen_stack) == 1:
             self.action_toggle_plan_mode()
             event.stop()
             return
 
-        if isinstance(self.focused, TextArea) and not self._focus_in_viewer():
+        if isinstance(self.focused, TextArea):
             self._vim_pending_g = False
-            self._vim_pending_d = False
             return
 
         key = event.key
-        task_list_focused = isinstance(self.focused, DataTable) and self.focused.id == "task-list"
-        if self._vim_pending_d:
-            self._vim_pending_d = False
-            if key == "d" and task_list_focused:
-                self._delete_task_at_cursor()
-                event.stop()
-                return
-
         if self._vim_pending_g:
             self._vim_pending_g = False
             if key == "g":
                 self._scroll_output("home")
             else:
                 self._handle_vim_key(key)
-            event.stop()
-            return
-
-        if key == "d" and task_list_focused:
-            self._vim_pending_d = True
-            self._set_status("d-")
             event.stop()
             return
 
@@ -2864,8 +1851,6 @@ class DaedalusTuiApp(App[None]):
     def on_unmount(self) -> None:
         self._textual_unmounted = True
         self._codex_usage_stop.set()
-        self._close_composer_draft()
-        self._flush_orchestrate_draft()
         _unregister_app_for_thread_exit(self)
         shutdown_complete = self._shutdown_coordinators("Textual app unmount")
         if shutdown_complete:
@@ -2881,16 +1866,13 @@ class DaedalusTuiApp(App[None]):
         width: int | None = None,
         height: int | None = None,
         compact: bool | None = None,
-        wrapped: bool = False,
     ) -> None:
         """Toggle responsive classes and dimensions after a viewport change.
 
         ``compact_width`` is a lower safety guard, not the primary wide-layout
         breakpoint. Above it, the actual laid-out controls are measured after
-        Textual has processed the style change. A clipped toolbar first wraps
-        onto two rows (``wrapped``) while the workspace stays side by side;
-        only when the wrapped toolbars are still clipped does the whole layout
-        switch to compact mode and the compact settings picker.
+        Textual has processed the style change so a clipped toolbar switches
+        to the compact settings picker immediately.
         """
         if not all(
             self.query(selector)
@@ -2901,13 +1883,10 @@ class DaedalusTuiApp(App[None]):
         height = self.size.height if height is None else height
         compact = width < self.settings.layout.compact_width if compact is None else compact
         short = height < self.settings.layout.short_height
-        wrapped = wrapped and not compact
         self._compact_mode = compact
-        self._wrapped_toolbars = wrapped
         self._short_height_mode = short
         screen = self.query_one("#screen", VerticalScroll)
         screen.set_class(compact, "compact-width")
-        screen.set_class(wrapped, "wrapped-toolbars")
         screen.set_class(short, "short-height")
         task_sidebar = self.query_one("#task-sidebar", Vertical)
         prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
@@ -2927,7 +1906,6 @@ class DaedalusTuiApp(App[None]):
         output.styles.width = "1fr" if compact else self.settings.output_width
         self._refresh_task_list()
         self._refresh_compact_setting_value()
-        self._apply_viewer_visibility(width)
         if not compact:
             self._queue_responsive_measurement()
 
@@ -2950,27 +1928,19 @@ class DaedalusTuiApp(App[None]):
         )
 
     def _apply_measured_responsive_layout(self) -> None:
-        """Wrap the toolbars, then compact, when wide controls are clipped."""
+        """Switch to compact mode when wide controls extend past their bars."""
         self._responsive_measure_pending = False
         if not self.query("#screen"):
             return
         width = self.size.width
         height = self.size.height
-        compact = width < self.settings.layout.compact_width
-        if not compact and self._wide_controls_overflow():
-            if not self._wrapped_toolbars:
-                # Try the two-row toolbars first; the queued re-measurement
-                # falls back to compact mode if they are clipped as well.
-                self._apply_responsive_layout(width, height, wrapped=True)
-                return
-            compact = True
+        compact = width < self.settings.layout.compact_width or self._wide_controls_overflow()
         if compact != self._compact_mode:
             self._apply_responsive_layout(width, height, compact=compact)
 
     def _wide_controls_overflow(self) -> bool:
         """Return whether wide-layout controls are clipped or too narrow."""
-        settings_selector = "#orchestrate-roles" if self._orchestrate_view_shown else "#settings"
-        for selector in ("#task-bar", settings_selector):
+        for selector in ("#task-bar", "#settings"):
             containers = self.query(selector)
             if not containers:
                 continue
@@ -2978,36 +1948,19 @@ class DaedalusTuiApp(App[None]):
             available = container.content_region
             if available.width <= 0:
                 return True
-            # The orchestrate role row nests each role's selects in a group,
-            # so measure those selects too, not only the direct children.
-            nested = (
-                [widget for widget in container.query(Select) if widget.parent is not container]
-                if selector == "#orchestrate-roles"
-                else []
-            )
-            for child in (*container.children, *nested):
-                if not child.display:
-                    continue
+            for child in container.children:
                 region = child.region
                 if region.width <= 0 or region.height <= 0:
                     return True
-                # A button narrower than its label plus line padding wraps
-                # the label onto a second line.
-                if isinstance(child, Button) and region.width < cell_len(str(child.label)) + 2:
-                    return True
                 if (
-                    selector == settings_selector
+                    selector == "#settings"
                     and isinstance(child, Select)
                     and region.width < self.settings.layout.wide_control_min_width
                 ):
                     return True
-                # Controls pushed past the bar, or grown taller than it
-                # because their text wrapped, are clipped by the bar.
                 if (
                     region.x < available.x
                     or region.x + region.width > available.x + available.width
-                    or region.y < available.y
-                    or region.y + region.height > available.y + available.height
                 ):
                     return True
         return False
@@ -3017,49 +1970,8 @@ class DaedalusTuiApp(App[None]):
         self._shutdown_coordinators("explicit Textual exit")
         super().exit(*args, **kwargs)
 
-    def _on_external_signal(self, signum: int) -> None:
-        """Handle a signal from outside the TUI without losing the session.
-
-        Runs inside the signal handler, so it only logs and schedules work on
-        the event loop. A SIGINT is treated exactly like Ctrl+C (stop the
-        selected run, or the orchestrate session); SIGTERM and SIGHUP exit
-        the way Ctrl+Q does, pausing agents first.
-        """
-        action, name = external_signal_plan(signum)
-        LOGGER.error(
-            "Received %s from outside the TUI (terminal ISIG=%s); %s.",
-            name,
-            _terminal_isig_enabled(),
-            "treating it as Ctrl+C" if action == "interrupt" else "exiting gracefully",
-        )
-        loop = getattr(self, "_loop", None)
-        if loop is None or not self.is_running:
-            if action == "exit":
-                self._shutdown_coordinators(f"{name} before the Textual loop was running")
-            return
-        callback = self._interrupt_from_signal if action == "interrupt" else self._exit_from_signal
-        try:
-            loop.call_soon_threadsafe(callback, name)
-        except RuntimeError as error:
-            LOGGER.warning("Could not schedule the %s handler on the Textual loop: %s", name, error)
-
-    def _interrupt_from_signal(self, name: str) -> None:
-        try:
-            self._set_status(f"{name} received; stopping like Ctrl+C")
-            self.action_interrupt_task()
-        except Exception as error:  # A failed interrupt must not become the crash it prevents.
-            log_exception(f"Could not interrupt after {name}", error)
-
-    def _exit_from_signal(self, name: str) -> None:
-        try:
-            self.exit()
-        except Exception as error:
-            log_exception(f"Could not exit cleanly after {name}", error)
-            self._shutdown_coordinators(f"{name} exit failed")
-
     def _handle_exception(self, error: Exception) -> None:
         """Persist Textual failures that would otherwise only flash on screen."""
-        self._fatal_error = True
         log_exception("Unhandled Textual application exception", error)
         debug_path = getattr(self, "debug_log_path", None)
         message = (
@@ -3127,24 +2039,7 @@ class DaedalusTuiApp(App[None]):
             self._shutdown_started = True
         LOGGER.info("%s; requesting coordinator shutdown.", reason)
         self._accept_task_events = False
-        try:
-            self._flush_draft(force=True)
-        except Exception as error:
-            log_exception("Could not flush the composer draft during shutdown", error)
-        try:
-            self._flush_orchestrate_draft()
-        except Exception as error:
-            log_exception("Could not flush the orchestrate draft during shutdown", error)
         shutdown_complete = True
-        # Sessions stop first so their loops do not dispatch into a closing
-        # task coordinator; the task coordinator then stops the workers.
-        for orchestrator in self._orchestrators.values():
-            if hasattr(orchestrator, "set_event_callback"):
-                orchestrator.set_event_callback(None)
-            try:
-                orchestrator.shutdown()
-            except Exception as error:
-                log_exception("Orchestrate coordinator shutdown failed", error)
         for coordinator in self._coordinators.values():
             if hasattr(coordinator, "set_event_callback"):
                 coordinator.set_event_callback(None)
@@ -3161,7 +2056,7 @@ class DaedalusTuiApp(App[None]):
         self._submit_prompt()
 
     def action_toggle_plan_mode(self) -> None:
-        if len(self.screen_stack) != 1 or self._orchestrate_view_shown:
+        if len(self.screen_stack) != 1:
             return
         self._toggle_plan_mode()
 
@@ -3181,29 +2076,7 @@ class DaedalusTuiApp(App[None]):
         self._continue_plan()
 
     def action_cancel_task(self) -> None:
-        self._interrupt_task()
-
-    def action_interrupt_task(self) -> None:
-        """Stop the selected task's run, keep its progress, restore its prompt."""
-        if len(self.screen_stack) != 1:
-            # Modal dialogs keep their own cancel/close behavior.
-            return
-        if self._orchestrate_view_shown:
-            # In Orchestrate Mode the interrupt stops the whole session.
-            self._stop_orchestration()
-            return
-        self._interrupt_task()
-
-    def action_toggle_orchestrate_mode(self) -> None:
-        if len(self.screen_stack) != 1:
-            return
-        self._set_orchestrate_view(not self._orchestrate_view_shown)
-
-    def action_toggle_output_viewer(self) -> None:
-        self._set_viewer_visible(not self._viewer_visible)
-
-    def action_toggle_task_history(self) -> None:
-        self._toggle_task_history()
+        self._cancel_task()
 
     def action_retry_task(self) -> None:
         self._retry_task()
@@ -3261,45 +2134,10 @@ class DaedalusTuiApp(App[None]):
         self._set_status(f"Auto-sync after completed tasks {state}")
 
     def action_show_statistics(self) -> None:
-        # The screen reads the operator's whole Claude Code spend through the
-        # usage monitor, so Ctrl+U shows more than the tasks Daedalus launched.
-        # Turning usage readings off also turns that reading off, because it is
-        # the same local Claude data the usage bar would have polled.
-        reader = (
-            self.usage_monitor.read_claude_account_usage
-            if self.settings.usage.enabled
-            else None
-        )
-        self.push_screen(
-            CodingStatisticsScreen(
-                self._usage_entries(),
-                self.statistics_settings,
-                account_usage_reader=reader,
-            )
-        )
-
-    def action_show_push_history(self) -> None:
-        """Show the launch-root record of successful branch pushes."""
-        try:
-            records = self.memory.get_pushed_commits()
-        except (OSError, ValueError) as error:
-            self._set_error(f"Could not read pushed commit history: {error}")
-            self._set_status("Push history unavailable")
-            return
-        self.push_screen(PushedCommitsScreen(records, self.memory.path))
+        self.push_screen(CodingStatisticsScreen(self._usage_entries(), self.statistics_settings))
 
     def action_show_new_project(self) -> None:
-        self.push_screen(
-            ProjectInitializerScreen(self.launch_root, self._default_backend()),
-            self._on_project_initialized,
-        )
-
-    def _default_backend(self) -> str:
-        """Return the backend preselected for new projects."""
-        try:
-            return str(load_initializer_settings().get("default_backend", "none"))
-        except (OSError, ValueError, KeyError):
-            return "none"
+        self.push_screen(ProjectInitializerScreen(self.launch_root), self._on_project_initialized)
 
     def action_show_create_topic(self) -> None:
         self.push_screen(CreateTopicScreen(self._active_project_path), self._on_topic_created)
@@ -3563,41 +2401,6 @@ class DaedalusTuiApp(App[None]):
         """Finish a queued modal update only if its screen is still mounted."""
         if progress is not None and progress.is_attached:
             progress.finish(succeeded, detail)
-    def action_register_backend(self) -> None:
-        """Choose and scaffold the backend files for the active project."""
-        self.push_screen(
-            BackendRegistrationScreen(
-                self._active_project_path,
-                self._registered_backend(),
-                self._default_backend(),
-            ),
-            self._on_backend_registered,
-        )
-
-    def _on_backend_registered(self, message: str | None) -> None:
-        if message:
-            self._set_error("")
-            self._set_status(message)
-        self._refresh_backend_button()
-
-    def _registered_backend(self) -> str | None:
-        """Return the backend the active project is already registered for."""
-        project_path = self._active_project_path
-        try:
-            if is_firebase_registered(project_path):
-                return "firebase"
-            if is_personal_supabase_registered(project_path):
-                return "supabase"
-        except (OSError, ValueError):
-            return None
-        return None
-
-    def action_show_sign_in(self) -> None:
-        """Show sign-in status for the provider selected in the settings bar."""
-        if not self.query("#provider-select"):
-            return
-        provider = str(self.query_one("#provider-select", Select).value)
-        self.push_screen(ProviderSignInScreen(provider, self.settings))
 
     def action_view_topic(self) -> None:
         """Open the selected project topic in a read-only modal."""
@@ -3618,28 +2421,6 @@ class DaedalusTuiApp(App[None]):
             self._submit_prompt()
         elif event.button.id == "view-topic-button":
             self.action_view_topic()
-        elif event.button.id == "new-task-button":
-            self._start_new_task()
-        elif event.button.id == "orchestrate-mode-button":
-            self._set_orchestrate_view(not self._orchestrate_view_shown)
-        elif event.button.id == "orchestrate-start-button":
-            self._start_orchestration()
-        elif event.button.id == "orchestrate-stop-button":
-            self._stop_orchestration()
-        elif event.button.id == "new-project-button":
-            self.action_show_new_project()
-        elif event.button.id == "create-topic-button":
-            self.action_show_create_topic()
-        elif event.button.id == "register-backend-button":
-            self.action_register_backend()
-        elif event.button.id == "sign-in-button":
-            self.action_show_sign_in()
-        elif event.button.id == "view-topic-button":
-            self.action_view_topic()
-        elif event.button.id == "push-branch-button":
-            self._push_selected_branch()
-        elif event.button.id == "push-history-button":
-            self.action_show_push_history()
         elif event.button.id == "continue-plan-button":
             self._continue_plan()
         elif event.button.id == "pause-button":
@@ -3647,17 +2428,13 @@ class DaedalusTuiApp(App[None]):
         elif event.button.id == "resume-button":
             self._resume_task()
         elif event.button.id == "cancel-button":
-            self._interrupt_task()
+            self._cancel_task()
         elif event.button.id == "retry-button":
             self._retry_task()
         elif event.button.id == "follow-up-button":
             self._follow_up_task()
         elif event.button.id == "output-toggle-button":
             self._set_output_view(not self._showing_error_output, focus=True)
-        elif event.button.id == "viewer-toggle-button":
-            self._set_viewer_visible(not self._viewer_visible)
-        elif event.button.id == "history-toggle-button":
-            self._toggle_task_history()
         elif event.button.id == "answer-plan-button":
             self._answer_plan()
         elif event.button.id == "implement-button":
@@ -3673,27 +2450,6 @@ class DaedalusTuiApp(App[None]):
         # Such an event describes stale state and must not re-enter a refresh
         # or switch projects/providers behind the user's back.
         if event.value != event.select.value:
-            return
-        if event.select.id == "prompt-history-select":
-            if not self._suppress_history_select and event.value not in _SELECT_EMPTY:
-                self._load_prompt_history_entry(str(event.value))
-            return
-        if event.select.id == "orchestrate-session-select":
-            if event.value not in _SELECT_EMPTY and str(event.value) != self._selected_session_id:
-                self._selected_session_id = str(event.value)
-                self._refresh_orchestrate_view()
-            return
-        if event.select.id in {"planner-provider-select", "worker-provider-select"}:
-            if event.value not in _SELECT_EMPTY:
-                role = event.select.id.split("-", 1)[0]
-                self._apply_role_provider(role, str(event.value))
-            return
-        if event.select.id in {
-            "planner-model-select",
-            "planner-reasoning-select",
-            "worker-model-select",
-            "worker-reasoning-select",
-        }:
             return
         if event.select.id == "compact-settings-category":
             if event.value != getattr(event.select, "_latest_value", event.value):
@@ -3725,19 +2481,16 @@ class DaedalusTuiApp(App[None]):
                 else:
                     return
             if not self._suppress_compact_setting_change:
-                value_select._pending_user_value = None
                 self._apply_compact_setting(str(event.value))
             return
         if event.select.id == "project-select":
-            if str(event.value) == OPEN_DIRECTORY_VALUE:
-                self._prompt_for_project_directory()
-            elif event.value not in _SELECT_EMPTY:
+            if event.value not in (Select.BLANK, ""):
                 self._switch_project(Path(str(event.value)))
             return
         if event.select.id == "target-branch-select":
             if self._suppress_target_branch_change:
                 return
-            if event.value not in _SELECT_EMPTY:
+            if event.value not in (Select.BLANK, ""):
                 self._on_target_branch_selected(str(event.value))
             self._refresh_push_button()
             self._refresh_compact_setting_value()
@@ -3774,8 +2527,6 @@ class DaedalusTuiApp(App[None]):
             return
         if event.select.id != "provider-select":
             return
-        if event.value in _SELECT_EMPTY:
-            return
         self._apply_provider_selection(str(event.value))
 
     def _apply_provider_selection(self, provider: str) -> None:
@@ -3785,14 +2536,21 @@ class DaedalusTuiApp(App[None]):
             provider_select.value = provider
         model_select = self.query_one("#model-select", Select)
         reasoning_select = self.query_one("#reasoning-select", Select)
-        model_options = self._provider_model_options(provider)
-        reasoning_options = self._provider_reasoning_options(provider)
-        model_value = self.settings.default_model_for(provider)
-        reasoning_value = self.settings.default_reasoning_for(provider)
-        # A provider with a single fixed model or no effort scale keeps its
-        # selector visible but inert rather than removing the control.
-        model_select.disabled = len(model_options) < 2
-        reasoning_select.disabled = not self.settings.reasoning_for(provider)
+        is_cursor = provider == "cursor"
+        if is_cursor:
+            model_options = [(self.settings.cursor_model.label, self.settings.cursor_model.value)]
+            reasoning_options = [("Not applicable", "")]
+            model_value = self.settings.cursor_model.value
+            reasoning_value = ""
+            model_select.disabled = True
+            reasoning_select.disabled = True
+        else:
+            model_options = [(option.label, option.value) for option in self.settings.codex_models]
+            reasoning_options = [(option.label, option.value) for option in self.settings.codex_reasoning]
+            model_value = self.settings.default_model
+            reasoning_value = self.settings.default_reasoning
+            model_select.disabled = False
+            reasoning_select.disabled = False
         self._set_select_options_if_changed(model_select, model_options)
         if model_select.value != model_value:
             model_select.value = model_value
@@ -3806,17 +2564,6 @@ class DaedalusTuiApp(App[None]):
         self._compact_setting_values.pop("reasoning", None)
         if self.query("#compact-settings-category"):
             self._refresh_compact_setting_value()
-
-    def _provider_model_options(self, provider: str) -> list[tuple[str, str]]:
-        """Return the model choices for a provider, for both settings layouts."""
-        return [(option.label, option.value) for option in self.settings.models_for(provider)]
-
-    def _provider_reasoning_options(self, provider: str) -> list[tuple[str, str]]:
-        """Return effort choices, or a single inert entry for providers without one."""
-        options = self.settings.reasoning_for(provider)
-        if not options:
-            return [("Not applicable", "")]
-        return [(option.label, option.value) for option in options]
 
     @staticmethod
     def _set_select_options_if_changed(
@@ -3842,11 +2589,15 @@ class DaedalusTuiApp(App[None]):
         if category == "provider":
             return [(option.label, option.value) for option in self.settings.providers]
         if category == "model":
-            return self._provider_model_options(str(self.query_one("#provider-select", Select).value))
+            provider = str(self.query_one("#provider-select", Select).value)
+            if provider == "cursor":
+                return [(self.settings.cursor_model.label, self.settings.cursor_model.value)]
+            return [(option.label, option.value) for option in self.settings.codex_models]
         if category == "reasoning":
-            return self._provider_reasoning_options(
-                str(self.query_one("#provider-select", Select).value)
-            )
+            provider = str(self.query_one("#provider-select", Select).value)
+            if provider == "cursor":
+                return [("Not applicable", "")]
+            return [(option.label, option.value) for option in self.settings.codex_reasoning]
         if category == "mode":
             return [(option.label, option.value) for option in self.settings.modes]
         if category == "topic":
@@ -3897,10 +2648,6 @@ class DaedalusTuiApp(App[None]):
         current = self._compact_setting_current_value(category)
         values = {value for _, value in options}
         effective = current if current in values else options[0][1]
-        pending = getattr(value_select, "_pending_user_value", None)
-        if pending is not None and pending in values and pending != effective:
-            # Leave the user's not-yet-applied choice in place.
-            return
         self._suppress_compact_setting_change = True
         try:
             if sync_category and category_select.value != category:
@@ -3964,286 +2711,14 @@ class DaedalusTuiApp(App[None]):
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         if event.text_area.id and event.text_area.id.startswith("plan-custom-answer-"):
             self._update_plan_action_buttons()
-            return
-        if event.text_area.id == "prompt-input" and not self._suppress_draft_events:
-            self._draft_revision += 1
-            self._draft_dirty = True
-            self._schedule_draft_save()
-        if event.text_area.id == "orchestrate-prompt" and not self._suppress_orchestrate_draft_events:
-            self._orchestrate_draft_dirty = True
-            self._schedule_orchestrate_draft_save()
-
-    def on_vim_text_area_mode_changed(self, event) -> None:
-        """Keep the compact Insert/Normal/Visual indicator current."""
-        nodes = self.query("#vim-mode")
-        if nodes:
-            nodes.first().update(MODE_LABELS.get(event.mode, str(event.mode)))
-
-    def on_daedalus_vim_text_area_clipboard_status(self, event: DaedalusVimTextArea.ClipboardStatus) -> None:
-        if not event.succeeded:
-            self._set_status(event.message)
-
-    # ------------------------------------------------------------------
-    # Draft persistence
-    # ------------------------------------------------------------------
-
-    def _schedule_draft_save(self) -> None:
-        if self._draft_timer is not None:
-            return
-        delay = self.prompting.draft_autosave_delay_ms / 1000
-        if delay <= 0:
-            self._flush_draft()
-            return
-        self._draft_timer = self.set_timer(delay, self._draft_timer_fired)
-
-    def _draft_timer_fired(self) -> None:
-        self._draft_timer = None
-        self._flush_draft()
-
-    def _flush_draft(self, force: bool = False) -> bool:
-        """Write the composer draft to disk; returns False when it could not be saved."""
-        if self._composer_draft_closed:
-            # The window has already closed the draft; its state on disk is
-            # final and a late shutdown flush must not resurrect it.
-            return True
-        if self._draft_timer is not None:
-            self._draft_timer.stop()
-            self._draft_timer = None
-        if not self._draft_dirty and not force:
-            return True
-        nodes = self.query("#prompt-input")
-        if not nodes:
-            return True
-        prompt = nodes.first()
-        text = prompt.text
-        self._draft_dirty = False
-        project = self._composer_project
-        task_id = self._composer_task_id
-        try:
-            if not text:
-                self.prompt_store.delete_draft(project, task_id)
-            else:
-                self.prompt_store.save_draft(
-                    project,
-                    task_id,
-                    text,
-                    cursor=tuple(prompt.cursor_location),
-                    revision=self._draft_revision,
-                    revises_turn_id=self._composer_revises_turn_id,
-                )
-        except (PromptStoreError, OSError) as error:
-            # Keep the editor usable; report the exact path that failed and
-            # never claim the draft is saved.
-            self._draft_dirty = True
-            LOGGER.warning("Draft save failed: %s", error)
-            self._set_status(f"Draft not saved: {error}")
-            return False
-        return True
-
-    def _close_composer_draft(self) -> None:
-        """Save or clear the composer draft as the Daedalus window closes.
-
-        With ``[drafts] clear_on_exit`` set, closing the window deliberately
-        clears the prompt the composer was holding, so the next launch starts
-        on an empty composer instead of last session's unsent text. Autosaves
-        still protect the draft for as long as the app runs, and a crash never
-        reaches this hook, so an unexpected exit still leaves the draft on disk
-        to be recovered.
-        """
-        if not self.prompting.clear_drafts_on_exit or self._fatal_error:
-            self._flush_draft(force=True)
-        else:
-            self._discard_draft()
-        self._composer_draft_closed = True
-
-    def _discard_draft(self) -> None:
-        """Delete the composer's saved draft without touching stashed drafts.
-
-        Only the draft the composer would reload on the next launch is removed.
-        Drafts stashed by an interruption and prompts recovered from an
-        archive stay reachable from Prompt history, because those were set
-        aside deliberately rather than left in the prompt box.
-        """
-        if self._draft_timer is not None:
-            self._draft_timer.stop()
-            self._draft_timer = None
-        self._draft_dirty = False
-        try:
-            self.prompt_store.delete_draft(self._composer_project, self._composer_task_id)
-        except (PromptStoreError, OSError) as error:
-            LOGGER.warning("Draft discard failed: %s", error)
-
-    def _load_composer(
-        self,
-        task_id: str | None,
-        text: str,
-        *,
-        revises_turn_id: str | None = None,
-        cursor: tuple[int, int] | None = None,
-        revision: int = 0,
-        focus: bool = True,
-    ) -> None:
-        """Deliberately replace the composer contents (never from a render path)."""
-        prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
-        self._composer_task_id = task_id
-        self._composer_project = self._active_project_path
-        self._composer_revises_turn_id = revises_turn_id
-        self._draft_revision = revision
-        self._draft_dirty = False
-        self._suppress_draft_events = True
-        try:
-            prompt.read_only = False
-            prompt.load_text(text)
-        finally:
-            self._suppress_draft_events = False
-        if cursor is not None:
-            row = min(max(0, cursor[0]), max(0, prompt.document.line_count - 1))
-            column = min(max(0, cursor[1]), len(str(prompt.get_line(row))))
-            prompt.cursor_location = (row, column)
-        else:
-            prompt.move_cursor_to_end()
-        self.query_one("#output", TranscriptLog).invalidate_render_cache()
-        prompt.enter_insert_mode()
-        if focus:
-            prompt.focus()
-        self._refresh_send_button()
-
-    def _load_composer_for_selection(self, *, restore_status: bool = True) -> None:
-        """Load the saved draft for the selected task (or the new-task draft)."""
-        task_id = self._selected_task_id
-        record = self.coordinator.get(task_id or "") if task_id else None
-        if record is None:
-            task_id = None
-        try:
-            draft = self.prompt_store.load_draft(self._active_project_path, task_id)
-        except OSError:
-            draft = None
-        if draft is not None and draft.text:
-            self._load_composer(
-                task_id,
-                draft.text,
-                revises_turn_id=draft.revises_turn_id,
-                cursor=draft.cursor,
-                revision=draft.revision,
-            )
-            if restore_status and draft.kind == "recovered":
-                self._set_status("Recovered an unsent prompt")
-        else:
-            self._load_composer(task_id, "")
-        self._refresh_task_title(record)
-        self._refresh_prompt_history(record)
-
-    def _refresh_task_title(self, record: TaskRecord | None) -> None:
-        nodes = self.query("#task-title")
-        if not nodes:
-            return
-        if record is None:
-            nodes.first().update("New task")
-        else:
-            nodes.first().update(f"Task: {record.display_title}")
-
-    def _refresh_send_button(self) -> None:
-        nodes = self.query("#send-button")
-        if not nodes:
-            return
-        record = self.coordinator.get(self._selected_task_id or "") if self._selected_task_id else None
-        # Composing is always allowed; Send waits until the task's run has
-        # stopped or finished so one task never has two executing runs.
-        nodes.first().disabled = record is not None and record.status in ACTIVE_RUN_STATUSES
-
-    @staticmethod
-    def _record_has_active_run(record: TaskRecord) -> bool:
-        """Treat inconsistent task and run metadata as active until it settles."""
-        if record.status in ACTIVE_RUN_STATUSES:
-            return True
-        runs = getattr(record, "runs", None) or ()
-        return bool(runs) and getattr(runs[-1], "status", None) in ACTIVE_RUN_STATUSES
-
-    def _refresh_prompt_history(self, record: TaskRecord | None) -> None:
-        nodes = self.query("#prompt-history-select")
-        if not nodes:
-            return
-        select = nodes.first()
-        options: list[tuple[Text, str]] = []
-        if record is not None:
-            for turn in getattr(record, "turns", None) or ():
-                if not getattr(turn, "is_user", True):
-                    continue
-                preview = " ".join(turn.text.split())
-                if len(preview) > 48:
-                    preview = f"{preview[:45]}…"
-                options.append((Text(f"Turn {turn.sequence}: {preview}"), f"turn:{turn.turn_id}"))
-            if not options and record.prompt:
-                preview = " ".join(record.prompt.split())[:45]
-                options.append((Text(f"Turn 1: {preview}"), "turn:legacy"))
-            try:
-                for draft in self.prompt_store.list_drafts(self._active_project_path, record.task_id):
-                    if draft.draft_id == "draft":
-                        continue
-                    preview = " ".join(draft.text.split())
-                    if len(preview) > 40:
-                        preview = f"{preview[:37]}…"
-                    label = "Saved follow-up" if draft.kind == "stashed" else "Saved draft"
-                    options.append((Text(f"{label}: {preview}"), f"draft:{draft.draft_id}"))
-            except OSError:
-                pass
-        self._suppress_history_select = True
-        try:
-            select.set_options(options)
-            select.disabled = not options
-        finally:
-            self._suppress_history_select = False
-
-    def _load_prompt_history_entry(self, value: str) -> None:
-        """Load an earlier prompt or saved follow-up into the composer, leaving its file untouched."""
-        record = self.coordinator.get(self._selected_task_id or "") if self._selected_task_id else None
-        if record is None:
-            return
-        self._flush_draft(force=True)
-        text: str | None = None
-        revises: str | None = None
-        if value.startswith("turn:"):
-            turn_id = value.removeprefix("turn:")
-            if turn_id == "legacy":
-                text = record.prompt
-            else:
-                turn = record.turn_by_id(turn_id) if hasattr(record, "turn_by_id") else None
-                if turn is not None:
-                    text = turn.text
-                    revises = turn.turn_id
-        elif value.startswith("draft:"):
-            draft_id = value.removeprefix("draft:")
-            try:
-                draft = self.prompt_store.load_draft(self._active_project_path, record.task_id, draft_id)
-            except OSError:
-                draft = None
-            if draft is not None:
-                text = draft.text
-                revises = draft.revises_turn_id
-        select = self.query_one("#prompt-history-select", Select)
-        self._suppress_history_select = True
-        try:
-            # Select.NULL is the blank sentinel; the legacy Select.BLANK is not
-            # a legal value in Textual 8.
-            select.clear()
-        except InvalidSelectValueError:
-            pass
-        finally:
-            self._suppress_history_select = False
-        if text is None:
-            self._set_status("That prompt is no longer available")
-            return
-        self._load_composer(record.task_id, text, revises_turn_id=revises)
-        self._draft_dirty = True
-        self._schedule_draft_save()
-        self._set_status("Loaded earlier prompt into the composer")
 
     def _submit_prompt(self) -> None:
-        prompt_widget = self.query_one("#prompt-input", DaedalusVimTextArea)
-        if self._submission_in_progress:
+        prompt_widget = self.query_one("#prompt-input", TextArea)
+        if prompt_widget.read_only:
+            self._set_status("Press New Task first")
             return
-        raw_text = prompt_widget.text
-        if not raw_text.strip():
+        prompt = prompt_widget.text.strip()
+        if not prompt:
             self._set_error("Prompt cannot be empty.")
             self._set_status("Error")
             prompt_widget.focus()
@@ -4274,73 +2749,13 @@ class DaedalusTuiApp(App[None]):
         # Persist the value read from the Select before submitting so a fresh
         # task can restore it even if Select.Changed is still queued.
         self._on_topic_selected(topic)
-        # Flush the draft first so nothing is lost if submission fails.
-        self._flush_draft(force=True)
-        followup_record = (
-            self.coordinator.get(self._composer_task_id) if self._composer_task_id else None
-        )
-        self._submission_in_progress = True
         try:
-            if (
-                followup_record is not None
-                and self._selected_task_id == followup_record.task_id
-                and not self._record_has_active_run(followup_record)
-            ):
-                record = self._submit_followup(followup_record, raw_text, provider, model, reasoning, mode, topic)
-            else:
-                record = self.coordinator.submit(raw_text, provider, model, reasoning, mode, topic=topic)
-        except (RuntimeError, ValueError, OSError) as error:
+            record = self.coordinator.submit(prompt, provider, model, reasoning, mode, topic=topic)
+        except (RuntimeError, ValueError) as error:
             self._set_error(str(error))
             self._set_status("Error")
             return
-        finally:
-            self._submission_in_progress = False
-        if record is None:
-            self._set_error("The selected task is no longer available.")
-            self._set_status("Error")
-            return
-        # Durable submission succeeded: the sent text is now an immutable turn
-        # and the composer becomes a blank follow-up draft for that task.
-        try:
-            self.prompt_store.delete_draft(self._composer_project, self._composer_task_id)
-        except OSError:
-            pass
-        self._load_composer(record.task_id, "")
         self._focus_submitted_task(record, "prompt submission")
-
-    def _submit_followup(
-        self,
-        record: TaskRecord,
-        text: str,
-        provider: str,
-        model: str,
-        reasoning: str,
-        mode: str,
-        topic: str | None,
-    ) -> TaskRecord | None:
-        """Send another turn to the selected task, recording explicit setting changes."""
-        submit_followup = getattr(self.coordinator, "submit_followup", None)
-        if submit_followup is None:
-            raise RuntimeError("This task coordinator does not support follow-up prompts.")
-        if record.status in ACTIVE_RUN_STATUSES:
-            raise RuntimeError("Wait for the current run to stop before sending another prompt.")
-        changes: dict[str, object] = {}
-        snapshot = self._selection_settings
-        current = (provider, model, reasoning, mode)
-        if snapshot is not None and current != snapshot:
-            # Only settings the user changed after selecting the task are
-            # recorded on the new turn; the rest stay as the task had them.
-            for name, before, after in zip(("provider", "model", "reasoning", "mode"), snapshot, current):
-                if before != after:
-                    changes[name] = after
-        if topic != record.topic:
-            changes["topic"] = topic or ""
-        return submit_followup(
-            record.task_id,
-            text,
-            revises_turn_id=self._composer_revises_turn_id,
-            **changes,
-        )
 
     def _toggle_plan_mode(self) -> None:
         mode_select = self.query_one("#mode-select", Select)
@@ -4392,8 +2807,6 @@ class DaedalusTuiApp(App[None]):
         if project_path is not None:
             self._switch_project(project_path)
             self._start_new_task()
-        if event.data_table.id == "orchestrate-board":
-            self._focus_board_row(row_key)
             return
         task_target = self._task_rows.get(row_key)
         if task_target is None:
@@ -4416,11 +2829,6 @@ class DaedalusTuiApp(App[None]):
             self._apply_task_event(record, phase, message, kind)
         else:
             with self._task_event_lock:
-                if kind == "pushed" and message:
-                    # A later lifecycle event can replace the pending task
-                    # event before the UI thread flushes it. Keep push notices
-                    # separately so a successful push is never swallowed.
-                    self._pending_push_notices.append((record, message))
                 self._pending_task_events[record.task_id] = (record, phase, message, kind)
                 if self._task_event_flush_scheduled:
                     return
@@ -4431,9 +2839,6 @@ class DaedalusTuiApp(App[None]):
                 with self._task_event_lock:
                     self._task_event_flush_scheduled = False
                     self._pending_task_events.pop(record.task_id, None)
-                    self._pending_push_notices = [
-                        item for item in self._pending_push_notices if item[0] is not record
-                    ]
                 # A worker can race with Textual's final shutdown transition.
                 # Do not let a late event print an exception after the UI closes.
                 if "App is not running" not in str(error):
@@ -4445,22 +2850,13 @@ class DaedalusTuiApp(App[None]):
         """Apply only the newest event per task to keep the UI responsive."""
         with self._task_event_lock:
             events_to_apply = tuple(self._pending_task_events.values())
-            push_notices = tuple(self._pending_push_notices)
             self._pending_task_events.clear()
-            self._pending_push_notices.clear()
             self._task_event_flush_scheduled = False
         for record, phase, message, kind in events_to_apply:
             self._apply_task_event(record, phase, message, kind)
-        for record, message in push_notices:
-            self._apply_push_confirmation(record, message)
 
     def _apply_task_event(self, record: TaskRecord, phase: str, message: str, kind: str) -> None:
-        if self._textual_unmounted or not self.is_attached:
-            return
         try:
-            if phase == ORCHESTRATE_PHASE:
-                self._apply_session_event(record, message, kind)
-                return
             project_path = self._project_for_record(record)
             if project_path is None:
                 return
@@ -4482,9 +2878,6 @@ class DaedalusTuiApp(App[None]):
                             record.task_id,
                             project_path,
                         )
-            if getattr(record, "is_worker", False) and kind != "message":
-                # A worker settling or advancing changes its card on the board.
-                self._refresh_orchestrate_view()
             row_key = self._task_row_key(project_path, record.task_id)
             is_selected = (
                 project_path == self._active_project_path
@@ -4504,8 +2897,6 @@ class DaedalusTuiApp(App[None]):
                 self._render_selected_task_safely(f"task event phase={phase}")
             if phase.lower() in {"proposed", "completed"} and record.provider == "codex":
                 self._start_codex_usage_refresh()
-            if kind == "pushed" and message:
-                self._apply_push_confirmation(record, message)
         except Exception as error:
             log_exception(f"Could not render task event task={record.task_id} phase={phase}", error)
             if not self._accept_task_events:
@@ -4545,21 +2936,6 @@ class DaedalusTuiApp(App[None]):
             return
         if normalized == "cancelled":
             self._set_status("Sync conflict recovery cancelled")
-    def _apply_push_confirmation(self, record: TaskRecord, message: str) -> None:
-        """Keep an orchestration push visible after task events repaint the UI."""
-        project_path = self._project_for_record(record)
-        if project_path is None:
-            project_path = self._project_for_session_record(record)
-        if project_path is None:
-            return
-        pushed = parse_push_notice(message)
-        if pushed is not None:
-            self._record_pushed_commit(project_path, *pushed)
-            if project_path == self._active_project_path:
-                self._push_confirmation_branch = pushed[0]
-                self._refresh_push_button()
-        self._set_error("")
-        self._set_status(message)
 
     @staticmethod
     def _should_promote_task_update(record: TaskRecord, phase: str) -> bool:
@@ -4585,10 +2961,6 @@ class DaedalusTuiApp(App[None]):
             coordinator.migration_push_lock = self._migration_push_locks.setdefault(
                 project_path, threading.Lock()
             )
-            if hasattr(coordinator, "memory"):
-                # Keep injected coordinators on the same launch-root memory as
-                # coordinators created by the app, including push history.
-                coordinator.memory = self.memory
         else:
             coordinator = TaskCoordinator(
                 project_path,
@@ -4600,47 +2972,11 @@ class DaedalusTuiApp(App[None]):
                 migration_push_lock=self._migration_push_locks.setdefault(
                     project_path, threading.Lock()
                 ),
-                prompt_store=self.prompt_store,
-                storage=self.storage,
-                title_length=self.prompting.task_title_length,
-                context_budget_chars=self.prompting.conversation_context_budget_chars,
-                run_log_max_bytes=self.prompting.run_log_max_bytes,
             )
         if hasattr(coordinator, "set_event_callback"):
             coordinator.set_event_callback(self._on_task_event)
         self._coordinators[project_path] = coordinator
-        # The Orchestrate Mode dispatcher lives beside the task coordinator so
-        # its restored sessions are visible before the operator starts one.
-        self._orchestrator_for(project_path)
         return coordinator
-
-    def _orchestrator_for(self, project_path: Path) -> OrchestrateCoordinator | None:
-        """Return the project's Orchestrate Mode dispatcher, creating it once."""
-        project_path = project_path.resolve()
-        if project_path in self._orchestrators:
-            return self._orchestrators[project_path]
-        task_coordinator = self._coordinator_for(project_path)
-        if self._external_orchestrator is not None:
-            orchestrator = self._external_orchestrator
-            self._external_orchestrator = None
-        else:
-            try:
-                orchestrator = OrchestrateCoordinator(
-                    task_coordinator,
-                    self.runner,
-                    task_coordinator.settings,
-                    self.orchestrate_settings,
-                    self.storage,
-                    self.memory,
-                    self._on_task_event,
-                )
-            except Exception as error:
-                log_exception(f"Could not create the Orchestrate coordinator for {project_path}", error)
-                return None
-        if hasattr(orchestrator, "set_event_callback"):
-            orchestrator.set_event_callback(self._on_task_event)
-        self._orchestrators[project_path] = orchestrator
-        return orchestrator
 
     def _effective_primary_branch(self, project_path: Path) -> str:
         """Memory override for the project, else the parameter-file default."""
@@ -4666,7 +3002,6 @@ class DaedalusTuiApp(App[None]):
 
     def _on_target_branch_selected(self, branch: str) -> None:
         project_path = self._active_project_path
-        self._push_confirmation_branch = None
         default_branch = self.orchestration_settings.primary_branch
         try:
             if branch == default_branch:
@@ -4746,8 +3081,6 @@ class DaedalusTuiApp(App[None]):
             button.disabled = True
             return
         button.disabled = False
-        button.label = "Pushed" if branch and branch == self._push_confirmation_branch else "Push"
-        button.disabled = not branch or not remote_exists(self._active_project_path)
 
     def _push_selected_branch(self) -> None:
         """Sync the Branch Select value for the active project with origin."""
@@ -4759,7 +3092,6 @@ class DaedalusTuiApp(App[None]):
             self._set_status("Error")
             return
         project_path = self._active_project_path
-        self._push_confirmation_branch = None
         if not remote_exists(project_path):
             self._set_error("Remote 'origin' is not configured for this project.")
             self._set_status("Error")
@@ -4779,16 +3111,15 @@ class DaedalusTuiApp(App[None]):
 
         def work() -> None:
             try:
-                commit = push_branch(project_path, branch, pull_first=pull_first)
+                push_branch(project_path, branch, pull_first=pull_first)
             except SyncMergeConflictError as error:
                 self.call_from_thread(self._on_push_finished, False, error, branch)
-                return
             except GitWorktreeError as error:
-                self.call_from_thread(self._on_push_finished, False, str(error), branch, "", project_path)
+                self.call_from_thread(self._on_push_finished, False, str(error), branch)
             except Exception as error:  # pragma: no cover - defensive UI boundary
-                self.call_from_thread(self._on_push_finished, False, str(error), branch, "", project_path)
+                self.call_from_thread(self._on_push_finished, False, str(error), branch)
             else:
-                self.call_from_thread(self._on_push_finished, True, "", branch, commit, project_path)
+                self.call_from_thread(self._on_push_finished, True, "", branch)
 
         self.run_worker(
             work,
@@ -4798,79 +3129,19 @@ class DaedalusTuiApp(App[None]):
             exit_on_error=False,
         )
 
-    def _record_pushed_commit(
-        self,
-        project_path: Path,
-        branch: str,
-        remote: str,
-        commit: str,
-    ) -> Path | None:
-        """Persist push history, falling back when a target root is read-only."""
-        try:
-            self.memory.record_pushed_commit(project_path, branch, remote, commit)
-            return self.memory.path
-        except (OSError, ValueError) as error:
-            primary_error = error
-
-        fallback_path = self.storage.data_root / DEFAULT_MEMORY_FILE
-        if fallback_path.resolve() == self.memory.path.resolve():
-            LOGGER.warning(
-                "Could not persist pushed commit commit=%s error=%s",
-                commit,
-                primary_error,
-            )
-            return None
-        fallback = TaskMemoryStore(fallback_path)
-        try:
-            fallback.record_pushed_commit(project_path, branch, remote, commit)
-        except (OSError, ValueError) as fallback_error:
-            LOGGER.warning(
-                "Could not persist pushed commit commit=%s primary_error=%s fallback_error=%s",
-                commit,
-                primary_error,
-                fallback_error,
-            )
-            return None
-        self.memory = fallback
-        for coordinator in self._coordinators.values():
-            if hasattr(coordinator, "memory"):
-                coordinator.memory = fallback
-        return fallback.path
-
     def _on_push_finished(
         self,
         succeeded: bool,
-        error: str,
+        error: str | SyncMergeConflictError,
         branch: str,
-        commit: str = "",
-        project_path: Path | None = None,
     ) -> None:
         self._push_in_flight = False
         pull_first = self.command_menu_settings.pull_before_push
         if succeeded:
-            self._push_confirmation_branch = branch
-        self._refresh_push_button()
-        if succeeded:
+            self._refresh_push_button()
             self._set_error("")
             verb = "Synced" if pull_first else "Pushed"
             self._set_status(f"{verb} {branch} to origin")
-            if isinstance(commit, str) and commit:
-                recorded_path = self._record_pushed_commit(
-                    project_path or self._active_project_path,
-                    branch,
-                    "origin",
-                    commit,
-                )
-                if recorded_path is not None:
-                    self._set_status(
-                        f"Pushed {branch} to origin (commit {commit[:12]}); recorded in {recorded_path}"
-                    )
-                else:
-                    self._set_status(
-                        f"Pushed {branch} to origin (commit {commit[:12]}); push history unavailable"
-                    )
-            else:
-                self._set_status(f"Pushed {branch} to origin")
             return
         if (
             isinstance(error, SyncMergeConflictError)
@@ -4949,28 +3220,6 @@ class DaedalusTuiApp(App[None]):
             return
         self.query_one("#view-topic-button", Button).disabled = self._selected_topic() is None
 
-    def _refresh_backend_button(self) -> None:
-        """Show which backend the active project already registered, if any."""
-        if not self.query("#register-backend-button"):
-            return
-        button = self.query_one("#register-backend-button", Button)
-        backend = self._registered_backend()
-        button.disabled = backend is not None
-        if backend == "firebase":
-            try:
-                project_id = load_firebase_status(self._active_project_path).project_id
-            except (OSError, ValueError):
-                project_id = None
-            button.tooltip = f"Firebase project {project_id!r} already registered"
-        elif backend == "supabase":
-            try:
-                schema = schema_from_project_root(self._active_project_path)
-            except ValueError:
-                schema = None
-            button.tooltip = f"Supabase schema {schema!r} already registered"
-        else:
-            button.tooltip = "Scaffold Firebase or personal Supabase files for this project"
-
     def _usage_entries(self):
         try:
             persisted = usage_entries_from_memory(self.memory)
@@ -4998,89 +3247,6 @@ class DaedalusTuiApp(App[None]):
             # Project navigation should remain usable if local memory is unavailable.
             pass
 
-    def _opened_project_entries(self) -> list[DaedalusProject]:
-        """Return by-path projects, forgetting directories that no longer exist."""
-
-        entries: list[DaedalusProject] = []
-        remaining: list[Path] = []
-        for directory in self._opened_directories:
-            try:
-                entries.append(project_from_directory(directory, self.launch_root))
-            except ValueError:
-                # The directory was moved or deleted; stop offering it.
-                try:
-                    self.memory.remove_opened_project_directory(directory)
-                except (OSError, ValueError):
-                    pass
-                continue
-            remaining.append(directory)
-        self._opened_directories = remaining
-        return entries
-
-    def _project_selector_options(self) -> list[tuple[str, str]]:
-        """Return project choices followed by the open-by-path entry.
-
-        The list stays limited to projects actually in use: a directory appears
-        only once it has been opened, so the single trailing entry is the whole
-        cost of reaching projects outside the launch root.
-        """
-
-        options = [
-            (project.display_name, str(project.path))
-            for project in self._selector_projects()
-        ]
-        options.append((OPEN_DIRECTORY_LABEL, OPEN_DIRECTORY_VALUE))
-        return options
-
-    def _prompt_for_project_directory(self) -> None:
-        """Restore the displayed project, then ask which directory to open."""
-
-        project_select = self.query_one("#project-select", Select)
-        effective = self._project_select_value()
-        if project_select.value != effective:
-            # The sentinel is an action, not a project; a queued Changed event
-            # for the restored value is a no-op in _switch_project.
-            project_select.value = effective
-        self.push_screen(
-            OpenProjectDirectoryScreen(self.launch_root),
-            self._on_project_directory_chosen,
-        )
-
-    def _on_project_directory_chosen(self, directory: str | None) -> None:
-        if not directory:
-            return
-        self._open_project_directory(Path(directory))
-
-    def _open_project_directory(self, directory: Path) -> None:
-        """List a directory in the project selector and switch onto it."""
-
-        try:
-            project = project_from_directory(directory, self.launch_root)
-        except ValueError as error:
-            self._set_error(str(error))
-            self._set_status("Error")
-            return
-        project_path = project.path
-        if not is_direct_child_project(project_path, self.launch_root):
-            # Direct children are rediscovered on every refresh and need no
-            # remembered entry of their own.
-            if project_path not in self._opened_directories:
-                self._opened_directories.append(project_path)
-            try:
-                self.memory.add_opened_project_directory(project_path)
-            except (OSError, ValueError):
-                # The directory still opens this session without local memory.
-                pass
-        if project_path not in {known.path.resolve() for known in self.projects}:
-            self.projects = (*self.projects, project)
-        self._refresh_project_selector()
-        if project_path == self._active_project_path:
-            self._set_status(f"Opened {project.display_name}")
-            return
-        self._switch_project(project_path)
-        # The switch changes which option is effective, so sync the selector.
-        self._refresh_project_selector()
-
     def _switch_project(self, project_path: Path) -> None:
         project_path = project_path.expanduser().resolve()
         if project_path == self._active_project_path:
@@ -5089,47 +3255,33 @@ class DaedalusTuiApp(App[None]):
             project.path.resolve() for project in self._selector_projects()
         }:
             return
-        # Keep an in-progress new-task draft when changing projects so a
-        # mis-targeted prompt can be redirected instead of erased. A task
-        # follow-up draft stays with its task (flushed to that task's file).
-        self._flush_draft(force=True)
+        # Keep in-progress editable drafts when changing projects so a
+        # mis-targeted prompt can be redirected instead of erased.
         draft: str | None = None
         try:
             prompt_widget = self.query_one("#prompt-input", TextArea)
-            if self._composer_task_id is None:
+            if not prompt_widget.read_only:
                 draft = prompt_widget.text
         except Exception:
             draft = None
         self._active_project_path = project_path
         self.directory = project_path
         self.query_one("#project-select", Select).value = self._project_select_value()
-        self._push_confirmation_branch = None
         # Persist after the active focus changes so the marker mirrors the
         # project that is currently visible in the TUI.
         self._remember_project(project_path)
         self.coordinator = self._coordinator_for(project_path)
         self._selected_task_id = None
-        self._new_task_mode = True
+        self._new_task_mode = draft is not None
         self._updated_task_rows = {
             row_key for row_key in self._updated_task_rows if row_key in self._task_rows
         }
         self._refresh_target_branch_select()
         self._refresh_topic_select()
-        self._refresh_backend_button()
         self._refresh_task_list()
         self._render_selected_task_safely("project switch")
-        self._flush_orchestrate_draft()
-        self._selected_session_id = None
-        self._load_orchestrate_draft()
-        self._refresh_orchestrate_view()
-        if draft:
-            self._load_composer(None, draft)
-            self._draft_dirty = True
-            self._schedule_draft_save()
-            self._refresh_task_title(None)
-            self._refresh_prompt_history(None)
-        else:
-            self._load_composer_for_selection(restore_status=False)
+        if draft is not None:
+            self._set_prompt_text(draft, editable=True)
         self._set_status("Project switched")
 
     def _on_project_initialized(self, result: dict | None) -> None:
@@ -5147,16 +3299,12 @@ class DaedalusTuiApp(App[None]):
     def _reload_projects(self, preferred: Path | None = None) -> None:
         discovered = [
             project
-            for project in discover_projects(self.launch_root, self.settings.project_discovery)
+            for project in discover_projects(self.launch_root)
             if is_direct_child_project(project.path, self.launch_root)
         ]
         if not discovered:
             discovered = [DaedalusProject(self.launch_root, self.launch_root)]
         discovered_paths = {project.path.resolve() for project in discovered}
-        for opened in self._opened_project_entries():
-            if opened.path not in discovered_paths:
-                discovered.append(opened)
-                discovered_paths.add(opened.path)
         for known in self.projects:
             path = known.path.resolve()
             if (
@@ -5178,33 +3326,28 @@ class DaedalusTuiApp(App[None]):
             if target != self._active_project_path:
                 self._switch_project(target)
             self.query_one("#project-select", Select).value = self._project_select_value()
-            else:
-                self.query_one("#directory", Static).update(self._directory_text())
-                self._refresh_backend_button()
-            self.query_one("#project-select", Select).value = self._project_select_value()
-        else:
-            self._refresh_backend_button()
 
     def _refresh_project_selector(self) -> None:
         project_select = self.query_one("#project-select", Select)
-        options = self._project_selector_options()
+        options = [
+            (project.display_name, str(project.path))
+            for project in self._selector_projects()
+        ]
         self._set_select_options_if_changed(project_select, options, compare_labels=True)
         effective = self._project_select_value()
         if project_select.value != effective:
             project_select.value = effective
 
     def _selector_projects(self) -> tuple[DaedalusProject, ...]:
-        """Return direct-child and opened-by-path projects, or the root fallback."""
+        """Return only direct-child projects, or the empty-root fallback."""
 
-        opened = set(self._opened_directories)
-        listed = tuple(
+        direct_children = tuple(
             project
             for project in self.projects
             if is_direct_child_project(project.path, self.launch_root)
-            or project.path.resolve() in opened
         )
-        if listed:
-            return listed
+        if direct_children:
+            return direct_children
         return tuple(
             project
             for project in self.projects
@@ -5307,15 +3450,6 @@ class DaedalusTuiApp(App[None]):
             self._task_rows[row_key] = (project_path, record.task_id)
             self._task_row_indices[row_key] = row_index
             task_id = self._fit_task_cell(record.task_id, task_width)
-            project_name = project_names.get(project_path, project_path.name)
-            card_id = getattr(record, "card_id", None)
-            if getattr(record, "is_worker", False) and card_id:
-                # Worker tasks of an Orchestrate session carry their card id.
-                project_name = f"⋯ {card_id}"
-            project_name = self._fit_task_cell(project_name, project_width)
-            summary = " ".join(self._record_title(record).split())
-            summary = self._fit_task_cell(summary, task_width)
-            marker = "!" if row_key in self._updated_task_rows else ""
             status = self._fit_task_cell(record.status, status_width)
             task_list.add_row(task_id, status, key=row_key)
             row_index += 1
@@ -5326,13 +3460,7 @@ class DaedalusTuiApp(App[None]):
                 task_list.move_cursor(row=self._task_row_indices[selected_key], column=0)
 
     def _should_show_task(self, project_path: Path, record: TaskRecord) -> bool:
-        """Keep failures, active work, and all tasks submitted in this launch.
-
-        The All tasks toggle also lists completed and interrupted history so
-        any earlier conversation can be reopened after a restart.
-        """
-        if self._show_all_tasks:
-            return True
+        """Keep failures, active work, and all tasks submitted in this launch."""
         row_key = self._task_row_key(project_path, record.task_id)
         return (
             row_key in self._session_task_rows
@@ -5341,97 +3469,8 @@ class DaedalusTuiApp(App[None]):
         )
 
     @staticmethod
-    def _record_title(record: TaskRecord) -> str:
-        title = getattr(record, "display_title", None)
-        return title if isinstance(title, str) and title else record.prompt
-
-    def _toggle_task_history(self) -> None:
-        self._show_all_tasks = not self._show_all_tasks
-        try:
-            self.memory.set_ui_preference("show_all_tasks", self._show_all_tasks)
-        except (OSError, ValueError):
-            pass
-        self._refresh_history_toggle_button()
-        self._refresh_task_list()
-        self._set_status("Showing all tasks" if self._show_all_tasks else "Showing recent tasks")
-
-    def _refresh_history_toggle_button(self) -> None:
-        nodes = self.query("#history-toggle-button")
-        if nodes:
-            nodes.first().label = "Recent tasks" if self._show_all_tasks else "All tasks"
-
-    @staticmethod
     def _task_row_key(project_path: Path, task_id: str) -> str:
         return f"{project_path.resolve()}::{task_id}"
-
-    def _delete_task_at_cursor(self) -> None:
-        """Delete the task currently under the focused sidebar cursor."""
-        task_list = self.query_one("#task-list", DataTable)
-        cursor_row = task_list.cursor_row
-        row_keys = tuple(self._task_rows)
-        if cursor_row < 0 or cursor_row >= len(row_keys):
-            self._set_status("No task selected in the sidebar")
-            return
-
-        row_key = row_keys[cursor_row]
-        task_target = self._task_rows.get(row_key)
-        if task_target is None:
-            self._set_status("No task selected in the sidebar")
-            return
-        project_path, task_id = task_target
-        coordinator = self._coordinators.get(project_path)
-        if coordinator is None:
-            self._set_status("Task coordinator unavailable")
-            return
-        record = coordinator.get(task_id)
-        if record is None:
-            self._refresh_task_list()
-            self._set_status("Task is no longer available")
-            return
-        delete_task = getattr(coordinator, "delete_task", None)
-        if not callable(delete_task):
-            self._set_status("Task deletion unavailable")
-            return
-
-        selected = (
-            project_path == self._active_project_path
-            and task_id == self._selected_task_id
-        )
-        if selected and not self._flush_draft(force=True):
-            self._set_status("Task not deleted: draft could not be saved")
-            return
-        try:
-            deleted = bool(delete_task(task_id))
-        except (RuntimeError, OSError, ValueError) as error:
-            self._set_status(f"Task not deleted: {error}")
-            return
-        if not deleted:
-            if record.status in ACTIVE_RUN_STATUSES:
-                self._set_status("Stop the active task before deleting it")
-            else:
-                self._set_status("Task could not be deleted")
-            return
-
-        if selected:
-            try:
-                self.prompt_store.delete_draft(project_path, task_id)
-            except (PromptStoreError, OSError):
-                pass
-            self._selected_task_id = None
-            self._new_task_mode = True
-            self._selection_settings = None
-            self._load_composer_for_selection(restore_status=False)
-        self._session_task_rows.discard(row_key)
-        self._updated_task_rows.discard(row_key)
-        self._refresh_task_list()
-        if self._task_rows:
-            # Rebuilds clear Textual's cursor. Keep the same visual position,
-            # clamping only when the deleted row was the last one.
-            task_list.move_cursor(row=min(cursor_row, len(self._task_rows) - 1), column=0)
-        if selected:
-            self._render_selected_task_safely("task deletion")
-            task_list.focus()
-        self._set_status(f"Deleted task: {self._record_title(record)}")
 
     @staticmethod
     def _fit_task_cell(value: str, width: int) -> str:
@@ -5461,11 +3500,6 @@ class DaedalusTuiApp(App[None]):
         record_coordinator = self._coordinators.get(project_path)
         if record_coordinator is None or record_coordinator.get(task_id) is None:
             return
-        selection_changed = (
-            project_path != self._active_project_path or task_id != self._selected_task_id
-        )
-        if selection_changed:
-            self._flush_draft(force=True)
         self._active_project_path = project_path
         self.directory = project_path
         self._remember_project(project_path)
@@ -5476,10 +3510,6 @@ class DaedalusTuiApp(App[None]):
         self.query_one("#project-select", Select).value = self._project_select_value()
         self._refresh_task_list()
         self._render_selected_task_safely("task selection")
-        if selection_changed or self._composer_task_id != task_id:
-            # Deliberate transition: load this task's follow-up draft.
-            self._load_composer_for_selection()
-            self._selection_settings = self._current_submission_settings()
 
     def _focus_submitted_task(self, record: TaskRecord, source: str) -> None:
         """Make a newly submitted task the visible task in every mode."""
@@ -5509,21 +3539,15 @@ class DaedalusTuiApp(App[None]):
                 log_exception("Could not show selected-task rendering error", display_error)
 
     def _render_selected_task(self) -> None:
-        """Render the selected task's transcript, header, and controls.
-
-        This is a view refresh: it never touches the composer, so background
-        output cannot overwrite a draft, steal focus, or reset the cursor.
-        Composer contents change only on deliberate draft/task transitions.
-        """
         record = self.coordinator.get(self._selected_task_id or "")
         self._plan_review_generation += 1
         plan_review_generation = self._plan_review_generation
         output = self.query_one("#output", TranscriptLog)
         output.clear()
         self._displayed_error = ""
-        self._refresh_send_button()
         if record is None:
             self._rendered_plan_question_signature = None
+            self._set_prompt_text("", editable=True)
             self.query_one("#output-panel", Vertical).styles.display = "block"
             self.query_one("#task-context", Static).update("Task branch: —    Worktree: —")
             self._update_agent_outcome(None)
@@ -5536,15 +3560,13 @@ class DaedalusTuiApp(App[None]):
             self.query_one("#continue-plan-button", Button).disabled = True
             self.query_one("#resume-notes-panel", Vertical).styles.display = "none"
             self.query_one("#plan-review", Vertical).styles.display = "none"
-            self._refresh_task_title(None)
-            self._refresh_output_viewer(None)
             return
         # Use Textual's resolved Rich color rather than the raw CSS variable:
         # the default `$text` value is CSS syntax (`auto 87%`), not a Rich
-        # color string.
+        # color string, and selecting an existing task has made the prompt
+        # read-only by this point.
         output.set_final_color(self.screen.rich_style.color)
         self._set_prompt_text("", editable=True)
-        output.set_user_color(self.screen.rich_style.color)
         plan_review = self.query_one("#plan-review", Vertical)
         plan_review.styles.display = "block" if record.mode == "plan" else "none"
         self.query_one("#output-panel", Vertical).styles.display = (
@@ -5571,7 +3593,6 @@ class DaedalusTuiApp(App[None]):
                     turn.messages,
                     final=turn.status in {"proposed", "completed"},
                 )
-            self._write_conversation(output, record)
         worktree = str(record.worktree_path) if record.worktree_path else "—"
         branch = record.branch_name or "—"
         self.query_one("#task-context", Static).update(
@@ -5592,163 +3613,15 @@ class DaedalusTuiApp(App[None]):
         self.query_one("#pause-button", Button).disabled = not active
         self.query_one("#resume-button", Button).disabled = record.status != "paused"
         self.query_one("#cancel-button", Button).disabled = not active and record.status != "questioning"
-        self.query_one("#phase", Static).update(f"Phase: {record.phase}")
-        self._set_error(record.error or "", record=record)
-        self._set_status(record.phase if record.phase == "Stopping" else record.status.capitalize())
-        active = record.status in ACTIVE_RUN_STATUSES
-        stopping = getattr(record, "stopping", False)
-        self.query_one("#pause-button", Button).disabled = not active or stopping
-        self.query_one("#resume-button", Button).disabled = record.status not in {"paused", "interrupted"}
-        self.query_one("#cancel-button", Button).disabled = not active
         self.query_one("#retry-button", Button).disabled = record.status != "failed"
         self.query_one("#follow-up-button", Button).disabled = record.status not in {"completed", "failed"}
         self.query_one("#continue-plan-button", Button).disabled = record.status != "questioning"
         self.query_one("#resume-notes-panel", Vertical).styles.display = (
-            "block" if record.status in {"paused", "interrupted", "questioning"} else "none"
+            "block" if record.status in {"paused", "questioning"} else "none"
         )
         self.query_one("#resume-notes-label", Static).update(
             "Plan follow-up or question" if record.status == "questioning" else "Optional notes for resuming this task"
         )
-        self._refresh_task_title(record)
-        self._refresh_output_viewer(record)
-
-    def _write_conversation(self, output: TranscriptLog, record: TaskRecord) -> None:
-        """Render user turns and per-run assistant responses in order."""
-        turns = list(getattr(record, "turns", None) or ())
-        runs = list(getattr(record, "runs", None) or ())
-        if not turns:
-            # A record without turns (minimal test doubles) renders its
-            # messages only; the prompt stays visible in the task title.
-            for index, message in enumerate(record.messages):
-                output.write_message(
-                    message,
-                    final=record.status == "completed" and index == len(record.messages) - 1,
-                )
-            return
-        runs_by_turn: dict[str, list] = {}
-        for run in runs:
-            runs_by_turn.setdefault(run.turn_id, []).append(run)
-        last_run = runs[-1] if runs else None
-        for turn in turns:
-            if turn.is_user:
-                output.write_message(f"You · turn {turn.sequence}:\n{turn.text}", tone="user")
-            else:
-                output.write_message(f"Generated follow-up · turn {turn.sequence} (not typed by you)", tone="user")
-            for run in runs_by_turn.get(turn.turn_id, ()):
-                messages = record.run_messages(run)
-                status_label = "Stopping" if run is last_run and getattr(record, "stopping", False) else run.status
-                attempt = f" · attempt {run.attempt}" if run.attempt > 1 else ""
-                output.write_message(f"Assistant{attempt} · {status_label}", tone="user")
-                for index, message in enumerate(messages):
-                    output.write_message(
-                        message,
-                        final=(
-                            run is last_run
-                            and record.status == "completed"
-                            and index == len(messages) - 1
-                        ),
-                    )
-        covered = sum(len(record.run_messages(run)) for run in runs)
-        if covered < len(record.messages) and not runs:
-            for message in record.messages:
-                output.write_message(message)
-
-    # ------------------------------------------------------------------
-    # Output viewer
-    # ------------------------------------------------------------------
-
-    def _viewer(self) -> OutputViewer | None:
-        nodes = self.query("#output-viewer")
-        return nodes.first() if nodes else None
-
-    def _set_viewer_visible(self, visible: bool) -> None:
-        self._viewer_visible = visible
-        try:
-            self.memory.set_ui_preference("output_viewer_visible", visible)
-        except (OSError, ValueError):
-            pass
-        self._apply_viewer_visibility()
-        if visible:
-            record = self.coordinator.get(self._selected_task_id or "") if self._selected_task_id else None
-            self._refresh_output_viewer(record, final=True)
-        self._set_status("Viewer shown" if visible else "Viewer hidden")
-
-    def _apply_viewer_visibility(self, width: int | None = None) -> None:
-        """Show the viewer as a one-third panel, or full width when too narrow."""
-        nodes = self.query("#workspace")
-        viewer = self._viewer()
-        if not nodes or viewer is None:
-            return
-        width = self.size.width if width is None else width
-        required = self.prompting.viewer_minimum_width + self.prompting.main_minimum_width
-        full = self._viewer_visible and (self._compact_mode or width < required)
-        self._viewer_full = full
-        workspace = nodes.first()
-        workspace.set_class(self._viewer_visible and not full, "viewer-visible")
-        workspace.set_class(full, "viewer-full")
-        viewer.set_full_width(full)
-        toggle = self.query("#viewer-toggle-button")
-        if toggle:
-            toggle.first().label = "Hide viewer" if self._viewer_visible else "Show viewer"
-
-    def _refresh_output_viewer(self, record: TaskRecord | None, *, final: bool = False) -> None:
-        viewer = self._viewer()
-        if viewer is None:
-            return
-        if record is None:
-            viewer.show_sources(None, [ViewerSource(LATEST_SOURCE, "Latest response", "", "No task selected")])
-            return
-        title = self._record_title(record)
-        runs = list(getattr(record, "runs", None) or ())
-        turn_positions = {
-            turn.turn_id: turn.sequence for turn in (getattr(record, "turns", None) or ())
-        }
-        latest_text = ""
-        latest_identity = f"{title} · no response yet"
-        earlier: list[tuple[str, str, str]] = []
-        textual_runs = [run for run in runs if record.response_text(run)]
-        if textual_runs:
-            latest = textual_runs[-1]
-            latest_text = record.response_text(latest)
-            latest_identity = (
-                f"{title} · turn {turn_positions.get(latest.turn_id, '?')} · run {latest.attempt} · {latest.status}"
-            )
-            for run in reversed(textual_runs[:-1]):
-                earlier.append(
-                    (
-                        f"run:{run.run_id}",
-                        f"Turn {turn_positions.get(run.turn_id, '?')} response (attempt {run.attempt}, {run.status})",
-                        record.response_text(run),
-                    )
-                )
-        elif record.messages:
-            latest_text = "\n\n".join(message for message in record.messages if message.strip())
-            latest_identity = f"{title} · {record.status}"
-        if record.mode == "plan" and record.plan_text:
-            latest_text = record.plan_text
-            latest_identity = f"{title} · plan · {record.status}"
-        viewer.show_sources(
-            f"{self._active_project_path}::{record.task_id}",
-            response_sources(latest_text, earlier, record.plan_text or None, latest_identity),
-            final=final or record.status not in ACTIVE_RUN_STATUSES,
-        )
-
-    def on_output_viewer_back_requested(self, event: OutputViewer.BackRequested) -> None:
-        event.stop()
-        self._set_viewer_visible(False)
-        self.query_one("#prompt-input", DaedalusVimTextArea).focus()
-
-    def on_output_viewer_link_activated(self, event: OutputViewer.LinkActivated) -> None:
-        event.stop()
-        # Links are never opened automatically; show the target instead.
-        self._set_status(f"Link: {event.href}")
-
-    def _focus_in_viewer(self) -> bool:
-        viewer = self._viewer()
-        focused = self.focused
-        if viewer is None or focused is None:
-            return False
-        return focused is viewer or viewer in focused.ancestors
 
     def _update_agent_outcome(self, record: TaskRecord | None) -> None:
         """Show animated activity or a concise terminal task outcome."""
@@ -6152,22 +4025,28 @@ class DaedalusTuiApp(App[None]):
         self._set_status("Implementation queued")
 
     def _start_new_task(self) -> None:
-        """Save the current draft and open a separate new-task conversation."""
-        self._flush_draft(force=True)
+        """Clear the selected task and unlock a fresh prompt editor."""
         self._selected_task_id = None
         self._new_task_mode = True
-        self._selection_settings = None
         self._refresh_topic_select()
         self._refresh_task_list()
         self._render_selected_task_safely("new task")
-        self._load_composer_for_selection(restore_status=False)
         self._set_status("New task")
 
     def _set_prompt_text(self, text: str, *, editable: bool) -> None:
-        """Compatibility helper: deliberately replace the composer text."""
-        self._load_composer(self._composer_task_id, text)
         prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
+        # Loading text is a programmatic operation, so temporarily make the
+        # widget writable even when replacing a submitted task's immutable
+        # prompt.
+        prompt.read_only = False
+        prompt.load_text(text)
         prompt.read_only = not editable
+        self.query_one("#output", TranscriptLog).invalidate_render_cache()
+        send_button = self.query_one("#send-button", Button)
+        send_button.disabled = not editable
+        if editable:
+            prompt.enter_insert_mode()
+            prompt.focus()
 
     def _copy_selection(self) -> None:
         selection = self._get_selected_text()
@@ -6198,13 +4077,6 @@ class DaedalusTuiApp(App[None]):
 
     def _scroll_output(self, direction: str) -> None:
         output = self.query_one("#output", TranscriptLog)
-        if self._focus_in_viewer():
-            viewer = self._viewer()
-            if viewer is not None:
-                viewer.scroll_content(direction)
-                self._set_status(f"Viewer {direction.replace('_', ' ')}")
-                return
-        output = self.query_one("#task-error" if self._showing_error_output else "#output", Log)
         output.focus()
         scroll_methods = {
             "up": output.scroll_up,
@@ -6227,7 +4099,8 @@ class DaedalusTuiApp(App[None]):
             return
         prompt = self.query_one("#prompt-input", TextArea)
         if prompt.read_only:
-            prompt.read_only = False
+            self._set_status("Press New Task first")
+            return
         if isinstance(prompt, DaedalusVimTextArea):
             prompt.enter_insert_mode()
         prompt.focus()
@@ -6252,15 +4125,10 @@ class DaedalusTuiApp(App[None]):
                 return selected_text
         return self.screen.get_selected_text()
 
-    def copy_to_clipboard(self, text: str) -> bool:
-        """Use Textual's OSC 52 path and a native clipboard fallback.
-
-        Returns whether the native clipboard accepted the text; OSC 52 has no
-        acknowledgement, so a False result means only that the host command
-        was unavailable or failed, and the Vim register still holds the text.
-        """
+    def copy_to_clipboard(self, text: str) -> None:
+        """Use Textual's OSC 52 path and a native clipboard fallback."""
         super().copy_to_clipboard(text)
-        return bool(copy_to_system_clipboard(text))
+        copy_to_system_clipboard(text)
 
     def _copy_text(self, text: str) -> None:
         self.copy_to_clipboard(text)
@@ -6297,66 +4165,6 @@ class DaedalusTuiApp(App[None]):
                 self._set_status("Sync conflict recovery cancelled")
             else:
                 self._set_status("Cancelling")
-        """Compatibility alias: Cancel now interrupts without discarding work."""
-        self._interrupt_task()
-
-    def _interrupt_task(self) -> None:
-        """Shared interruption for Ctrl+C, Cancel, and Ctrl+X.
-
-        Captures the selected task and its active turn first, saves any
-        separately typed follow-up as a recoverable draft, asks the
-        coordinator to stop the run non-destructively, and restores the
-        interrupted turn's exact text to the composer for editing.
-        """
-        record = self.coordinator.get(self._selected_task_id or "") if self._selected_task_id else None
-        if record is None:
-            self._set_status("Nothing is running")
-            return
-        interrupt = getattr(self.coordinator, "interrupt", None)
-        if interrupt is None:
-            self._set_status("Interrupt unavailable")
-            return
-        turn = getattr(record, "latest_user_turn", None)
-        turn_text = turn.text if turn is not None else record.prompt
-        turn_id = turn.turn_id if turn is not None else None
-        # Save whatever is in the composer before anything else changes.
-        self._flush_draft(force=True)
-        prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
-        stashed = False
-        current = prompt.text
-        if (
-            self._composer_task_id == record.task_id
-            and current.strip()
-            and current != turn_text
-        ):
-            try:
-                self.prompt_store.save_draft(
-                    self._active_project_path,
-                    record.task_id,
-                    current,
-                    cursor=tuple(prompt.cursor_location),
-                    revision=self._draft_revision,
-                    revises_turn_id=self._composer_revises_turn_id,
-                    draft_id=f"stash-{int(time.time() * 1000)}",
-                    kind="stashed",
-                )
-                stashed = True
-            except (PromptStoreError, OSError) as error:
-                self._set_status(f"Follow-up not saved: {error}")
-        if not interrupt(record.task_id):
-            self._set_status("Nothing is running")
-            return
-        self._mark_task_current_session(record)
-        # Restore the interrupted turn for editing. The recovered prompt may
-        # be edited immediately; Send stays disabled until the run has stopped.
-        self._load_composer(record.task_id, turn_text, revises_turn_id=turn_id)
-        self._draft_dirty = True
-        self._flush_draft(force=True)
-        self._refresh_prompt_history(record)
-        status = "Stopping; the prompt is back in the editor"
-        if stashed:
-            status += " (your unsent follow-up is saved under Prompt history)"
-        self._set_status(status)
 
     def _retry_task(self) -> None:
         record = self.coordinator.get(self._selected_task_id or "")
@@ -6384,320 +4192,16 @@ class DaedalusTuiApp(App[None]):
             self._set_status("Follow Up unavailable")
             return
         self._focus_submitted_task(next_record, "task follow-up")
-    # ------------------------------------------------------------------
-    # Orchestrate Mode view
-    # ------------------------------------------------------------------
-
-    def _set_orchestrate_view(self, shown: bool) -> None:
-        """Switch between the task view and the orchestrate view."""
-        switcher = self.query("#view-switcher")
-        if not switcher:
-            return
-        self._orchestrate_view_shown = shown
-        switcher.first().current = "orchestrate-view" if shown else "tasks-view"
-        buttons = self.query("#orchestrate-mode-button")
-        if buttons:
-            buttons.first().label = "Task Mode" if shown else "Orchestrate Mode"
-        try:
-            self.memory.set_ui_preference("orchestrate_view", shown)
-        except (OSError, ValueError):
-            pass
-        if shown:
-            self._refresh_orchestrate_view()
-            self.query_one("#orchestrate-prompt", DaedalusVimTextArea).focus()
-        else:
-            self._render_selected_task_safely("orchestrate view closed")
-            self.query_one("#prompt-input", DaedalusVimTextArea).focus()
-        # The two views have different toolbars, so start again from the
-        # single-row layout and let the measurement wrap or compact it.
-        self._apply_responsive_layout()
-
-    def _active_orchestrator(self) -> OrchestrateCoordinator | None:
-        return self._orchestrator_for(self._active_project_path)
-
-    def _role_selection(self, role: str) -> tuple[str, str, str]:
-        """Read one role's ``(provider, model, reasoning)`` from the role row."""
-        provider = str(self.query_one(f"#{role}-provider-select", Select).value)
-        model = str(self.query_one(f"#{role}-model-select", Select).value)
-        reasoning_value = self.query_one(f"#{role}-reasoning-select", Select).value
-        reasoning = "" if reasoning_value in _SELECT_EMPTY else str(reasoning_value)
-        return provider, model, reasoning
-
-    def _orchestrate_selections(self) -> tuple[tuple[str, str, str], tuple[str, str, str], int] | None:
-        """Read the role row; report the first invalid control and return None."""
-        orchestrate = self.orchestrate_settings
-        workers_text = self.query_one("#max-workers-input", Input).value.strip()
-        try:
-            workers = int(workers_text)
-        except ValueError:
-            workers = 0
-        if not 1 <= workers <= orchestrate.max_workers_limit:
-            self._set_orchestrate_status(
-                f"Workers must be a whole number from 1 to {orchestrate.max_workers_limit}"
-            )
-            self.query_one("#max-workers-input", Input).focus()
-            return None
-        return self._role_selection("planner"), self._role_selection("worker"), workers
-
-    def _start_orchestration(self) -> None:
-        prompt_widget = self.query_one("#orchestrate-prompt", DaedalusVimTextArea)
-        text = prompt_widget.text
-        if not text.strip():
-            self._set_orchestrate_status("Prompt cannot be empty")
-            prompt_widget.focus()
-            return
-        selections = self._orchestrate_selections()
-        if selections is None:
-            return
-        planner, worker, workers = selections
-        orchestrator = self._active_orchestrator()
-        if orchestrator is None:
-            self._set_orchestrate_status("Orchestrate Mode is unavailable for this project")
-            return
-        self._flush_orchestrate_draft()
-        try:
-            session = orchestrator.start(text, planner, worker, workers, topic=self._selected_topic())
-        except (RuntimeError, ValueError, OSError) as error:
-            self._set_orchestrate_status(f"Could not start: {error}")
-            return
-        self._selected_session_id = session.session_id
-        self._suppress_orchestrate_draft_events = True
-        try:
-            prompt_widget.load_text("")
-        finally:
-            self._suppress_orchestrate_draft_events = False
-        self._orchestrate_draft_dirty = False
-        try:
-            self.prompt_store.delete_draft(self._active_project_path, None, draft_id="orchestrate")
-        except (PromptStoreError, OSError):
-            pass
-        self._refresh_orchestrate_view()
-        self._set_orchestrate_status(f"Session {session.session_id} started")
-
-    def _stop_orchestration(self) -> None:
-        orchestrator = self._active_orchestrator()
-        session = self._selected_session()
-        if orchestrator is None or session is None:
-            self._set_orchestrate_status("No session selected")
-            return
-        if not orchestrator.stop(session.session_id):
-            self._set_orchestrate_status("Session is not running")
-            return
-        self._refresh_orchestrate_view()
-        self._set_orchestrate_status(f"Stopping {session.session_id}")
-
-    def _selected_session(self) -> OrchestrationSession | None:
-        orchestrator = self._orchestrators.get(self._active_project_path.resolve())
-        if orchestrator is None:
-            return None
-        sessions = list(orchestrator.sessions())
-        if not sessions:
-            return None
-        if self._selected_session_id is not None:
-            for session in sessions:
-                if session.session_id == self._selected_session_id:
-                    return session
-        self._selected_session_id = sessions[-1].session_id
-        return sessions[-1]
-
-    def _apply_session_event(self, record, message: str, kind: str) -> None:
-        session_id = getattr(record, "session_id", None)
-        if session_id and self._selected_session_id is None:
-            self._selected_session_id = session_id
-        self._refresh_orchestrate_view()
-        if message and self._orchestrate_view_shown:
-            self._set_orchestrate_status(message)
-        if kind == "pushed" and message:
-            # The context file push arrives as a session event, not a task
-            # event; record it in the push log like any other Daedalus push.
-            self._apply_push_confirmation(record, message)
-
-    def _project_for_session_record(self, record) -> Path | None:
-        """Project owning an orchestrate session event, or None for task records."""
-        session_id = getattr(record, "session_id", None)
-        if not session_id:
-            return None
-        for project_path, orchestrator in self._orchestrators.items():
-            if orchestrator.get(session_id) is not None:
-                return project_path
-        return None
-
-    def _refresh_orchestrate_view(self) -> None:
-        """Render the session selector, board, planner log, and summary."""
-        if not self.query("#orchestrate-board"):
-            return
-        orchestrator = self._orchestrators.get(self._active_project_path.resolve())
-        sessions = list(orchestrator.sessions()) if orchestrator is not None else []
-        session = self._selected_session()
-        session_select = self.query_one("#orchestrate-session-select", Select)
-        options = [
-            (f"{item.session_id} · {item.status}", item.session_id) for item in reversed(sessions)
-        ]
-        current = tuple(value for _label, value in getattr(session_select, "_options", ()))
-        if current != tuple(value for _, value in options):
-            session_select.set_options(_literal_select_options(options))
-        if session is not None and session_select.value != session.session_id:
-            try:
-                session_select.value = session.session_id
-            except InvalidSelectValueError:
-                pass
-        board = self.query_one("#orchestrate-board", DataTable)
-        board.clear(columns=True)
-        title_width = self.orchestrate_settings.board_title_width
-        for label, width in (
-            ("Card", 5),
-            ("Title", title_width),
-            ("Status", 11),
-            ("Checklist", 9),
-            ("Worker task", 13),
-            ("Tokens", 7),
-        ):
-            board.add_column(label, width=width)
-        self._orchestrate_board_rows = []
-        stop_button = self.query_one("#orchestrate-stop-button", Button)
-        log = self.query_one("#planner-log", TranscriptLog)
-        log.clear()
-        summary = self.query_one("#orchestrate-summary", Static)
-        if session is None:
-            stop_button.disabled = True
-            summary.update("No orchestration session yet.")
-            self.query_one("#orchestrate-status", Static).update("Idle")
-            return
-        for card in session.ordered_cards():
-            board.add_row(
-                card.card_id,
-                self._fit_task_cell(" ".join(card.task.title.split()), title_width),
-                card.status,
-                card.ticks_text,
-                card.worker_task_id or "—",
-                str(card.tokens),
-                key=card.card_id,
-            )
-            self._orchestrate_board_rows.append((card.card_id, card.worker_task_id))
-        stop_button.disabled = not session.active
-        limit = max(1, self.orchestrate_settings.planner_log_lines)
-        lines: list[str] = []
-        for entry in session.log:
-            lines.extend(entry.splitlines() or [""])
-        for line in lines[-limit:]:
-            log.write_message(line or " ")
-        summary.update(
-            f"Planner tokens: {session.tokens_planner}    Worker tokens: {session.tokens_workers}    "
-            f"Total: {session.tokens_total}    "
-            f"Context sent to workers: {session.worker_prompt_chars} chars over {session.dispatched_cards} tasks"
-        )
-        status_text = f"{session.session_id}: {session.status} (round {session.round})"
-        if session.error:
-            status_text += f" — {' '.join(session.error.split())[:160]}"
-        self.query_one("#orchestrate-status", Static).update(status_text)
-        if self._orchestrate_view_shown:
-            self._refresh_orchestrate_viewer(session, orchestrator)
-
-    def _refresh_orchestrate_viewer(self, session: OrchestrationSession, orchestrator) -> None:
-        """Show the session's PLAN.md in the Markdown viewer."""
-        viewer = self._viewer()
-        if viewer is None:
-            return
-        plan_text = getattr(orchestrator, "plan_text", None)
-        text = plan_text(session) if callable(plan_text) else session.summary
-        identity = f"{session.session_id} · {session.status} · round {session.round}"
-        viewer.show_sources(
-            f"{self._active_project_path}::{session.session_id}",
-            [ViewerSource(LATEST_SOURCE, "Plan", text, identity)],
-            final=not session.active,
-        )
-
-    def _focus_board_row(self, card_id: str) -> None:
-        worker_task_id = next(
-            (task_id for item_id, task_id in self._orchestrate_board_rows if item_id == card_id), None
-        )
-        if not worker_task_id:
-            self._set_orchestrate_status(f"{card_id} has no worker task yet")
-            return
-        self._focus_task(self._active_project_path, worker_task_id)
-        self._set_orchestrate_status(f"Selected worker task {worker_task_id} for {card_id}")
-
-    def _set_orchestrate_status(self, status: str) -> None:
-        nodes = self.query("#orchestrate-status")
-        if nodes:
-            nodes.first().update(status)
-
-    def _schedule_orchestrate_draft_save(self) -> None:
-        if self._orchestrate_draft_timer is not None:
-            return
-        delay = self.prompting.draft_autosave_delay_ms / 1000
-        if delay <= 0:
-            self._flush_orchestrate_draft()
-            return
-        self._orchestrate_draft_timer = self.set_timer(delay, self._orchestrate_draft_timer_fired)
-
-    def _orchestrate_draft_timer_fired(self) -> None:
-        self._orchestrate_draft_timer = None
-        self._flush_orchestrate_draft()
-
-    def _flush_orchestrate_draft(self) -> None:
-        """Save the orchestrate prompt under its own draft key."""
-        if self._orchestrate_draft_timer is not None:
-            self._orchestrate_draft_timer.stop()
-            self._orchestrate_draft_timer = None
-        if not self._orchestrate_draft_dirty:
-            return
-        nodes = self.query("#orchestrate-prompt")
-        if not nodes:
-            return
-        text = nodes.first().text
-        try:
-            if text.strip():
-                self.prompt_store.save_draft(self._active_project_path, None, text, draft_id="orchestrate")
-            else:
-                self.prompt_store.delete_draft(self._active_project_path, None, draft_id="orchestrate")
-            self._orchestrate_draft_dirty = False
-        except (PromptStoreError, OSError) as error:
-            self._set_orchestrate_status(f"Draft not saved: {error}")
-
-    def _load_orchestrate_draft(self) -> None:
-        nodes = self.query("#orchestrate-prompt")
-        if not nodes:
-            return
-        try:
-            draft = self.prompt_store.load_draft(self._active_project_path, None, draft_id="orchestrate")
-        except (PromptStoreError, OSError):
-            draft = None
-        self._suppress_orchestrate_draft_events = True
-        try:
-            nodes.first().load_text(draft.text if draft is not None else "")
-        finally:
-            self._suppress_orchestrate_draft_events = False
-        self._orchestrate_draft_dirty = False
 
     def _set_status(self, status: str) -> None:
         self.query_one("#status", Static).update(status)
 
-    def _set_error(self, error: str, record: TaskRecord | None = None) -> None:
+    def _set_error(self, error: str) -> None:
         error = truncate_diagnostic(error) if error else ""
-        header = self._diagnostics_header(record) if record is not None else ""
-        text = f"{header}\n\n{error}" if header and error else (error or header)
-        if text == self._displayed_error:
+        if error == self._displayed_error:
             return
         output = self.query_one("#output", TranscriptLog)
         output.clear_errors()
         if error:
             output.write_error(error)
         self._displayed_error = error
-        error_widget = self.query_one("#task-error", Log)
-        error_widget.clear()
-        if text:
-            error_widget.write(text)
-        self._displayed_error = text
-
-    def _diagnostics_header(self, record: TaskRecord) -> str:
-        """Name the local log files for the selected run so they can be opened."""
-        lines = []
-        run = getattr(record, "active_run", None)
-        path = getattr(run, "diagnostics_path", None) if run is not None else None
-        if path:
-            lines.append(f"Run diagnostics: {path}")
-        elif getattr(record, "diagnostics_dir", None):
-            lines.append(f"Task diagnostics: {record.diagnostics_dir}")
-        lines.append(f"Runtime log: {self.debug_log_path}")
-        return "\n".join(lines)

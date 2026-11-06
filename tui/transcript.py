@@ -52,8 +52,7 @@ class TranscriptLog(Log):
         super().__init__(*args, **kwargs)
         self._line_tones: dict[int, str] = {}
         self._final_color = None
-        self._user_color = None
-        self._messages: list[tuple[str, bool, str | None]] = []
+        self._messages: list[tuple[str, bool, str]] = []
         self._wrapped_width: int | None = None
 
     @property
@@ -83,27 +82,16 @@ class TranscriptLog(Log):
         self._final_color = color
         self.invalidate_render_cache()
 
-    def set_user_color(self, color) -> None:
-        """Color used for the user's own submitted turns and separators."""
-        self._user_color = color
-        self.invalidate_render_cache()
-
     def invalidate_render_cache(self) -> None:
         """Re-render lines after a surrounding widget's color state changes."""
         self._render_line_cache.clear()
         self.refresh()
 
-    def write_message(
-        self, message: str, *, final: bool = False, tone: str | None = None
-    ) -> "TranscriptLog":
-        """Append one message and assign its semantic tone.
-
-        ``tone`` may be ``"user"`` for the user's own submitted turns and
-        separators; otherwise ``final`` selects the brighter final tone.
-        """
+    def write_message(self, message: str, *, final: bool = False) -> "TranscriptLog":
+        """Append one assistant message and assign its semantic tone."""
         if not message:
             return self
-        self._messages.append((message, final, tone))
+        self._messages.append((message, final, "final" if final else "generic"))
         self._rebuild_lines(scroll_end=self.auto_scroll)
         return self
 
@@ -131,10 +119,7 @@ class TranscriptLog(Log):
             if message:
                 is_final = final and index == len(messages) - 1
                 self._messages.append((message, is_final, "final" if is_final else "generic"))
-    @property
-    def messages(self) -> tuple[str, ...]:
-        """Return the logical (unwrapped) messages in order."""
-        return tuple(message for message, _final, _tone in self._messages)
+        self._rebuild_lines(scroll_end=self.auto_scroll)
 
     def _rebuild_lines(self, *, scroll_end: bool) -> None:
         """Render logical messages as wrapped, selectable Log lines."""
@@ -144,11 +129,10 @@ class TranscriptLog(Log):
         width = max(0, content_width - 1)
         rendered_lines: list[str] = []
         tones: list[str] = []
-        for message_index, (message, final, explicit_tone) in enumerate(self._messages):
-            if message_index:
+        for message, _final, tone in self._messages:
+            if tone not in {"divider", "task"} and rendered_lines:
                 rendered_lines.append("")
                 tones.append("generic")
-            tone = explicit_tone or ("final" if final else "generic")
             if tone == "divider":
                 rendered_lines.append("─" * max(1, width))
                 tones.append(tone)
@@ -277,8 +261,9 @@ class TranscriptLog(Log):
         line = self._process_line(self._lines[y])
         line_text = Text(line, no_wrap=True)
         line_text.stylize(rich_style)
-        line_tone = self._line_tones.get(y)
-        if line_tone == "final" and self._final_color is not None:
+        if line.startswith("Sync recovery — why plan mode?"):
+            line_text.stylize(Style(underline=True, bold=True))
+        if self._line_tones.get(y) == "final" and self._final_color is not None:
             line_text.stylize(Style(color=self._final_color))
         if self._line_tones.get(y) == "prompt":
             line_text.stylize(Style(italic=True))
@@ -288,8 +273,6 @@ class TranscriptLog(Log):
             line_text.stylize(Style(color="white"))
         elif self._line_tones.get(y) == "error":
             line_text.stylize(Style(color="red"))
-        elif line_tone == "user" and self._user_color is not None:
-            line_text.stylize(Style(color=self._user_color, bold=True))
 
         if self.highlight:
             line_text = self.highlighter(line_text)
