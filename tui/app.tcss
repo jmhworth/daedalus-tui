@@ -3,7 +3,7 @@ Screen {
 }
 
 /* Outrank Textual's built-in Screen component rule for selectable output. */
-#screen > .screen--selection {
+Screen > .screen--selection {
     background: $accent;
     color: $text;
 }
