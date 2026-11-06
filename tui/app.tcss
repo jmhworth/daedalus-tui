@@ -311,6 +311,17 @@ Screen > .screen--selection {
     border: round $secondary;
 }
 
+#automatic-follow-up-label {
+    height: 1;
+    color: $text-muted;
+    margin-top: 1;
+}
+
+#automatic-follow-up-input {
+    height: 3;
+    border: round $secondary;
+}
+
 #resume-notes-panel {
     display: none;
     height: 5;
