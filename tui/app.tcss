@@ -1,4 +1,4 @@
-#screen {
+Screen {
     background: $surface;
 
     /* Keep selectable output as readable as the prompt editor selection. */
