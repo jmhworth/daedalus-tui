@@ -20,6 +20,11 @@ The standalone Daedalus TUI is an installable Textual application that runs from
   out terminals. The picker keeps provider, model, reasoning, mode, topic, and
   operating-branch choices available, while short terminals reduce prompt and
   surrounding vertical chrome.
+- **Adjustable workspace sections**: Drag the boundary beside task updates to
+  resize the wide sidebar, and drag the separators below task updates, agent
+  output, and prompt input to resize their vertical space in compact mode or
+  their output/input height in either layout. Session-only sizes survive
+  responsive layout changes, with minimum dimensions protecting usability.
 - **Optional Topics**: A Topic Select lists `(None)` plus `topic_files/*.md`
   stems so related tasks can share goal/status/state-log memory without
   requiring a topic on every submission.
@@ -74,6 +79,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-06: Added session-only drag resizing for the task updates sidebar, agent output, and prompt input, including minimum sizes and responsive layout retention.
 - 2026-11-05: Kept task inbox columns at their configured widths in the vertical workspace so the agent output retains the available width.
 - 2026-11-05: Synchronized the project selector when inbox focus switches projects and corrected a task selection regression assertion to account for grouped heading rows.
 - 2026-11-05: Let the vertical workspace's full-width task inbox expand its task and status columns, since stacked output no longer competes for horizontal space.
