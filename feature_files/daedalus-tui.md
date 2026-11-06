@@ -74,6 +74,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-06: Applied the same solid theme colors to screen and prompt selections so their highlights match across different surfaces.
 - 2026-11-06: Kept the task inbox regression expectation aligned with the 6/18 ID/status widths and removed the prompt selection override that diverged from Textual's screen selection palette.
 - 2026-11-06: Shifted two task-inbox cells from the task ticker to the status column so status remains fully visible at a glance.
 - 2026-11-06: Matched prompt selection to Textual's screen selection palette so prompt and transcript highlighting stay consistent.

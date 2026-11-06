@@ -6,6 +6,17 @@
     overflow-x: hidden;
 }
 
+Screen > .screen--selection {
+    /* Use solid shared colors so selection remains consistent across surfaces. */
+    background: $primary;
+    color: $foreground;
+}
+
+#prompt-input > .text-area--selection {
+    background: $primary;
+    color: $foreground;
+}
+
 #workspace {
     layer: content;
     height: 1fr;
