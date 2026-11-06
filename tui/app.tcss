@@ -1,14 +1,5 @@
 #screen {
     background: $surface;
-
-    /* Keep selectable output as readable as the prompt editor selection. */
-    & > .screen--selection {
-        background: $input-selection-background;
-        color: $input-selection-foreground;
-    }
-}
-
-#screen {
     layers: checkerboard content;
     height: 1fr;
     padding: 1 2;
@@ -29,8 +20,9 @@
 }
 
 #prompt-input > .text-area--selection {
-    background: $input-selection-background;
-    color: $input-selection-foreground;
+    /* Match Textual's screen selection colors for selectable transcript text. */
+    background: $screen-selection-background;
+    color: $screen-selection-foreground;
 }
 
 #task-list {

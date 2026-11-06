@@ -74,6 +74,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-06: Matched prompt selection to Textual's screen selection palette so prompt and transcript highlighting stay consistent.
 - 2026-11-06: Scoped transcript selection styling to the screen ID so it overrides Textual's built-in selection colors and matches the prompt editor.
 - 2026-11-06: Applied the shared input selection colors to Textual's Screen component so transcript highlights match the prompt editor.
 - 2026-11-06: Increased the screen selection rule specificity so transcript highlights use the same theme colors as prompt selections.
