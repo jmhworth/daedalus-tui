@@ -118,6 +118,36 @@ def _redact_supabase_diagnostic(message: str, environment: dict[str, str] | None
     return truncate_diagnostic(redact_environment_values(message, environment))
 
 
+class ResizeHandle(Static):
+    """Mouse-draggable boundary for one of the main workspace sections."""
+
+    def __init__(self, section: str, *, vertical: bool = True, **kwargs) -> None:
+        super().__init__("━" if vertical else "┃", **kwargs)
+        self.section = section
+        self.vertical = vertical
+        self._last_coordinate: int | None = None
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        event.stop()
+        self._last_coordinate = event.screen_y if self.vertical else event.screen_x
+        self.capture_mouse()
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        if self._last_coordinate is None or not event.button:
+            return
+        coordinate = event.screen_y if self.vertical else event.screen_x
+        delta = coordinate - self._last_coordinate
+        self._last_coordinate = coordinate
+        if delta:
+            self.app._resize_workspace_section(self.section, delta)
+
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        if self._last_coordinate is not None:
+            self._last_coordinate = None
+            self.release_mouse()
+            event.stop()
+
+
 _THREAD_EXIT_APPS: dict[int, "DaedalusTuiApp"] = {}
 _THREAD_EXIT_APPS_LOCK = threading.Lock()
 _THREAD_EXIT_HOOK_REGISTERED = False
@@ -1536,6 +1566,7 @@ class DaedalusTuiApp(App[None]):
         self._compact_mode = False
         self._short_height_mode = False
         self._responsive_measure_pending = False
+        self._workspace_sizes: dict[str, int] = {}
         self._displayed_error = ""
         self._supabase_bootstrap_started = False
         self._personal_supabase_progress_screen: (
@@ -1558,6 +1589,7 @@ class DaedalusTuiApp(App[None]):
                 with Vertical(id="task-sidebar"):
                     yield Static("Task updates", id="task-label")
                     yield DataTable(id="task-list", cursor_type="row")
+                yield ResizeHandle("task-sidebar", vertical=False, id="task-sidebar-resize")
                 with Vertical(id="project-main"):
                     yield Static("Local agent orchestration", id="title")
                     with Horizontal(id="task-bar"):
@@ -1581,6 +1613,7 @@ class DaedalusTuiApp(App[None]):
                             yield Static("Agent output", id="output-view-label")
                         # Log supports Textual click-drag selection; RichLog does not.
                         yield TranscriptLog(id="output", auto_scroll=True)
+                    yield ResizeHandle("output", id="output-resize")
                     with Horizontal(id="settings"):
                         yield Select(
                             [(option.label, option.value) for option in self.settings.providers],
@@ -1636,6 +1669,7 @@ class DaedalusTuiApp(App[None]):
                             id="prompt-input",
                             placeholder="Describe the change for the local agent...",
                         )
+                        yield ResizeHandle("prompt", id="prompt-resize")
                         with Vertical(id="resume-notes-panel"):
                             yield Static("Optional notes for resuming this task", id="resume-notes-label")
                             yield TextArea(
@@ -1894,20 +1928,67 @@ class DaedalusTuiApp(App[None]):
         task_sidebar.styles.height = (
             self.settings.layout.compact_task_sidebar_height if compact else "1fr"
         )
+        if compact:
+            task_sidebar.styles.width = "1fr"
+            task_sidebar.styles.height = self._workspace_sizes.get(
+                "task-sidebar-height", self.settings.layout.compact_task_sidebar_height
+            )
+        else:
+            task_sidebar.styles.width = self._workspace_sizes.get("task-sidebar-width", 25)
         prompt.styles.height = (
             self.settings.layout.compact_prompt_height
             if compact or short
             else 7
         )
+        if "prompt-height" in self._workspace_sizes:
+            prompt.styles.height = self._workspace_sizes["prompt-height"]
         output_panel = self.query_one("#output-panel", Vertical)
         output_panel.styles.height = (
             self.settings.layout.compact_output_height if compact else "1fr"
         )
+        if "output-height" in self._workspace_sizes:
+            output_panel.styles.height = self._workspace_sizes["output-height"]
         output.styles.width = "1fr" if compact else self.settings.output_width
         self._refresh_task_list()
         self._refresh_compact_setting_value()
         if not compact:
             self._queue_responsive_measurement()
+
+    def _resize_workspace_section(self, section: str, delta: int) -> None:
+        """Apply one drag increment while keeping the affected pane usable."""
+        if section == "task-sidebar":
+            if self._compact_mode:
+                key = "task-sidebar-height"
+                current = self._workspace_sizes.get(
+                    key, self.settings.layout.compact_task_sidebar_height
+                )
+                self._workspace_sizes[key] = max(7, current + delta)
+                self.query_one("#task-sidebar", Vertical).styles.height = self._workspace_sizes[key]
+            else:
+                key = "task-sidebar-width"
+                current = self._workspace_sizes.get(key, 25)
+                self._workspace_sizes[key] = max(22, current + delta)
+                self.query_one("#task-sidebar", Vertical).styles.width = self._workspace_sizes[key]
+            return
+        if section == "output":
+            key = "output-height"
+            current = self._workspace_sizes.get(
+                key,
+                self.settings.layout.compact_output_height if self._compact_mode else max(
+                    8, self.query_one("#output-panel", Vertical).region.height
+                ),
+            )
+            self._workspace_sizes[key] = max(6, current + delta)
+            self.query_one("#output-panel", Vertical).styles.height = self._workspace_sizes[key]
+            return
+        if section == "prompt":
+            key = "prompt-height"
+            current = self._workspace_sizes.get(
+                key,
+                self.settings.layout.compact_prompt_height if self._compact_mode else 7,
+            )
+            self._workspace_sizes[key] = max(5, current + delta)
+            self.query_one("#prompt-input", DaedalusVimTextArea).styles.height = self._workspace_sizes[key]
 
     def _queue_responsive_measurement(self) -> None:
         """Measure wide controls after their current layout pass completes."""

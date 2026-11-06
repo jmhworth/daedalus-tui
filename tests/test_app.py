@@ -682,6 +682,37 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(app._short_height_mode)
             self.assertEqual(app.query_one("#prompt-input").styles.height.value, 3)
 
+    async def test_workspace_sections_resize_and_retain_sizes_across_layouts(self):
+        app = DaedalusTuiApp(
+            runner=FakeRunner(),
+            directory=Path("/workspace/project"),
+            settings=replace(settings(), layout=LayoutSettings(100, 30, 6, 3)),
+            coordinator=FakeCoordinator(),
+        )
+        async with app.run_test() as pilot:
+            await pilot.resize_terminal(180, 40)
+            await pilot.pause()
+            app._resize_workspace_section("task-sidebar", -10)
+            app._resize_workspace_section("output", -20)
+            app._resize_workspace_section("prompt", -20)
+            self.assertEqual(app.query_one("#task-sidebar").styles.width.value, 22)
+            self.assertEqual(app.query_one("#output-panel").styles.height.value, 6)
+            self.assertEqual(app.query_one("#prompt-input").styles.height.value, 5)
+
+            await pilot.resize_terminal(180, 40)
+            await pilot.pause()
+            app._resize_workspace_section("task-sidebar", 8)
+            self.assertEqual(app.query_one("#task-sidebar").styles.width.value, 30)
+
+            await pilot.resize_terminal(80, 40)
+            await pilot.pause()
+            self.assertEqual(app.query_one("#task-sidebar").styles.height.value, 6)
+            self.assertEqual(app.query_one("#output-panel").styles.height.value, 6)
+            self.assertEqual(app.query_one("#prompt-input").styles.height.value, 5)
+
+            app._resize_workspace_section("task-sidebar", -10)
+            self.assertEqual(app.query_one("#task-sidebar").styles.height.value, 7)
+
     async def test_responsive_layout_compacts_when_settings_selects_are_too_narrow(self):
         app, _ = self.make_app()
         async with app.run_test() as pilot:

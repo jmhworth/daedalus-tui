@@ -20,6 +20,11 @@ The standalone Daedalus TUI is an installable Textual application that runs from
   out terminals. The picker keeps provider, model, reasoning, mode, topic, and
   operating-branch choices available, while short terminals reduce prompt and
   surrounding vertical chrome.
+- **Adjustable workspace sections**: Drag the boundary beside task updates to
+  resize the wide sidebar, and drag the separators below task updates, agent
+  output, and prompt input to resize their vertical space in compact mode or
+  their output/input height in either layout. Session-only sizes survive
+  responsive layout changes, with minimum dimensions protecting usability.
 - **Optional Topics**: A Topic Select lists `(None)` plus `topic_files/*.md`
   stems so related tasks can share goal/status/state-log memory without
   requiring a topic on every submission.
@@ -82,6 +87,10 @@ HACKING
 - 2026-11-06: Applied the shared input selection colors to Textual's Screen component so transcript highlights match the prompt editor.
 - 2026-11-06: Increased the screen selection rule specificity so transcript highlights use the same theme colors as prompt selections.
 - 2026-11-06: Expanded the task updates sidebar and prioritized full status labels over task ID width.
+- 2026-11-06: Scoped the output selection component override to Textual's Screen so its accent matches the prompt selection across themes.
+- 2026-11-06: Unified output and prompt selection colors through the active theme accent after verification exposed differing component selection variables.
+- 2026-11-06: Used the opaque theme accent for output and prompt selection backgrounds so both resolve to the same color over different surfaces.
+- 2026-11-06: Added session-only drag resizing for the task updates sidebar, agent output, and prompt input, including minimum sizes and responsive layout retention.
 - 2026-11-05: Kept task inbox columns at their configured widths in the vertical workspace so the agent output retains the available width.
 - 2026-11-05: Synchronized the project selector when inbox focus switches projects and corrected a task selection regression assertion to account for grouped heading rows.
 - 2026-11-05: Let the vertical workspace's full-width task inbox expand its task and status columns, since stacked output no longer competes for horizontal space.

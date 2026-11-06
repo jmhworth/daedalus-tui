@@ -1,20 +1,18 @@
+Screen {
+    background: $surface;
+}
+
+/* Outrank Textual's built-in Screen component rule for selectable output. */
+Screen > .screen--selection {
+    background: $accent;
+    color: $text;
+}
 #screen {
     background: $surface;
     layers: checkerboard content;
     height: 1fr;
     padding: 1 2;
     overflow-x: hidden;
-}
-
-Screen > .screen--selection {
-    /* Use solid shared colors so selection remains consistent across surfaces. */
-    background: $primary;
-    color: $foreground;
-}
-
-#prompt-input > .text-area--selection {
-    background: $primary;
-    color: $foreground;
 }
 
 #workspace {
@@ -30,6 +28,29 @@ Screen > .screen--selection {
     padding: 1;
 }
 
+#task-sidebar-resize {
+    width: 1;
+    height: 1fr;
+    color: $text-muted;
+    content-align: center middle;
+}
+
+#output-resize, #prompt-resize {
+    width: 1fr;
+    height: 1;
+    color: $text-muted;
+    content-align: center middle;
+}
+
+#task-sidebar-resize:hover, #output-resize:hover, #prompt-resize:hover {
+    color: $text-accent;
+    background: $boost;
+}
+
+#prompt-input > .text-area--selection {
+    background: $accent;
+    color: $text;
+}
 #task-list {
     height: 1fr;
     /* The inbox columns have fixed cell widths; never introduce a second
@@ -429,6 +450,11 @@ Screen > .screen--selection {
     min-width: 0;
     height: 14;
     padding: 1;
+}
+
+#screen.compact-width #task-sidebar-resize {
+    width: 1fr;
+    height: 1;
 }
 
 #screen.compact-width #task-list {
