@@ -19,12 +19,6 @@
     padding: 1;
 }
 
-#prompt-input > .text-area--selection {
-    /* Match Textual's screen selection colors for selectable transcript text. */
-    background: $screen-selection-background;
-    color: $screen-selection-foreground;
-}
-
 #task-list {
     height: 1fr;
     /* The inbox columns have fixed cell widths; never introduce a second
