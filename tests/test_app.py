@@ -236,7 +236,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             task_list = app.query_one("#task-list", DataTable)
             self.assertEqual(
                 [column.width for column in task_list.columns.values()],
-                [12, 5],
+                [6, 18],
             )
             self.assertTrue(all(not column.auto_width for column in task_list.columns.values()))
             self.assertIsInstance(app.query_one("#prompt-input", TextArea), DaedalusVimTextArea)
