@@ -79,6 +79,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-06: Scoped the output selection style to the main screen so it overrides Textual's default and matches prompt selection colors.
 - 2026-11-06: Added session-only drag resizing for the task updates sidebar, agent output, and prompt input, including minimum sizes and responsive layout retention.
 - 2026-11-05: Kept task inbox columns at their configured widths in the vertical workspace so the agent output retains the available width.
 - 2026-11-05: Synchronized the project selector when inbox focus switches projects and corrected a task selection regression assertion to account for grouped heading rows.

@@ -1,11 +1,11 @@
 Screen {
     background: $surface;
+}
 
-    /* Keep selectable output as readable as the prompt editor selection. */
-    & > .screen--selection {
-        background: $input-selection-background;
-        color: $input-selection-foreground;
-    }
+/* Outrank Textual's built-in Screen component rule for selectable output. */
+#screen > .screen--selection {
+    background: $input-selection-background;
+    color: $input-selection-foreground;
 }
 
 #screen {
