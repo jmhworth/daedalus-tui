@@ -2975,7 +2975,9 @@ class DaedalusTuiApp(App[None]):
                     self._refresh_push_button()
                     self._update_sync_recovery_status(record, phase)
             if is_selected:
-                self._render_selected_task_safely(f"task event phase={phase}")
+                self._render_selected_task_preserving_prompt(
+                    f"task event phase={phase}"
+                )
             if phase.lower() in {"proposed", "completed"} and record.provider == "codex":
                 self._start_codex_usage_refresh()
         except Exception as error:
@@ -3618,6 +3620,14 @@ class DaedalusTuiApp(App[None]):
                 self._set_status("Error")
             except Exception as display_error:
                 log_exception("Could not show selected-task rendering error", display_error)
+
+    def _render_selected_task_preserving_prompt(self, source: str) -> None:
+        """Refresh task output without discarding text being drafted in the prompt."""
+        prompt = self.query_one("#prompt-input", DaedalusVimTextArea)
+        draft = prompt.text if not prompt.read_only else None
+        self._render_selected_task_safely(source)
+        if draft is not None:
+            self._set_prompt_text(draft, editable=True)
 
     def _render_selected_task(self) -> None:
         record = self.coordinator.get(self._selected_task_id or "")

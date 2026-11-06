@@ -53,6 +53,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
 - **Submission focus**: Every newly submitted task becomes the selected task immediately, regardless of mode, so its status, transcript, plan review, and task context are visible while it runs.
+- **Draft preservation**: Asynchronous updates to the selected task refresh its transcript and status without clearing text currently being composed in the prompt.
 - **Command Menu**: `Ctrl+K` opens a discoverable action menu for New Task, Create Topic, Activate/remove personal Supabase, and Sync to GitHub (pull then push by default; merge conflicts can launch plan-mode recovery). New Task also remains available through `Ctrl+T`; the menu links to the full keyboard-shortcut reference, while New Project remains available through `Ctrl+Shift+N` and coding statistics remains on `Ctrl+U`.
 - **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a taller task inbox and a three-column settings grid below the output and above the composer, giving several task rows room while retaining independent scrolling inside each widget.
 
@@ -79,6 +80,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-06: Preserved editable prompt drafts when asynchronous updates rerender the selected task view.
 - 2026-11-06: Scoped the output selection component override to Textual's Screen so its accent matches the prompt selection across themes.
 - 2026-11-06: Unified output and prompt selection colors through the active theme accent after verification exposed differing component selection variables.
 - 2026-11-06: Used the opaque theme accent for output and prompt selection backgrounds so both resolve to the same color over different surfaces.
