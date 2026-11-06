@@ -4,8 +4,8 @@ Screen {
 
 /* Outrank Textual's built-in Screen component rule for selectable output. */
 #screen > .screen--selection {
-    background: $input-selection-background;
-    color: $input-selection-foreground;
+    background: $accent 35%;
+    color: $text;
 }
 
 #screen {
@@ -48,8 +48,8 @@ Screen {
 }
 
 #prompt-input > .text-area--selection {
-    background: $input-selection-background;
-    color: $input-selection-foreground;
+    background: $accent 35%;
+    color: $text;
 }
 
 #task-list {
