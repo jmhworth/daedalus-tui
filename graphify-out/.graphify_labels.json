@@ -96,8 +96,6 @@
   "94": "._render_line_strip",
   "95": "._on_personal_supabase_activation_progress",
   "96": "._resize_workspace_section",
-  "97": "._apply_measured_responsive_layout",
   "98": ".edit_paste_after",
-  "99": ".edit_paste_before",
   "100": ".enter_insert_mode"
 }
