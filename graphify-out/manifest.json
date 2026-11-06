@@ -15,13 +15,13 @@
     "semantic_hash": ""
   },
   "tests/test_app.py": {
-    "mtime": 1793856328.6481135,
-    "ast_hash": "cd8ddc760c9e20f192ad2f65b9a8384f",
+    "mtime": 1794006842.32946,
+    "ast_hash": "d5377c6219790966a30077628d532e19",
     "semantic_hash": ""
   },
   "tests/test_config.py": {
-    "mtime": 1793855974.3097227,
-    "ast_hash": "094c24160fddb3011821ac46f57bf4f7",
+    "mtime": 1794006842.3307855,
+    "ast_hash": "e25fe4bf3029f52b438b2ad2e8637bfc",
     "semantic_hash": ""
   },
   "tests/test_git_worktree.py": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "tui/app.py": {
-    "mtime": 1793893175.6432774,
-    "ast_hash": "570139b2ca2246bf3a82f1bf5854d365",
+    "mtime": 1794001634.85042,
+    "ast_hash": "19f0a75d36103896e35091d1e3daceea",
     "semantic_hash": ""
   },
   "tui/clipboard.py": {
@@ -85,8 +85,8 @@
     "semantic_hash": "cf5f808e3a03a0cd04a9f08912c9cacd"
   },
   "tui/config.py": {
-    "mtime": 1793855974.3102326,
-    "ast_hash": "2aad298e92cc215c07a262e48660b58c",
+    "mtime": 1794006842.3340814,
+    "ast_hash": "42d6031b666ec12d956799d7727a1f09",
     "semantic_hash": ""
   },
   "tui/environment.py": {
@@ -145,8 +145,8 @@
     "semantic_hash": ""
   },
   "feature_files/daedalus-tui.md": {
-    "mtime": 1793893175.6413434,
-    "ast_hash": "cde5505c85f0f33932e7c54d40b806cb",
+    "mtime": 1794006842.3119981,
+    "ast_hash": "bb4ba468c6137e203fbed37391e3a3c5",
     "semantic_hash": ""
   },
   "requirements.txt": {
@@ -485,7 +485,7 @@
     "semantic_hash": ""
   },
   "supabase/.temp/linked-project.json": {
-    "mtime": 1793891869.0643399,
+    "mtime": 1794006394.6626651,
     "ast_hash": "64776afc229ec5a9edacc27174e71abd",
     "semantic_hash": ""
   },
@@ -507,6 +507,21 @@
   "graphify-out/memory/query_20261105_051344_what_is_the__ready__status__and_is_it_possible_for.md": {
     "mtime": 1793856328.646423,
     "ast_hash": "4ea234aa3fd6f67ba9b496951f9e8fc0",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/202611052020_medley_create_song_moments.sql": {
+    "mtime": 1793928193.1117768,
+    "ast_hash": "5e51ab0a7e676c03635202facd48245e",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/202611061200_medley_create_music_context.sql": {
+    "mtime": 1793986215.121084,
+    "ast_hash": "0935c5f690942536c1576fcf85b61cbd",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/202611061300_medley_remove_song_moments.sql": {
+    "mtime": 1794001267.4257832,
+    "ast_hash": "f9893c32316484484b7a648f0c515ab3",
     "semantic_hash": ""
   }
 }
