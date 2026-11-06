@@ -56,10 +56,10 @@ compact_prompt_height = 8
 compact_output_height = 16
 
 # Baseline content widths for task IDs and statuses in the grouped task inbox.
-# The full status fits while IDs remain compact; these widths apply in both layouts.
+# Prioritize full status labels while keeping task IDs as compact tickers.
 [task_inbox]
-task_width = 8
-status_width = 16
+task_width = 6
+status_width = 18
 
 # Fatal Textual exceptions are written to the launch-root debug log
 # (see orchestration `debug_log_filename`) and also printed to stderr.
