@@ -48,7 +48,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
 - **Project heading task entry**: Selecting a project heading in the task updates sidebar switches to that project and opens a blank, editable task composer.
-- **Stable task inbox layout**: Both workspaces use fixed, parameterized task-ID and status widths with visible ellipses; the sidebar gives status 18 cells so every task status remains readable while task IDs stay compact in a 6-cell ticker. The vertical workspace keeps the same columns while the agent output uses the available width.
+- **Stable task inbox layout**: The task inbox uses parameterized baseline widths and visible ellipses. In the wide workspace, added sidebar width expands the task-ID column while status retains its configured width so task statuses remain readable; the vertical workspace keeps its baseline columns while the agent output uses the available width.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -81,6 +81,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-06: Used extra wide-sidebar space to reveal more task ID characters while keeping the status column fixed.
 - 2026-11-06: Let the regular workspace grow inside its screen scroller when resized output or prompt sections exceed the viewport, keeping prompts reachable.
 - 2026-11-06: Preserved editable prompt drafts when asynchronous updates rerender the selected task view.
 - 2026-11-06: Applied the same solid theme colors to screen and prompt selections so their highlights match across different surfaces.
