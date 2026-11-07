@@ -228,8 +228,6 @@ class TaskMemoryStore:
         sync_conflict_attempt_limit: int | None = None,
         chain_id: str | None = None,
         parent_task_id: str | None = None,
-        automatic_follow_up_prompt: str | None = None,
-        automatic_follow_up_task_id: str | None = None,
     ) -> None:
         """Upsert a task snapshot keyed by the task worktree's directory name."""
         task = {
@@ -257,10 +255,6 @@ class TaskMemoryStore:
             task["chain_id"] = chain_id
         if parent_task_id is not None:
             task["parent_task_id"] = parent_task_id
-        if automatic_follow_up_prompt:
-            task["automatic_follow_up_prompt"] = automatic_follow_up_prompt
-        if automatic_follow_up_task_id is not None:
-            task["automatic_follow_up_task_id"] = automatic_follow_up_task_id
         if branch_name is not None:
             task["branch_name"] = branch_name
         if worktree_path is not None:

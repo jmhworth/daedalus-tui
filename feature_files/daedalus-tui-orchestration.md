@@ -7,8 +7,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 - **Worktree isolation**: Each task receives an `agent/task-<id>` branch and a sibling `.daedalus-worktrees` directory.
 - **Project worktree provisioning**: An optional target-project `.daedalus` file can run one install command inside each task worktree and symlink declared repository-relative shared paths from the primary checkout.
 - **Restart recovery**: Persisted failed tasks are restored with Retry available, while tasks active during shutdown are restored as paused tasks with their existing worktree context.
-- **Conversation follow-ups**: Completed and failed tasks can start a separately numbered linked task that carries earlier user prompts and assistant outputs as agent context; Retry continues to rerun a failed task independently.
-- **Automatic task follow-ups**: A task may include an optional next-task prompt in the composer. It is persisted with the parent and only creates and dispatches the linked task after the parent reaches successful completion; failures leave it unsent.
+- **Conversation follow-ups**: Active, completed, and failed tasks can start a separately numbered linked task that carries earlier user prompts and assistant outputs as agent context; the executor queues follow-ups when all worker slots are occupied, and Retry continues to rerun a failed task independently.
 - **Plan proposal status**: Confirmed plan-mode tasks persist as `proposed`, keeping plan review distinct from completed coding while enabling the Implement handoff.
 - **Verification repair**: Failed task checks launch repair attempts in the same worktree up to the configured limit.
 - **Verification diagnostics**: When every verification attempt fails, each attempt's failure output is written to the task error panel and included in the final failure message.
@@ -37,13 +36,13 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 
 ## Relevant Files
 - `tui/orchestrator.py`: Single-task lifecycle, verification repair, migration push repair, integration, and resolver loops.
-- `tui/task_coordinator.py`: Concurrent task records, executor limit, serialized integration gate, and linked automatic follow-up dispatch after success.
+- `tui/task_coordinator.py`: Concurrent task records, executor limit, serialized integration gate, and linked follow-up submission.
 - `tui/transcript.py`: Selectable numbered task turns, italic submitted prompts, and reflowing task dividers.
 - `tui/app.py`: Task selection, prompt editing, and Follow Up controls.
 - `tui/token_usage.py`: Completed coding and proposed planning task usage records.
 - `tui/git_worktree.py`: Git validation, worktree, branch listing, operator pull-then-push sync helper, merge, and cleanup operations.
 - `tui/project_config.py`: Target-project `.daedalus` worktree provisioning settings.
-- `tui/memory.py`: Atomic task snapshots, worktree identity, restart metadata, automatic follow-up intent, and per-project target branches.
+- `tui/memory.py`: Atomic task snapshots, worktree identity, restart metadata, and per-project target branches.
 - `tui/topics.py`: Topic discovery and embed helpers used at prompt-build time.
 - `tui/verification.py`: Configured and convention-based verification execution.
 - `tui/supabase_migrations.py`: Pending migration detection and non-interactive `supabase db push`.
@@ -55,6 +54,7 @@ The standalone TUI orchestration layer creates isolated Git worktrees from a con
 HACKING
 
 ## State Log
+- 2026-11-06: Removed the separate after-success prompt and enabled Follow Up on active tasks so the executor queues linked work when capacity is full.
 - 2026-11-06: Added an optional persisted next-task prompt that is dispatched as a linked follow-up only after successful task completion.
 - 2026-11-05: Explain in the Sync recovery transcript that plan mode follows pull conflicts and precedes conflict resolution and push.
 - 2026-11-04: Corrected selectable transcript regression coordinates to target the assistant row after numbered task headers were added.
