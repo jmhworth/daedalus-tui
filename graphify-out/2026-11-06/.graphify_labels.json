@@ -98,5 +98,8 @@
   "96": "._apply_measured_responsive_layout",
   "97": ".edit_paste_after",
   "98": ".edit_paste_before",
-  "99": ".enter_insert_mode"
+  "99": ".enter_insert_mode",
+  "100": "_textual_theme",
+  "101": ".parse_cursor_event",
+  "102": "_shortcut_binding_key"
 }
