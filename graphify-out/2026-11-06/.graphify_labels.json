@@ -48,6 +48,7 @@
   "46": "orchestrator.py",
   "47": "DaedalusTuiApp",
   "48": "._persist_task",
+  "49": "._set_status",
   "50": "environment.py",
   "51": "CompactSettingsSelect",
   "52": "Daedalus TUI Call Graph Visualization",
@@ -90,5 +91,12 @@
   "89": ".implement_plan",
   "90": "remove_personal_supabase",
   "91": "._apply_task_event",
-  "92": "PersonalSupabaseSetupWizardScreen"
+  "92": "PersonalSupabaseSetupWizardScreen",
+  "93": "._on_personal_supabase_activation_progress",
+  "94": "._resize_workspace_section",
+  "95": "profile_guidance_section",
+  "96": "._apply_measured_responsive_layout",
+  "97": ".edit_paste_after",
+  "98": ".edit_paste_before",
+  "99": ".enter_insert_mode"
 }
