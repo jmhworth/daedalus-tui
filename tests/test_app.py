@@ -236,7 +236,7 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             task_list = app.query_one("#task-list", DataTable)
             self.assertEqual(
                 [column.width for column in task_list.columns.values()],
-                [12, 5],
+                [6, 18],
             )
             self.assertTrue(all(not column.auto_width for column in task_list.columns.values()))
             self.assertIsInstance(app.query_one("#prompt-input", TextArea), DaedalusVimTextArea)
@@ -2697,6 +2697,20 @@ class TuiAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(app._exception)
             self.assertEqual(str(app.query_one("#status", Static).render()), "Error")
             self.assertIn("render failure", "\n".join(app.query_one("#output", Log)._lines))
+
+    async def test_selected_task_updates_preserve_an_editable_prompt_draft(self):
+        app, coordinator = self.make_app()
+        async with app.run_test() as pilot:
+            prompt = app.query_one("#prompt-input", DaedalusVimTextArea)
+            prompt.insert("Initial task")
+            app.action_submit_prompt()
+            record = coordinator.records[0]
+            await pilot.pause()
+
+            app._set_prompt_text("Draft for the next task", editable=True)
+            app._apply_task_event(record, "agent", "A background update.", "message")
+
+            self.assertEqual(prompt.text, "Draft for the next task")
 
     async def test_paused_task_exposes_optional_resume_notes(self):
         app, coordinator = self.make_app()

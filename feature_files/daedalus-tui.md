@@ -48,7 +48,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Actionable task history**: The task inbox keeps every failed task, active or paused work, and all tasks from the current TUI session while hiding older completed, blocked, and cancelled tasks.
 - **Grouped task inbox**: The task updates sidebar groups rows under project headings sorted alphabetically, then shows each task's ID and status instead of its prompt.
 - **Project heading task entry**: Selecting a project heading in the task updates sidebar switches to that project and opens a blank, editable task composer.
-- **Stable task inbox layout**: Both workspaces use fixed, parameterized task-ID and status widths with visible ellipses so long values do not horizontally scroll the compact sidebar. The vertical workspace keeps the same compact columns while the agent output uses the available width.
+- **Stable task inbox layout**: Both workspaces use fixed, parameterized task-ID and status widths with visible ellipses; the sidebar gives status 18 cells so every task status remains readable while task IDs stay compact in a 6-cell ticker. The vertical workspace keeps the same columns while the agent output uses the available width.
 - **Retryable failures**: Failed agent tasks expose their diagnostics and a Retry action so transient connectivity or service failures can be recovered in place.
 - **Prompt mode toggle**: On the main prompting screen, `Tab` toggles the new-task mode between Coding and Plan; the existing Ask mode remains available from the selector.
 - **Prompt placement**: Agent output sits above the settings toggles and prompt editor; the input and options stay at the bottom of the workspace, followed by submission and task action buttons.
@@ -81,6 +81,14 @@ HACKING
 
 ## State Log
 - 2026-11-06: Preserved editable prompt drafts when asynchronous updates rerender the selected task view.
+- 2026-11-06: Applied the same solid theme colors to screen and prompt selections so their highlights match across different surfaces.
+- 2026-11-06: Kept the task inbox regression expectation aligned with the 6/18 ID/status widths and removed the prompt selection override that diverged from Textual's screen selection palette.
+- 2026-11-06: Shifted two task-inbox cells from the task ticker to the status column so status remains fully visible at a glance.
+- 2026-11-06: Matched prompt selection to Textual's screen selection palette so prompt and transcript highlighting stay consistent.
+- 2026-11-06: Scoped transcript selection styling to the screen ID so it overrides Textual's built-in selection colors and matches the prompt editor.
+- 2026-11-06: Applied the shared input selection colors to Textual's Screen component so transcript highlights match the prompt editor.
+- 2026-11-06: Increased the screen selection rule specificity so transcript highlights use the same theme colors as prompt selections.
+- 2026-11-06: Expanded the task updates sidebar and prioritized full status labels over task ID width.
 - 2026-11-06: Scoped the output selection component override to Textual's Screen so its accent matches the prompt selection across themes.
 - 2026-11-06: Unified output and prompt selection colors through the active theme accent after verification exposed differing component selection variables.
 - 2026-11-06: Used the opaque theme accent for output and prompt selection backgrounds so both resolve to the same color over different surfaces.

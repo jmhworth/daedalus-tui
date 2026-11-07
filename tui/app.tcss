@@ -7,8 +7,8 @@ Screen > .screen--selection {
     background: $accent;
     color: $text;
 }
-
 #screen {
+    background: $surface;
     layers: checkerboard content;
     height: 1fr;
     padding: 1 2;
@@ -21,8 +21,8 @@ Screen > .screen--selection {
 }
 
 #task-sidebar {
-    width: 25;
-    min-width: 22;
+    width: 32;
+    min-width: 29;
     height: 1fr;
     border: round $primary;
     padding: 1;
@@ -51,7 +51,6 @@ Screen > .screen--selection {
     background: $accent;
     color: $text;
 }
-
 #task-list {
     height: 1fr;
     /* The inbox columns have fixed cell widths; never introduce a second
@@ -308,6 +307,17 @@ Screen > .screen--selection {
 
 #prompt-input {
     height: 7;
+    border: round $secondary;
+}
+
+#automatic-follow-up-label {
+    height: 1;
+    color: $text-muted;
+    margin-top: 1;
+}
+
+#automatic-follow-up-input {
+    height: 3;
     border: round $secondary;
 }
 
