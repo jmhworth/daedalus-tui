@@ -91,8 +91,12 @@
   "89": ".implement_plan",
   "90": "remove_personal_supabase",
   "91": "._apply_task_event",
+  "92": "log_exception",
+  "93": "_TimeoutTracker",
+  "94": "._codex_failure_diagnostics",
   "95": "profile_guidance_section",
   "96": "._apply_measured_responsive_layout",
   "97": ".edit_paste_after",
+  "98": ".parse_cursor_event",
   "100": "_textual_theme"
 }
