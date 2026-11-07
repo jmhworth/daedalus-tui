@@ -451,6 +451,16 @@ Screen > .screen--selection {
     padding: 1;
 }
 
+/* A manually enlarged section can make the regular workspace taller than the
+   viewport. Let the enclosing VerticalScroll reach the composer below it. */
+#screen.workspace-overflow #workspace {
+    height: auto;
+}
+
+#screen.workspace-overflow #project-main {
+    height: auto;
+}
+
 #screen.compact-width #workspace {
     layout: vertical;
     height: auto;

@@ -56,10 +56,11 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 - **Draft preservation**: Asynchronous updates to the selected task refresh its transcript and status without clearing text currently being composed in the prompt.
 - **Command Menu**: `Ctrl+K` opens a discoverable action menu for New Task, Create Topic, Activate/remove personal Supabase, and Sync to GitHub (pull then push by default; merge conflicts can launch plan-mode recovery). New Task also remains available through `Ctrl+T`; the menu links to the full keyboard-shortcut reference, while New Project remains available through `Ctrl+Shift+N` and coding statistics remains on `Ctrl+U`.
 - **Scrollable vertical workspace**: Compact-width terminals use a scrollable vertical screen with a taller task inbox and a three-column settings grid below the output and above the composer, giving several task rows room while retaining independent scrolling inside each widget.
+- **Scrollable resized workspace**: In the regular layout, enlarging the agent output or prompt beyond the available viewport lets the workspace extend vertically inside the screen scroller, keeping the composer and actions reachable.
 
 ## Relevant Files
 - `tui/app.py`: Textual layout, selectors, task list, transcript replay, and task controls.
-- `tui/app.tcss`: Shared full-height output-panel layout and readable transcript/diagnostic styling.
+- `tui/app.tcss`: Responsive workspace sizing, overflow scrolling, and readable transcript/diagnostic styling.
 - `tui/transcript.py`: Selectable transcript and red inline task-error rendering, wrapping, and compact file-reference annotation.
 - `tui/config.py`: Read-only provider and responsive-layout configuration models and loaders.
 - `tui/git_worktree.py`: Local Git helpers including operating-branch pull-then-push sync for the Command Menu action.
@@ -80,6 +81,7 @@ The standalone Daedalus TUI is an installable Textual application that runs from
 HACKING
 
 ## State Log
+- 2026-11-06: Let the regular workspace grow inside its screen scroller when resized output or prompt sections exceed the viewport, keeping prompts reachable.
 - 2026-11-06: Preserved editable prompt drafts when asynchronous updates rerender the selected task view.
 - 2026-11-06: Applied the same solid theme colors to screen and prompt selections so their highlights match across different surfaces.
 - 2026-11-06: Kept the task inbox regression expectation aligned with the 6/18 ID/status widths and removed the prompt selection override that diverged from Textual's screen selection palette.

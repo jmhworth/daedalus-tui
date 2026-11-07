@@ -1954,6 +1954,7 @@ class DaedalusTuiApp(App[None]):
         if "output-height" in self._workspace_sizes:
             output_panel.styles.height = self._workspace_sizes["output-height"]
         output.styles.width = "1fr" if compact else self.settings.output_width
+        self._sync_workspace_overflow()
         self._refresh_task_list()
         self._refresh_compact_setting_value()
         if not compact:
@@ -1985,6 +1986,7 @@ class DaedalusTuiApp(App[None]):
             )
             self._workspace_sizes[key] = max(6, current + delta)
             self.query_one("#output-panel", Vertical).styles.height = self._workspace_sizes[key]
+            self._sync_workspace_overflow()
             return
         if section == "prompt":
             key = "prompt-height"
@@ -1994,6 +1996,24 @@ class DaedalusTuiApp(App[None]):
             )
             self._workspace_sizes[key] = max(5, current + delta)
             self.query_one("#prompt-input", DaedalusVimTextArea).styles.height = self._workspace_sizes[key]
+            self._sync_workspace_overflow()
+
+    def _sync_workspace_overflow(self) -> None:
+        """Let a manually enlarged wide workspace extend into the screen scroller."""
+        if not self.query("#screen"):
+            return
+        screen = self.query_one("#screen", VerticalScroll)
+        if self._compact_mode:
+            screen.remove_class("workspace-overflow")
+            return
+
+        height = self.size.height
+        output_height = self._workspace_sizes.get("output-height", 0)
+        prompt_height = self._workspace_sizes.get("prompt-height", 0)
+        # Keep room for the fixed title, task context, settings, composer chrome,
+        # and action rows around the resized sections.
+        needs_scroll = output_height + 30 > height or prompt_height + 30 > height
+        screen.set_class(needs_scroll, "workspace-overflow")
 
     def _queue_responsive_measurement(self) -> None:
         """Measure wide controls after their current layout pass completes."""
