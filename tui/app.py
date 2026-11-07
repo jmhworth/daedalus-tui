@@ -1669,11 +1669,6 @@ class DaedalusTuiApp(App[None]):
                             id="prompt-input",
                             placeholder="Describe the change for the local agent...",
                         )
-                        yield Static("Next task (queued after success)", id="automatic-follow-up-label")
-                        yield TextArea(
-                            id="automatic-follow-up-input",
-                            placeholder="Optional: describe the task to start after this one succeeds...",
-                        )
                         yield ResizeHandle("prompt", id="prompt-resize")
                         with Vertical(id="resume-notes-panel"):
                             yield Static("Optional notes for resuming this task", id="resume-notes-label")
@@ -2856,13 +2851,7 @@ class DaedalusTuiApp(App[None]):
         # task can restore it even if Select.Changed is still queued.
         self._on_topic_selected(topic)
         try:
-            automatic_follow_up_prompt = self.query_one(
-                "#automatic-follow-up-input", TextArea
-            ).text.strip()
-            submit_options = {"topic": topic}
-            if automatic_follow_up_prompt:
-                submit_options["automatic_follow_up_prompt"] = automatic_follow_up_prompt
-            record = self.coordinator.submit(prompt, provider, model, reasoning, mode, **submit_options)
+            record = self.coordinator.submit(prompt, provider, model, reasoning, mode, topic=topic)
         except (RuntimeError, ValueError) as error:
             self._set_error(str(error))
             self._set_status("Error")
@@ -3670,11 +3659,6 @@ class DaedalusTuiApp(App[None]):
         if record is None:
             self._rendered_plan_question_signature = None
             self._set_prompt_text("", editable=True)
-            follow_up_input = self.query_one("#automatic-follow-up-input", TextArea)
-            follow_up_input.text = ""
-            follow_up_input.read_only = False
-            follow_up_input.styles.display = "block"
-            self.query_one("#automatic-follow-up-label", Static).styles.display = "block"
             self.query_one("#output-panel", Vertical).styles.display = "block"
             self.query_one("#task-context", Static).update("Task branch: —    Worktree: —")
             self._update_agent_outcome(None)
@@ -3694,11 +3678,6 @@ class DaedalusTuiApp(App[None]):
         # read-only by this point.
         output.set_final_color(self.screen.rich_style.color)
         self._set_prompt_text("", editable=True)
-        follow_up_input = self.query_one("#automatic-follow-up-input", TextArea)
-        follow_up_input.text = record.automatic_follow_up_prompt
-        follow_up_input.read_only = True
-        follow_up_input.styles.display = "block"
-        self.query_one("#automatic-follow-up-label", Static).styles.display = "block"
         plan_review = self.query_one("#plan-review", Vertical)
         plan_review.styles.display = "block" if record.mode == "plan" else "none"
         self.query_one("#output-panel", Vertical).styles.display = (
@@ -3746,7 +3725,10 @@ class DaedalusTuiApp(App[None]):
         self.query_one("#resume-button", Button).disabled = record.status != "paused"
         self.query_one("#cancel-button", Button).disabled = not active and record.status != "questioning"
         self.query_one("#retry-button", Button).disabled = record.status != "failed"
-        self.query_one("#follow-up-button", Button).disabled = record.status not in {"completed", "failed"}
+        self.query_one("#follow-up-button", Button).disabled = record.status not in {
+            "queued", "planning", "running", "verifying", "ready", "integrating", "resolving",
+            "completed", "failed",
+        }
         self.query_one("#continue-plan-button", Button).disabled = record.status != "questioning"
         self.query_one("#resume-notes-panel", Vertical).styles.display = (
             "block" if record.status in {"paused", "questioning"} else "none"

@@ -153,8 +153,6 @@ class TaskRecord:
     prompt_history: list[str] = field(default_factory=list, repr=False, compare=False)
     chain_id: str | None = None
     parent_task_id: str | None = None
-    automatic_follow_up_prompt: str = ""
-    automatic_follow_up_task_id: str | None = None
     conversation_context: str | None = field(default=None, repr=False, compare=False)
     plan_followup_prompt: str | None = field(default=None, repr=False, compare=False)
     retry_prompt: str | None = field(default=None, repr=False, compare=False)
@@ -257,7 +255,6 @@ class TaskCoordinator:
         reasoning: str,
         mode: str = "coding",
         topic: str | None = None,
-        automatic_follow_up_prompt: str = "",
     ) -> TaskRecord:
         with self._lock:
             if self._closed:
@@ -275,7 +272,6 @@ class TaskCoordinator:
                 reasoning,
                 mode=mode,
                 topic=cleaned_topic,
-                automatic_follow_up_prompt=automatic_follow_up_prompt.strip(),
             )
             record.prompt_history = [prompt]
             record.chain_id = task_id
@@ -690,12 +686,16 @@ class TaskCoordinator:
         return True
 
     def follow_up(self, task_id: str, prompt: str) -> TaskRecord | None:
-        """Submit a distinct task that continues a completed or failed chain."""
-        source = self.get(task_id)
-        if source is None or source.status not in {"completed", "failed"} or not prompt.strip():
+        """Submit a linked task from any active or finished task transcript."""
+        allowed_statuses = {
+            "queued", "planning", "running", "verifying", "ready", "integrating", "resolving",
+            "completed", "failed",
+        }
+        if not prompt.strip():
             return None
         with self._lock:
-            if self._closed:
+            source = self._tasks.get(task_id)
+            if self._closed or source is None or source.status not in allowed_statuses:
                 return None
             record = self._create_follow_up_locked(source, prompt)
         self._notify(record, "queued", "Follow-up task queued.", "status")
@@ -1081,31 +1081,6 @@ class TaskCoordinator:
             and not record.plan_implemented
         ):
             self._queue_sync_conflict_coding(record)
-        elif result.succeeded and record.status == "completed" and record.automatic_follow_up_prompt:
-            self._queue_automatic_follow_up(record)
-
-    def _queue_automatic_follow_up(self, source: TaskRecord) -> TaskRecord | None:
-        """Create a prepared successor only after its parent completes successfully."""
-        prompt = source.automatic_follow_up_prompt.strip()
-        if not prompt or source.status != "completed" or source.automatic_follow_up_task_id:
-            return None
-        with self._lock:
-            if self._closed or source.automatic_follow_up_task_id:
-                return None
-            existing = next(
-                (item for item in self._tasks.values() if item.parent_task_id == source.task_id),
-                None,
-            )
-            if existing is not None:
-                source.automatic_follow_up_task_id = existing.task_id
-                self._persist_task(source)
-                return existing
-            next_record = self._create_follow_up_locked(source, prompt)
-            source.automatic_follow_up_task_id = next_record.task_id
-            self._persist_task(source)
-        self._notify(next_record, "queued", "Automatic follow-up task queued after successful completion.", "status")
-        return next_record
-
     def _create_follow_up_locked(self, source: TaskRecord, prompt: str) -> TaskRecord:
         chain_id = source.chain_id or source.task_id
         chain = sorted(
@@ -1301,8 +1276,6 @@ class TaskCoordinator:
                 prompt_history=tuple(record.prompt_history or (record.prompt,)),
                 chain_id=record.chain_id,
                 parent_task_id=record.parent_task_id,
-                automatic_follow_up_prompt=record.automatic_follow_up_prompt or None,
-                automatic_follow_up_task_id=record.automatic_follow_up_task_id,
                 branch_name=record.context.branch_name if record.context is not None else None,
                 worktree_path=record.context.path if record.context is not None else None,
                 base_commit=record.context.base_commit if record.context is not None else None,
@@ -1408,10 +1381,6 @@ class TaskCoordinator:
                 task_id=task_id,
                 submission_sequence=sequence,
                 prompt=prompt,
-                automatic_follow_up_prompt=(
-                    snapshot.get("automatic_follow_up_prompt")
-                    if isinstance(snapshot.get("automatic_follow_up_prompt"), str) else ""
-                ),
                 provider=str(snapshot.get("provider") or "codex"),
                 model=str(snapshot.get("model") or ""),
                 reasoning=str(snapshot.get("reasoning") or ""),
@@ -1430,10 +1399,6 @@ class TaskCoordinator:
                 prompt_history=_string_list(snapshot.get("prompt_history")) or [prompt],
                 chain_id=snapshot.get("chain_id") if isinstance(snapshot.get("chain_id"), str) else task_id,
                 parent_task_id=snapshot.get("parent_task_id") if isinstance(snapshot.get("parent_task_id"), str) else None,
-                automatic_follow_up_task_id=(
-                    snapshot.get("automatic_follow_up_task_id")
-                    if isinstance(snapshot.get("automatic_follow_up_task_id"), str) else None
-                ),
                 resume_from=resume_from,
                 sync_recovery=sync_recovery,
                 sync_operating_branch=sync_operating_branch,
